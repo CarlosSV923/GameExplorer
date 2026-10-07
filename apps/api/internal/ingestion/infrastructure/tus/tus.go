@@ -51,7 +51,10 @@ type Adapter struct {
 	log     *slog.Logger
 }
 
-var _ application.UploadStore = (*Adapter)(nil)
+var (
+	_ application.UploadStore   = (*Adapter)(nil)
+	_ application.UploadAdopter = (*Adapter)(nil)
+)
 
 // New creates the store in dir (inside the library dataset, so later moves
 // are a rename) and the tus handler served under basePath.
@@ -143,6 +146,24 @@ func (a *Adapter) Delete(ctx context.Context, id domain.JobID) error {
 	}
 	if err := a.store.AsTerminatableUpload(up).Terminate(ctx); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
+	}
+	return nil
+}
+
+// Take implements application.UploadAdopter: the finished upload's data file
+// is renamed to dest (same dataset, so instant) and the upload is forgotten.
+func (a *Adapter) Take(_ context.Context, id domain.JobID, dest string) error {
+	src := filepath.Join(a.dir, filepath.Base(string(id)))
+	if err := os.MkdirAll(filepath.Dir(dest), 0o750); err != nil {
+		return err
+	}
+	if err := os.Rename(src, dest); err != nil {
+		return err
+	}
+	for _, suffix := range []string{".info", ".lock"} {
+		if err := os.Remove(src + suffix); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
 	}
 	return nil
 }

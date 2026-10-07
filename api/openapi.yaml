@@ -247,6 +247,60 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /jobs/{id}/items:
+    get:
+      tags: [uploads]
+      operationId: listJobItems
+      summary: Items found in an upload, with console and kind suggestions
+      description: |
+        Available once the job reaches `review`. Ignored items (readme, .nfo…)
+        are listed so the review can show what was set aside.
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Items, sorted by path.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StagedItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /jobs/{id}/password:
+    post:
+      tags: [uploads]
+      operationId: submitJobPassword
+      summary: Retry extraction of an encrypted archive with its password
+      description: The password is used for this extraction only and never stored.
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordRequest'
+      responses:
+        '202':
+          description: Extraction queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
   /jobs/{id}/cancel:
     post:
       tags: [uploads]
@@ -544,10 +598,19 @@ components:
           format: int64
         status:
           $ref: '#/components/schemas/JobStatus'
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Extraction percentage while status is extracting.
         error:
           type: string
           nullable: true
-          description: Human readable reason when status is failed.
+          description: Human readable reason (failed, or why a password is needed).
+        warning:
+          type: string
+          nullable: true
+          description: Non-fatal note, e.g. archive file attributes not applied.
         originConsole:
           type: string
           nullable: true
@@ -558,6 +621,65 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    PasswordRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 1
+          format: password
+
+    StagedItem:
+      type: object
+      required: [path, shape, parts, size, ignored, consoles, confidence]
+      properties:
+        path:
+          type: string
+          description: Relative to the upload; for discs, the .cue sheet. Identifies the item in the review.
+          example: Wrapper/INSIDE [0100D2D009028000][v0].nsp
+        shape:
+          type: string
+          enum: [file, disc, folder]
+          description: file; disc = .cue plus its .bin tracks; folder = folder-format game (PS3), kept whole.
+        parts:
+          type: array
+          items:
+            type: string
+        size:
+          type: integer
+          format: int64
+        ignored:
+          type: boolean
+          description: Junk (readme, .nfo, images) set aside; not stored in the library.
+        consoles:
+          type: array
+          description: Candidate console slugs; one when the content was conclusive, empty when unknown.
+          items:
+            type: string
+        confidence:
+          type: string
+          enum: [header, extension, none]
+        suggestedKind:
+          allOf:
+            - $ref: '#/components/schemas/ItemKind'
+          nullable: true
+        titleId:
+          type: string
+          nullable: true
+          description: Nintendo Switch title id found in the file name.
+        versionCode:
+          type: string
+          nullable: true
+          description: Numeric version tag ([v196608]).
+        displayVersion:
+          type: string
+          nullable: true
+          description: Human version (1.0.3), suggested as the update label.
+        discNumber:
+          type: integer
+          nullable: true
 
     ItemKind:
       type: string

@@ -1,11 +1,11 @@
 //go:build unix
 
-package tus
+package diskspace
 
 import "syscall"
 
-// FreeSpace reports the bytes available to unprivileged users on path's filesystem.
-func FreeSpace(path string) (uint64, error) {
+// Free reports the bytes available to unprivileged users on path's filesystem.
+func Free(path string) (uint64, error) {
 	var st syscall.Statfs_t
 	if err := syscall.Statfs(path, &st); err != nil {
 		return 0, err

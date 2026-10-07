@@ -49,9 +49,15 @@ Depende de: 1 · Cubre: RF-01, RF-02, RF-12, RF-13
 
 ## Fase 4 — Contexto `ingestion` II: extracción y detección
 Depende de: 3 · Cubre: RF-03 a RF-08
-- [ ] Puerto `Extractor` + adaptador 7zz (progreso, contraseña, espacio libre, zip-slip)
-- [ ] Escáner: agrupado cue/bin, juegos en carpeta, lista de ignorados
-- [ ] Detectores por consola + vectores `detection-cases.json` + cabeceras sintéticas
+- [x] 7-Zip oficial con RAR en todos lados: `scripts/install-7zip.sh` (hash verificado) usado por la imagen de desarrollo (`deploy/dev/Dockerfile`), CI y, en la fase 11, producción
+- [x] Puerto `Extractor` + adaptador 7zz: listado, progreso, contraseña (cabecera cifrada y archivos cifrados), errores solo de atributos tolerados, verificación tamaño + CRC32
+- [x] `Processor`: cola con workers (`EXTRACT_CONCURRENCY`), espacio libre, rechazo de rutas peligrosas antes de extraer y de enlaces después, borrado del comprimido, reanudación tras reinicio, descarte al cancelar
+- [x] Archivos sueltos (no comprimidos) pasan directo a revisión (rename desde el store de tus)
+- [x] Escáner: agrupado cue/bin (sin distinguir mayúsculas), juegos en carpeta (PS3), ignorados visibles, carpetas envolventes irrelevantes
+- [x] Detectores por cabecera (Switch, GC, Wii, WBFS, PBP, PKG, ISO9660 cocido y crudo para PS1/PS2/PS3) + vectores `detection-cases.json` (también contra las consolas reales de la BD)
+- [x] API: `progress`/`warning` en el trabajo, `GET /api/jobs/{id}/items`, `POST /api/jobs/{id}/password`; diagnóstico `extractor` en `/api/health`
+- [x] Probado con 4 RAR reales de Switch: tipos y versiones detectados por Title ID, Switch confirmado por cabecera; pico de RAM 66 MB
+- [ ] **Por decidir**: comprimidos multiparte (`.part1.rar`, `.part2.rar`…). Cada subida es un trabajo independiente; hoy las partes no se unen
 
 ## Fase 5 — Commit al contexto `catalog`
 Depende de: 2, 4 · Cubre: RF-09 a RF-11

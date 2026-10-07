@@ -55,7 +55,10 @@ type Console struct {
 	ReleaseYear    *int
 	LogoImageID    *string
 	Extensions     []string
-	SortOrder      int
+	// DetectorKey links built-in consoles to a header detector; "" for
+	// consoles added by the user (detected by extension only).
+	DetectorKey string
+	SortOrder   int
 }
 
 // ConsoleRepository persists consoles.

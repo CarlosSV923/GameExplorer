@@ -21,6 +21,22 @@ type Console struct {
 	CreatedAt      string
 }
 
+type StagedItem struct {
+	JobID          string
+	Path           string
+	Shape          string
+	Parts          string
+	Size           int64
+	Ignored        int64
+	Consoles       string
+	Confidence     string
+	SuggestedKind  string
+	TitleID        string
+	VersionCode    string
+	DisplayVersion string
+	DiscNumber     int64
+}
+
 type UploadJob struct {
 	ID            string
 	FileName      string
@@ -32,4 +48,6 @@ type UploadJob struct {
 	StoragePath   string
 	CreatedAt     string
 	UpdatedAt     string
+	Progress      int64
+	Warning       string
 }

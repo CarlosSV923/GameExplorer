@@ -62,22 +62,22 @@ func (e ImageSize) Valid() bool {
 
 // Defines values for ItemKind.
 const (
-	Base   ItemKind = "base"
-	Disc   ItemKind = "disc"
-	Dlc    ItemKind = "dlc"
-	Update ItemKind = "update"
+	ItemKindBase   ItemKind = "base"
+	ItemKindDisc   ItemKind = "disc"
+	ItemKindDlc    ItemKind = "dlc"
+	ItemKindUpdate ItemKind = "update"
 )
 
 // Valid indicates whether the value is a known member of the ItemKind enum.
 func (e ItemKind) Valid() bool {
 	switch e {
-	case Base:
+	case ItemKindBase:
 		return true
-	case Disc:
+	case ItemKindDisc:
 		return true
-	case Dlc:
+	case ItemKindDlc:
 		return true
-	case Update:
+	case ItemKindUpdate:
 		return true
 	default:
 		return false
@@ -117,6 +117,48 @@ func (e JobStatus) Valid() bool {
 	case Uploaded:
 		return true
 	case Uploading:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StagedItemConfidence.
+const (
+	Extension StagedItemConfidence = "extension"
+	Header    StagedItemConfidence = "header"
+	None      StagedItemConfidence = "none"
+)
+
+// Valid indicates whether the value is a known member of the StagedItemConfidence enum.
+func (e StagedItemConfidence) Valid() bool {
+	switch e {
+	case Extension:
+		return true
+	case Header:
+		return true
+	case None:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StagedItemShape.
+const (
+	StagedItemShapeDisc   StagedItemShape = "disc"
+	StagedItemShapeFile   StagedItemShape = "file"
+	StagedItemShapeFolder StagedItemShape = "folder"
+)
+
+// Valid indicates whether the value is a known member of the StagedItemShape enum.
+func (e StagedItemShape) Valid() bool {
+	switch e {
+	case StagedItemShapeDisc:
+		return true
+	case StagedItemShapeFile:
+		return true
+	case StagedItemShapeFolder:
 		return true
 	default:
 		return false
@@ -207,6 +249,11 @@ type MetadataPlatform struct {
 	ReleaseYear *int   `json:"releaseYear,omitempty"`
 }
 
+// PasswordRequest defines model for PasswordRequest.
+type PasswordRequest struct {
+	Password string `json:"password"`
+}
+
 // Problem RFC 9457 problem details.
 type Problem struct {
 	Detail *string `json:"detail,omitempty"`
@@ -220,11 +267,49 @@ type Session struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
+// StagedItem defines model for StagedItem.
+type StagedItem struct {
+	Confidence StagedItemConfidence `json:"confidence"`
+
+	// Consoles Candidate console slugs; one when the content was conclusive, empty when unknown.
+	Consoles   []string `json:"consoles"`
+	DiscNumber *int     `json:"discNumber,omitempty"`
+
+	// DisplayVersion Human version (1.0.3), suggested as the update label.
+	DisplayVersion *string `json:"displayVersion,omitempty"`
+
+	// Ignored Junk (readme, .nfo, images) set aside; not stored in the library.
+	Ignored bool     `json:"ignored"`
+	Parts   []string `json:"parts"`
+
+	// Path Relative to the upload; for discs, the .cue sheet. Identifies the item in the review.
+	//
+	// Example: Wrapper/INSIDE [0100D2D009028000][v0].nsp
+	Path string `json:"path"`
+
+	// Shape file; disc = .cue plus its .bin tracks; folder = folder-format game (PS3), kept whole.
+	Shape         StagedItemShape `json:"shape"`
+	Size          int64           `json:"size"`
+	SuggestedKind *ItemKind       `json:"suggestedKind,omitempty"`
+
+	// TitleId Nintendo Switch title id found in the file name.
+	TitleId *string `json:"titleId,omitempty"`
+
+	// VersionCode Numeric version tag ([v196608]).
+	VersionCode *string `json:"versionCode,omitempty"`
+}
+
+// StagedItemConfidence defines model for StagedItem.Confidence.
+type StagedItemConfidence string
+
+// StagedItemShape file; disc = .cue plus its .bin tracks; folder = folder-format game (PS3), kept whole.
+type StagedItemShape string
+
 // UploadJob defines model for UploadJob.
 type UploadJob struct {
 	CreatedAt time.Time `json:"createdAt"`
 
-	// Error Human readable reason when status is failed.
+	// Error Human readable reason (failed, or why a password is needed).
 	Error *string `json:"error,omitempty"`
 
 	// FileName Example: INSIDE-Switch-NSP-Base-Game.rar
@@ -235,13 +320,19 @@ type UploadJob struct {
 
 	// OriginConsole Slug of the console screen the upload started from.
 	OriginConsole *string `json:"originConsole,omitempty"`
-	Received      int64   `json:"received"`
-	Size          int64   `json:"size"`
+
+	// Progress Extraction percentage while status is extracting.
+	Progress *int  `json:"progress,omitempty"`
+	Received int64 `json:"received"`
+	Size     int64 `json:"size"`
 
 	// Status uploading → uploaded → (extracting ⇄ needs_password) → review →
 	// committing → done; failed and cancelled are terminal.
 	Status    JobStatus `json:"status"`
 	UpdatedAt time.Time `json:"updatedAt"`
+
+	// Warning Non-fatal note, e.g. archive file attributes not applied.
+	Warning *string `json:"warning,omitempty"`
 }
 
 // JobId defines model for JobId.
@@ -285,6 +376,9 @@ type SearchPlatformsParams struct {
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
+// SubmitJobPasswordJSONRequestBody defines body for SubmitJobPassword for application/json ContentType.
+type SubmitJobPasswordJSONRequestBody = PasswordRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Login Start a session with the shared password
@@ -317,6 +411,12 @@ type ServerInterface interface {
 	// CancelJob Cancel a job and delete its uploaded data
 	// (POST /jobs/{id}/cancel)
 	CancelJob(w http.ResponseWriter, r *http.Request, id JobId)
+	// ListJobItems Items found in an upload, with console and kind suggestions
+	// (GET /jobs/{id}/items)
+	ListJobItems(w http.ResponseWriter, r *http.Request, id JobId)
+	// SubmitJobPassword Retry extraction of an encrypted archive with its password
+	// (POST /jobs/{id}/password)
+	SubmitJobPassword(w http.ResponseWriter, r *http.Request, id JobId)
 	// SearchGames Search games on IGDB, optionally limited to one platform
 	// (GET /metadata/games)
 	SearchGames(w http.ResponseWriter, r *http.Request, params SearchGamesParams)
@@ -510,6 +610,58 @@ func (siw *ServerInterfaceWrapper) CancelJob(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CancelJob(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListJobItems operation middleware
+func (siw *ServerInterfaceWrapper) ListJobItems(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id JobId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListJobItems(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitJobPassword operation middleware
+func (siw *ServerInterfaceWrapper) SubmitJobPassword(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id JobId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitJobPassword(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -741,6 +893,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/jobs", wrapper.ListJobs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/jobs/events", wrapper.StreamJobEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/jobs/{id}", wrapper.GetJob)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/jobs/{id}/items", wrapper.ListJobItems)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/jobs/{id}/password", wrapper.SubmitJobPassword)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/jobs/{id}/cancel", wrapper.CancelJob)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/images/{size}/{imageId}", wrapper.GetImage)
 
@@ -1287,6 +1441,147 @@ func (response CancelJob409ApplicationProblemPlusJSONResponse) VisitCancelJobRes
 	return err
 }
 
+type ListJobItemsRequestObject struct {
+	Id JobId `json:"id"`
+}
+
+type ListJobItemsResponseObject interface {
+	VisitListJobItemsResponse(w http.ResponseWriter) error
+}
+
+type ListJobItems200JSONResponse []StagedItem
+
+func (response ListJobItems200JSONResponse) VisitListJobItemsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListJobItems401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListJobItems401ApplicationProblemPlusJSONResponse) VisitListJobItemsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListJobItems404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListJobItems404ApplicationProblemPlusJSONResponse) VisitListJobItemsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitJobPasswordRequestObject struct {
+	Id   JobId `json:"id"`
+	Body *SubmitJobPasswordJSONRequestBody
+}
+
+type SubmitJobPasswordResponseObject interface {
+	VisitSubmitJobPasswordResponse(w http.ResponseWriter) error
+}
+
+type SubmitJobPassword202JSONResponse UploadJob
+
+func (response SubmitJobPassword202JSONResponse) VisitSubmitJobPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitJobPassword400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitJobPassword400ApplicationProblemPlusJSONResponse) VisitSubmitJobPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitJobPassword401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitJobPassword401ApplicationProblemPlusJSONResponse) VisitSubmitJobPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitJobPassword404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitJobPassword404ApplicationProblemPlusJSONResponse) VisitSubmitJobPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitJobPassword409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitJobPassword409ApplicationProblemPlusJSONResponse) VisitSubmitJobPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SearchGamesRequestObject struct {
 	Params SearchGamesParams
 }
@@ -1491,6 +1786,12 @@ type StrictServerInterface interface {
 	// CancelJob Cancel a job and delete its uploaded data
 	// (POST /jobs/{id}/cancel)
 	CancelJob(ctx context.Context, request CancelJobRequestObject) (CancelJobResponseObject, error)
+	// ListJobItems Items found in an upload, with console and kind suggestions
+	// (GET /jobs/{id}/items)
+	ListJobItems(ctx context.Context, request ListJobItemsRequestObject) (ListJobItemsResponseObject, error)
+	// SubmitJobPassword Retry extraction of an encrypted archive with its password
+	// (POST /jobs/{id}/password)
+	SubmitJobPassword(ctx context.Context, request SubmitJobPasswordRequestObject) (SubmitJobPasswordResponseObject, error)
 	// SearchGames Search games on IGDB, optionally limited to one platform
 	// (GET /metadata/games)
 	SearchGames(ctx context.Context, request SearchGamesRequestObject) (SearchGamesResponseObject, error)
@@ -1785,6 +2086,65 @@ func (sh *strictHandler) CancelJob(w http.ResponseWriter, r *http.Request, id Jo
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CancelJobResponseObject); ok {
 		if err := validResponse.VisitCancelJobResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListJobItems operation middleware
+func (sh *strictHandler) ListJobItems(w http.ResponseWriter, r *http.Request, id JobId) {
+	var request ListJobItemsRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListJobItems(ctx, request.(ListJobItemsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListJobItems")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListJobItemsResponseObject); ok {
+		if err := validResponse.VisitListJobItemsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SubmitJobPassword operation middleware
+func (sh *strictHandler) SubmitJobPassword(w http.ResponseWriter, r *http.Request, id JobId) {
+	var request SubmitJobPasswordRequestObject
+
+	request.Id = id
+
+	var body SubmitJobPasswordJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitJobPassword(ctx, request.(SubmitJobPasswordRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitJobPassword")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubmitJobPasswordResponseObject); ok {
+		if err := validResponse.VisitSubmitJobPasswordResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

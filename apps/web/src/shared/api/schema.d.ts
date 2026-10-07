@@ -190,6 +190,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/{id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Items found in an upload, with console and kind suggestions
+         * @description Available once the job reaches `review`. Ignored items (readme, .nfo…)
+         *     are listed so the review can show what was set aside.
+         */
+        get: operations["listJobItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry extraction of an encrypted archive with its password
+         * @description The password is used for this extraction only and never stored.
+         */
+        post: operations["submitJobPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/{id}/cancel": {
         parameters: {
             query?: never;
@@ -320,14 +361,51 @@ export interface components {
             /** Format: int64 */
             received: number;
             status: components["schemas"]["JobStatus"];
-            /** @description Human readable reason when status is failed. */
+            /** @description Extraction percentage while status is extracting. */
+            progress?: number;
+            /** @description Human readable reason (failed, or why a password is needed). */
             error?: string | null;
+            /** @description Non-fatal note, e.g. archive file attributes not applied. */
+            warning?: string | null;
             /** @description Slug of the console screen the upload started from. */
             originConsole?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        PasswordRequest: {
+            /** Format: password */
+            password: string;
+        };
+        StagedItem: {
+            /**
+             * @description Relative to the upload; for discs, the .cue sheet. Identifies the item in the review.
+             * @example Wrapper/INSIDE [0100D2D009028000][v0].nsp
+             */
+            path: string;
+            /**
+             * @description file; disc = .cue plus its .bin tracks; folder = folder-format game (PS3), kept whole.
+             * @enum {string}
+             */
+            shape: "file" | "disc" | "folder";
+            parts: string[];
+            /** Format: int64 */
+            size: number;
+            /** @description Junk (readme, .nfo, images) set aside; not stored in the library. */
+            ignored: boolean;
+            /** @description Candidate console slugs; one when the content was conclusive, empty when unknown. */
+            consoles: string[];
+            /** @enum {string} */
+            confidence: "header" | "extension" | "none";
+            suggestedKind?: components["schemas"]["ItemKind"] | null;
+            /** @description Nintendo Switch title id found in the file name. */
+            titleId?: string | null;
+            /** @description Numeric version tag ([v196608]). */
+            versionCode?: string | null;
+            /** @description Human version (1.0.3), suggested as the update label. */
+            displayVersion?: string | null;
+            discNumber?: number | null;
         };
         /**
          * @description What a stored item is within a game folder.
@@ -641,6 +719,60 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listJobItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Items, sorted by path. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagedItem"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    submitJobPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Extraction queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     cancelJob: {

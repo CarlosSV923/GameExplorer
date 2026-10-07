@@ -19,8 +19,11 @@ import (
 	identityhttp "github.com/CarlosSV923/GameExplorer/apps/api/internal/identity/interfaces/http"
 	ingestionapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/application"
 	ingestiondomain "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain"
+	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain/detection"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/broker"
+	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/sevenzip"
 	ingestionsqlite "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/sqlite"
+	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/staging"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/tus"
 	ingestionhttp "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/interfaces/http"
 	metadataapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/application"
@@ -29,6 +32,7 @@ import (
 	metadatahttp "github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/interfaces/http"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/config"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/database"
+	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/diskspace"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/httpapi"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/httpx"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/system"
@@ -70,7 +74,9 @@ type app struct {
 	consoles  *catalogapp.ConsoleService
 	metadata  *metadataapp.Service
 	ingestion *ingestionapp.Service
+	processor *ingestionapp.Processor
 	uploads   *tus.Adapter // nil when the library is not writable
+	cfg       config.Config
 
 	shutdown     chan struct{}
 	shutdownOnce sync.Once
@@ -91,8 +97,14 @@ func (a *app) start(ctx context.Context) {
 	if a.uploads != nil {
 		go a.uploads.Run(ctx, a.ingestion)
 		go a.ingestion.RunPurge(ctx, time.Hour)
+		go a.processor.Run(ctx, a.cfg.ExtractConcurrency)
 	}
 	go a.syncConsoles(ctx, a.log)
+}
+
+// stagingDir holds each job's extracted files until they are committed.
+func stagingDir(libraryPath string) string {
+	return filepath.Join(libraryPath, ".gameexplorer", "staging", "extracted")
 }
 
 // uploadsDir is where tus stores incoming files: inside the library dataset,
@@ -137,25 +149,43 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 	consoles := catalogapp.NewConsoleService(catalogsqlite.NewConsoleRepository(db))
 
 	events := broker.New()
-	uploads, uploadsErr := tus.New(uploadsDir(cfg.LibraryPath), "/api/uploads/", log, tus.FreeSpace)
+	uploads, uploadsErr := tus.New(uploadsDir(cfg.LibraryPath), "/api/uploads/", log, diskspace.Free)
 	var store ingestionapp.UploadStore = unavailableStore{}
 	if uploadsErr != nil {
 		log.Error("uploads disabled: library not writable", "error", uploadsErr)
 	} else {
 		store = uploads
 	}
-	ingestion := ingestionapp.NewService(ingestionsqlite.NewJobRepository(db), store, events, log, nil)
+	jobs := ingestionsqlite.NewJobRepository(db)
+	items := ingestionsqlite.NewItemRepository(db)
+	extractor := sevenzip.New("")
+	ingestion := ingestionapp.NewService(jobs, store, events, log, nil).WithItems(items)
+	var processor *ingestionapp.Processor
+	if uploadsErr == nil {
+		processor = ingestionapp.NewProcessor(ingestionapp.ProcessorDeps{
+			Jobs: jobs, Items: items, Uploads: uploads, Extractor: extractor,
+			Staging: staging.New(stagingDir(cfg.LibraryPath)), Profiles: consoleProfiles{consoles},
+			Publisher: events, Log: log,
+		})
+		ingestion.WithQueue(processor)
+	}
 	shutdown := make(chan struct{})
 
 	server := api{
 		systemAPI: system.NewHandler(
 			system.WritableDir("library-writable", cfg.LibraryPath),
 			system.WritableDir("data-writable", cfg.DataPath),
+			system.Check{Name: "extractor", Run: func(context.Context) error {
+				if !extractor.Available() {
+					return errors.New("7-Zip (7zz) no está instalado: los comprimidos no se pueden extraer")
+				}
+				return nil
+			}},
 		),
 		identityAPI: identityHandler,
 		catalogAPI:  cataloghttp.NewHandler(consoles),
 		metadataAPI: metadatahttp.NewHandler(metadata, log),
-		jobsAPI:     ingestionhttp.NewHandler(ingestion, events, shutdown),
+		jobsAPI:     ingestionhttp.NewHandler(ingestion, passwordSubmitter{processor}, events, shutdown),
 	}
 
 	mux := http.NewServeMux()
@@ -200,12 +230,37 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 	)
 	a := &app{
 		handler: handler, db: db, log: log, consoles: consoles, metadata: metadata,
-		ingestion: ingestion, shutdown: shutdown,
+		ingestion: ingestion, processor: processor, shutdown: shutdown, cfg: cfg,
 	}
 	if uploadsErr == nil {
 		a.uploads = uploads
 	}
 	return a, nil
+}
+
+// consoleProfiles adapts the catalog's consoles to ingestion's detection.
+type consoleProfiles struct{ svc *catalogapp.ConsoleService }
+
+func (c consoleProfiles) Profiles(ctx context.Context) ([]detection.ConsoleProfile, error) {
+	consoles, err := c.svc.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]detection.ConsoleProfile, 0, len(consoles))
+	for _, con := range consoles {
+		out = append(out, detection.ConsoleProfile{Slug: string(con.Slug), Extensions: con.Extensions, DetectorKey: con.DetectorKey})
+	}
+	return out, nil
+}
+
+// passwordSubmitter answers 409 when uploads (and so processing) are disabled.
+type passwordSubmitter struct{ p *ingestionapp.Processor }
+
+func (s passwordSubmitter) SubmitPassword(ctx context.Context, id ingestiondomain.JobID, password string) (*ingestiondomain.UploadJob, error) {
+	if s.p == nil {
+		return nil, ingestionapp.ErrNotWaitingForPassword
+	}
+	return s.p.SubmitPassword(ctx, id, password)
 }
 
 // unavailableStore stands in for the tus store when the library is not writable.

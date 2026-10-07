@@ -5,7 +5,10 @@
 # Values come from .env.local (loaded by Task) with safe dev defaults.
 services:
   api:
-    image: golang:1.27
+    image: gameexplorer-dev:2
+    build:
+      context: .
+      dockerfile: deploy/dev/Dockerfile
     working_dir: /src/apps/api
     command: go run ./cmd/gameexplorer
     environment:

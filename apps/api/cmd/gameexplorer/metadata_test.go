@@ -98,7 +98,7 @@ func TestConsoleSyncFromIGDB(t *testing.T) {
 	igdbSrv := fakeIGDBServer(t)
 	cfg := config.Config{
 		Port: 8080, LibraryPath: t.TempDir(), DataPath: t.TempDir(), Password: testPassword,
-		SessionSecret: strings.Repeat("s", config.MinSessionSecretBytes), SessionTTL: 3600e9,
+		SessionSecret: strings.Repeat("s", config.MinSessionSecretBytes), SessionTTL: 3600e9, ExtractConcurrency: 1,
 	}
 	withFakeIGDB(igdbSrv)(&cfg)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))

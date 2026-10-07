@@ -1,13 +1,13 @@
 -- name: CreateJob :exec
-INSERT INTO upload_jobs (id, file_name, size, received, status, error, origin_console, storage_path, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO upload_jobs (id, file_name, size, received, status, error, origin_console, storage_path, progress, warning, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetJob :one
 SELECT * FROM upload_jobs WHERE id = ?;
 
 -- name: SaveJob :exec
 UPDATE upload_jobs
-SET received = ?, status = ?, error = ?, storage_path = ?, updated_at = ?
+SET received = ?, status = ?, error = ?, storage_path = ?, progress = ?, warning = ?, updated_at = ?
 WHERE id = ?;
 
 -- name: ListJobs :many

@@ -111,3 +111,62 @@ func TestCleanFileName(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractionLifecycle(t *testing.T) {
+	t.Parallel()
+
+	j, _ := domain.NewUploadJob("x", "game.rar", 10, nil, t0)
+	_ = j.MarkUploaded("/up/x", t0)
+
+	if err := j.StartExtraction(t0); err != nil {
+		t.Fatal(err)
+	}
+	j.RecordExtractionProgress(40, t0)
+	j.RecordExtractionProgress(20, t0) // never goes back
+	if j.Progress != 40 {
+		t.Fatalf("progress = %d", j.Progress)
+	}
+	if err := j.RequirePassword("Contraseña incorrecta.", t0); err != nil || j.Progress != 0 || j.Error == "" {
+		t.Fatalf("needs password: %v %+v", err, j)
+	}
+	if err := j.StartExtraction(t0); err != nil || j.Error != "" {
+		t.Fatalf("retry clears the error: %v %+v", err, j)
+	}
+	if err := j.FinishExtraction("atributos no aplicados", t0); err != nil || j.Status != domain.StatusReview || j.Progress != 100 || j.Warning == "" {
+		t.Fatalf("finish: %v %+v", err, j)
+	}
+}
+
+func TestRawFileGoesStraightToReview(t *testing.T) {
+	t.Parallel()
+
+	j, _ := domain.NewUploadJob("x", "game.nsp", 10, nil, t0)
+	if err := j.ReadyForReview(t0); err == nil {
+		t.Fatal("an upload in progress cannot be reviewed")
+	}
+	_ = j.MarkUploaded("/up/x", t0)
+	if err := j.ReadyForReview(t0); err != nil || j.Status != domain.StatusReview {
+		t.Fatalf("review: %v %s", err, j.Status)
+	}
+}
+
+func TestDetectArchive(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]domain.ArchiveFormat{
+		"PK\x03\x04rest":             domain.ArchiveZip,
+		"7z\xBC\xAF\x27\x1C\x00\x04": domain.Archive7z,
+		"Rar!\x1A\x07\x00x":          domain.ArchiveRar, // RAR 4
+		"Rar!\x1A\x07\x01\x00":       domain.ArchiveRar, // RAR 5 (real Switch dumps)
+	}
+	for header, want := range tests {
+		if got, ok := domain.DetectArchive([]byte(header)); !ok || got != want {
+			t.Errorf("%q = %q %v, want %q", header, got, ok, want)
+		}
+	}
+	for _, notArchive := range []string{"PFS0", "", "Rar!", "CD001"} {
+		if _, ok := domain.DetectArchive([]byte(notArchive)); ok {
+			t.Errorf("%q detected as archive", notArchive)
+		}
+	}
+}

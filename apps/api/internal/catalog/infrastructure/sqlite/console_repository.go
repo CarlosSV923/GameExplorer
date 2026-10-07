@@ -60,6 +60,9 @@ func toDomain(row sqlcgen.ListConsolesRow) (domain.Console, error) {
 		y := int(row.ReleaseYear.Int64)
 		c.ReleaseYear = &y
 	}
+	if row.DetectorKey.Valid {
+		c.DetectorKey = row.DetectorKey.String
+	}
 	if row.LogoImageID.Valid {
 		logo := row.LogoImageID.String
 		c.LogoImageID = &logo

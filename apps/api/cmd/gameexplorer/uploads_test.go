@@ -120,29 +120,30 @@ func TestUploadFlowWithLiveEvents(t *testing.T) {
 	tusPatch(t, url, cookie, 0, "0123")
 	tusPatch(t, url, cookie, 4, "456789") // resumed in a second request
 
-	job := waitForJob(t, srv, cookie, id, "uploaded")
+	// A raw (non-archive) file is moved into staging and goes straight to review.
+	job := waitForJob(t, srv, cookie, id, "review")
 	if job.FileName != name || job.Size != 10 || job.Received != 10 || job.OriginConsole == nil || *job.OriginConsole != "switch" {
 		t.Fatalf("job = %+v", job)
 	}
-	data, err := os.ReadFile(filepath.Join(uploadsDir(library), id))
+	data, err := os.ReadFile(filepath.Join(stagingDir(library), id, name))
 	if err != nil || string(data) != "0123456789" {
 		t.Fatalf("stored bytes = %q, %v", data, err)
 	}
 
 	seen := map[string]bool{}
 	timeout := time.After(5 * time.Second)
-	for !seen["uploaded"] {
+	for !seen["review"] {
 		select {
 		case e := <-events:
 			if e.ID == id {
 				seen[e.Status] = true
 			}
 		case <-timeout:
-			t.Fatalf("events seen = %v, want uploading and uploaded", seen)
+			t.Fatalf("events seen = %v, want uploading, uploaded and review", seen)
 		}
 	}
-	if !seen["uploading"] {
-		t.Fatalf("events seen = %v, missing uploading", seen)
+	if !seen["uploading"] || !seen["uploaded"] {
+		t.Fatalf("events seen = %v, missing uploading/uploaded", seen)
 	}
 
 	list := decode[[]jobJSON](t, do(t, http.MethodGet, srv.URL+"/api/jobs", "", cookie))

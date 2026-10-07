@@ -21,12 +21,13 @@ const testPassword = "correct horse battery staple"
 func newTestServer(t *testing.T, mutate func(*config.Config)) *httptest.Server {
 	t.Helper()
 	cfg := config.Config{
-		Port:          8080,
-		LibraryPath:   t.TempDir(),
-		DataPath:      t.TempDir(),
-		Password:      testPassword,
-		SessionSecret: strings.Repeat("s", config.MinSessionSecretBytes),
-		SessionTTL:    config.Config{}.SessionTTL + 3600e9,
+		Port:               8080,
+		LibraryPath:        t.TempDir(),
+		DataPath:           t.TempDir(),
+		Password:           testPassword,
+		SessionSecret:      strings.Repeat("s", config.MinSessionSecretBytes),
+		SessionTTL:         config.Config{}.SessionTTL + 3600e9,
+		ExtractConcurrency: 1,
 	}
 	if mutate != nil {
 		mutate(&cfg)
@@ -107,7 +108,8 @@ func TestHealthIsPublicAndReportsChecks(t *testing.T) {
 			Ok   bool   `json:"ok"`
 		} `json:"checks"`
 	}](t, res)
-	if h.Status != "ok" || len(h.Checks) != 2 {
+	// library-writable, data-writable and extractor (7-Zip).
+	if len(h.Checks) != 3 || !h.Checks[0].Ok || !h.Checks[1].Ok {
 		t.Fatalf("health = %+v", h)
 	}
 }

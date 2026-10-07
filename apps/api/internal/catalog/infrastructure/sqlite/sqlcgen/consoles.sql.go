@@ -11,7 +11,7 @@ import (
 )
 
 const listConsoles = `-- name: ListConsoles :many
-SELECT id, slug, display_name, igdb_platform_id, release_year, logo_image_id, extensions, sort_order
+SELECT id, slug, display_name, igdb_platform_id, release_year, logo_image_id, extensions, detector_key, sort_order
 FROM consoles
 ORDER BY sort_order, id
 `
@@ -24,6 +24,7 @@ type ListConsolesRow struct {
 	ReleaseYear    sql.NullInt64
 	LogoImageID    sql.NullString
 	Extensions     string
+	DetectorKey    sql.NullString
 	SortOrder      int64
 }
 
@@ -44,6 +45,7 @@ func (q *Queries) ListConsoles(ctx context.Context) ([]ListConsolesRow, error) {
 			&i.ReleaseYear,
 			&i.LogoImageID,
 			&i.Extensions,
+			&i.DetectorKey,
 			&i.SortOrder,
 		); err != nil {
 			return nil, err

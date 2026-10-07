@@ -43,6 +43,10 @@ type Config struct {
 	IGDBTokenURL string `env:"IGDB_TOKEN_URL"`
 	IGDBImageURL string `env:"IGDB_IMAGE_URL"`
 
+	// ExtractConcurrency is how many archives are extracted at once. One is
+	// right for spinning disks: parallel extractions only make them seek.
+	ExtractConcurrency int `env:"EXTRACT_CONCURRENCY" envDefault:"1"`
+
 	LogLevel slog.Level `env:"LOG_LEVEL" envDefault:"info"`
 }
 
@@ -82,6 +86,9 @@ func (c Config) validate() error {
 	}
 	if c.SessionTTL <= 0 {
 		errs = append(errs, errors.New("SESSION_TTL must be positive"))
+	}
+	if c.ExtractConcurrency < 1 || c.ExtractConcurrency > 8 {
+		errs = append(errs, fmt.Errorf("EXTRACT_CONCURRENCY must be between 1 and 8, got %d", c.ExtractConcurrency))
 	}
 	if c.Port <= 0 || c.Port > 65535 {
 		errs = append(errs, fmt.Errorf("PORT %d is out of range", c.Port))

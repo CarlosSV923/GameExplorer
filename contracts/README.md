@@ -10,4 +10,6 @@ so the two implementations cannot drift apart.
 | `naming-cases.json` | Folder/file naming for each item kind, including filename sanitization | `catalog/domain` `NamingPolicy` | `modules/ingestion/domain` |
 | `detection-cases.json` | Console and item-kind suggestion from file name/extension (header sniffing is covered by synthetic fixtures in each suite) | `ingestion/domain/detection` | `modules/ingestion/domain` |
 
+`consoles` in detection cases is a **set**: order is irrelevant.
+
 Changing a rule = change the vector first, then make both suites pass.

@@ -25,8 +25,11 @@ jobs:
         with:
           go-version-file: apps/api/go.mod
           cache-dependency-path: apps/api/go.sum
-      - name: Install 7-Zip (used by integration tests)
-        run: sudo apt-get update && sudo apt-get install -y 7zip
+      - name: Install official 7-Zip (with RAR; used by integration tests)
+        working-directory: .
+        run: sudo sh scripts/install-7zip.sh
+      - name: Require 7-Zip in tests
+        run: echo "REQUIRE_7ZZ=1" >> "$GITHUB_ENV"
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14

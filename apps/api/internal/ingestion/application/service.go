@@ -20,6 +20,13 @@ type UploadStore interface {
 	IDs(ctx context.Context) ([]domain.JobID, error)
 }
 
+// Queue processes finished uploads (implemented by Processor).
+type Queue interface {
+	Enqueue(id domain.JobID)
+	// Discard stops work on the job and deletes its staged files.
+	Discard(id domain.JobID)
+}
+
 // Publisher broadcasts job changes (server-sent events).
 type Publisher interface {
 	Publish(job domain.UploadJob)
@@ -36,8 +43,33 @@ type Service struct {
 	repo  domain.JobRepository
 	store UploadStore
 	pub   Publisher
+	queue Queue
+	items domain.StagedItemRepository
 	log   *slog.Logger
 	now   func() time.Time
+}
+
+// WithItems sets the repository of staged items (for the review).
+func (s *Service) WithItems(items domain.StagedItemRepository) *Service {
+	s.items = items
+	return s
+}
+
+// Items returns the items found in a job.
+func (s *Service) Items(ctx context.Context, id domain.JobID) ([]domain.StagedItem, error) {
+	if _, err := s.repo.Get(ctx, id); err != nil {
+		return nil, err
+	}
+	if s.items == nil {
+		return nil, nil
+	}
+	return s.items.List(ctx, id)
+}
+
+// WithQueue sets the processing queue that picks up finished uploads.
+func (s *Service) WithQueue(q Queue) *Service {
+	s.queue = q
+	return s
 }
 
 // NewService builds the service. now may be nil (time.Now).
@@ -78,9 +110,15 @@ func (s *Service) UploadProgress(ctx context.Context, id domain.JobID, received 
 
 // UploadFinished records that the upload is complete.
 func (s *Service) UploadFinished(ctx context.Context, id domain.JobID, storagePath string) error {
-	return s.update(ctx, id, func(j *domain.UploadJob) error {
+	if err := s.update(ctx, id, func(j *domain.UploadJob) error {
 		return j.MarkUploaded(storagePath, s.now())
-	})
+	}); err != nil {
+		return err
+	}
+	if s.queue != nil {
+		s.queue.Enqueue(id)
+	}
+	return nil
 }
 
 // UploadTerminated handles the browser deleting its upload (tus termination).
@@ -104,6 +142,9 @@ func (s *Service) Cancel(ctx context.Context, id domain.JobID) (*domain.UploadJo
 	}
 	if err := s.store.Delete(ctx, id); err != nil {
 		return nil, fmt.Errorf("delete upload data: %w", err)
+	}
+	if s.queue != nil {
+		s.queue.Discard(id)
 	}
 	if err := job.Cancel(s.now()); err != nil {
 		return nil, err

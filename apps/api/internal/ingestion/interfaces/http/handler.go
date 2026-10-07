@@ -22,17 +22,92 @@ type Subscriber interface {
 	Subscribe() (<-chan domain.UploadJob, func())
 }
 
+// PasswordSubmitter retries encrypted archives (implemented by the Processor).
+type PasswordSubmitter interface {
+	SubmitPassword(ctx context.Context, id domain.JobID, password string) (*domain.UploadJob, error)
+}
+
 // Handler implements the job operations of httpapi.StrictServerInterface.
 type Handler struct {
-	svc      *application.Service
-	sub      Subscriber
-	shutdown <-chan struct{}
+	svc       *application.Service
+	passwords PasswordSubmitter
+	sub       Subscriber
+	shutdown  <-chan struct{}
 }
 
 // NewHandler builds the handler. shutdown closes when the server stops, so
 // open event streams end instead of delaying the graceful shutdown.
-func NewHandler(svc *application.Service, sub Subscriber, shutdown <-chan struct{}) *Handler {
-	return &Handler{svc: svc, sub: sub, shutdown: shutdown}
+func NewHandler(svc *application.Service, passwords PasswordSubmitter, sub Subscriber, shutdown <-chan struct{}) *Handler {
+	return &Handler{svc: svc, passwords: passwords, sub: sub, shutdown: shutdown}
+}
+
+// ListJobItems implements httpapi.StrictServerInterface.
+func (h *Handler) ListJobItems(ctx context.Context, req httpapi.ListJobItemsRequestObject) (httpapi.ListJobItemsResponseObject, error) {
+	items, err := h.svc.Items(ctx, domain.JobID(req.Id))
+	if errors.Is(err, domain.ErrJobNotFound) {
+		return httpapi.ListJobItems404ApplicationProblemPlusJSONResponse{
+			NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(problem(http.StatusNotFound, "Not Found", "La subida no existe.")),
+		}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := make(httpapi.ListJobItems200JSONResponse, 0, len(items))
+	for _, it := range items {
+		out = append(out, itemToAPI(it))
+	}
+	return out, nil
+}
+
+// SubmitJobPassword implements httpapi.StrictServerInterface.
+func (h *Handler) SubmitJobPassword(ctx context.Context, req httpapi.SubmitJobPasswordRequestObject) (httpapi.SubmitJobPasswordResponseObject, error) {
+	if req.Body == nil || req.Body.Password == "" {
+		return httpapi.SubmitJobPassword400ApplicationProblemPlusJSONResponse{
+			BadRequestApplicationProblemPlusJSONResponse: httpapi.BadRequestApplicationProblemPlusJSONResponse(problem(http.StatusBadRequest, "Bad Request", "Escribe la contraseña.")),
+		}, nil
+	}
+	job, err := h.passwords.SubmitPassword(ctx, domain.JobID(req.Id), req.Body.Password)
+	switch {
+	case errors.Is(err, domain.ErrJobNotFound):
+		return httpapi.SubmitJobPassword404ApplicationProblemPlusJSONResponse{
+			NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(problem(http.StatusNotFound, "Not Found", "La subida no existe.")),
+		}, nil
+	case errors.Is(err, application.ErrNotWaitingForPassword):
+		return httpapi.SubmitJobPassword409ApplicationProblemPlusJSONResponse{
+			ConflictApplicationProblemPlusJSONResponse: httpapi.ConflictApplicationProblemPlusJSONResponse(problem(http.StatusConflict, "Conflict", "Esta subida no está esperando una contraseña.")),
+		}, nil
+	case err != nil:
+		return nil, err
+	}
+	return httpapi.SubmitJobPassword202JSONResponse(ToAPI(*job)), nil
+}
+
+func itemToAPI(it domain.StagedItem) httpapi.StagedItem {
+	out := httpapi.StagedItem{
+		Path:       it.Path,
+		Shape:      httpapi.StagedItemShape(it.Shape),
+		Parts:      it.Parts,
+		Size:       it.Size,
+		Ignored:    it.Ignored,
+		Consoles:   it.Consoles,
+		Confidence: httpapi.StagedItemConfidence(it.Confidence),
+	}
+	if it.SuggestedKind != "" {
+		k := httpapi.ItemKind(it.SuggestedKind)
+		out.SuggestedKind = &k
+	}
+	optional := func(s string) *string {
+		if s == "" {
+			return nil
+		}
+		return &s
+	}
+	out.TitleId, out.VersionCode, out.DisplayVersion = optional(it.TitleID), optional(it.VersionCode), optional(it.DisplayVersion)
+	if it.DiscNumber > 0 {
+		n := it.DiscNumber
+		out.DiscNumber = &n
+	}
+	return out
 }
 
 // ListJobs implements httpapi.StrictServerInterface.
@@ -165,6 +240,7 @@ func ToAPI(j domain.UploadJob) httpapi.UploadJob {
 		Size:          j.Size,
 		Received:      j.Received,
 		Status:        httpapi.JobStatus(j.Status),
+		Progress:      &j.Progress,
 		OriginConsole: j.OriginConsole,
 		CreatedAt:     j.CreatedAt,
 		UpdatedAt:     j.UpdatedAt,
@@ -172,6 +248,10 @@ func ToAPI(j domain.UploadJob) httpapi.UploadJob {
 	if j.Error != "" {
 		e := j.Error
 		out.Error = &e
+	}
+	if j.Warning != "" {
+		w := j.Warning
+		out.Warning = &w
 	}
 	return out
 }

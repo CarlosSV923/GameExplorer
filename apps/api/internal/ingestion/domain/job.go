@@ -69,12 +69,16 @@ var (
 
 // UploadJob is the aggregate root of the ingestion context.
 type UploadJob struct {
-	ID        JobID
-	FileName  string
-	Size      int64
-	Received  int64
-	Status    Status
-	Error     string
+	ID       JobID
+	FileName string
+	Size     int64
+	Received int64
+	Status   Status
+	Error    string
+	// Progress is the extraction percentage (0-100) while extracting.
+	Progress int
+	// Warning is a non-fatal note, e.g. archive attributes not applied.
+	Warning   string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
@@ -116,6 +120,55 @@ func (j *UploadJob) MarkUploaded(storagePath string, now time.Time) error {
 	j.Received = j.Size
 	j.StoragePath = storagePath
 	return nil
+}
+
+// StartExtraction begins (or retries, after a password) extracting the archive.
+func (j *UploadJob) StartExtraction(now time.Time) error {
+	if err := j.moveTo(StatusExtracting, now); err != nil {
+		return err
+	}
+	j.Progress, j.Error, j.Warning = 0, "", ""
+	return nil
+}
+
+// ResumeAfterRestart puts a job whose extraction was interrupted (the process
+// stopped mid-way) back to uploaded, so it can be extracted from scratch.
+func (j *UploadJob) ResumeAfterRestart(now time.Time) {
+	if j.Status == StatusExtracting {
+		j.Status, j.Progress, j.UpdatedAt = StatusUploaded, 0, now
+	}
+}
+
+// RecordExtractionProgress stores the extraction percentage.
+func (j *UploadJob) RecordExtractionProgress(pct int, now time.Time) {
+	if j.Status != StatusExtracting || pct <= j.Progress {
+		return
+	}
+	j.Progress = min(pct, 100)
+	j.UpdatedAt = now
+}
+
+// RequirePassword pauses the job until the user provides the archive password.
+func (j *UploadJob) RequirePassword(reason string, now time.Time) error {
+	if err := j.moveTo(StatusNeedsPassword, now); err != nil {
+		return err
+	}
+	j.Progress, j.Error = 0, reason
+	return nil
+}
+
+// FinishExtraction moves the job to review once its items are staged.
+func (j *UploadJob) FinishExtraction(warning string, now time.Time) error {
+	if err := j.moveTo(StatusReview, now); err != nil {
+		return err
+	}
+	j.Progress, j.Warning = 100, warning
+	return nil
+}
+
+// ReadyForReview moves an uploaded raw (non-archive) file straight to review.
+func (j *UploadJob) ReadyForReview(now time.Time) error {
+	return j.moveTo(StatusReview, now)
 }
 
 // Cancel stops the job at the user's request.

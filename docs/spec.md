@@ -25,7 +25,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 ### Subida e ingesta
 - **RF-01** Subir uno o varios archivos arrastrándolos a cualquier parte de la ventana o con los botones "Subir juegos" (Inicio) y "Agregar juegos" (pantalla de una consola), que abren el selector de archivos nativo. Con gamepad, ambos botones se activan con RT.
 - **RF-02** Las subidas son reanudables (protocolo tus) y no tienen límite práctico de tamaño.
-- **RF-03** Si el archivo es un comprimido (zip, 7z, rar/rar5, multiparte), se detecta por bytes mágicos y se extrae automáticamente. El comprimido original se borra tras una extracción exitosa.
+- **RF-03** Si el archivo es un comprimido (zip, 7z, rar/rar5), se detecta por bytes mágicos y se extrae automáticamente. El comprimido original se borra tras una extracción exitosa. Un archivo que no es comprimido pasa directo a revisión. *Comprimidos multiparte: pendiente de decisión (ver `tasks.md`, Fase 4).*
 - **RF-04** Si el comprimido está cifrado, el formulario pide la contraseña. La contraseña no se guarda.
 - **RF-05** Antes de extraer se comprueba el espacio libre. Ningún archivo extraído puede salir del directorio de staging (zip-slip) y los symlinks se rechazan.
 - **RF-05a** Tras extraer, **cada archivo se verifica contra el índice del comprimido (tamaño + CRC32)**. Los errores de 7zz que son *solo de atributos* (*Cannot set file attribute*, porque los datasets con ACL prohíben `chmod`) se registran como advertencia si la verificación pasa; cualquier otro error falla la extracción. *(Hallazgo de la Fase 0.5.)*
