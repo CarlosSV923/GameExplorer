@@ -52,18 +52,40 @@ func (h *Handler) Middleware() httpapi.StrictMiddlewareFunc {
 			if publicOperations[operationID] {
 				return next(ctx, w, r, req)
 			}
-			var token string
-			if c, err := r.Cookie(CookieName); err == nil {
-				token = c.Value
-			}
-			session, err := h.svc.Authenticate(ctx, token)
-			if err != nil {
-				httpx.WriteProblem(w, http.StatusUnauthorized, "Unauthorized", "Inicia sesión para continuar.")
+			session, ok := h.authenticate(r)
+			if !ok {
+				writeUnauthorized(w)
 				return nil, nil
 			}
 			return next(context.WithValue(ctx, sessionKey{}, session), w, r, req)
 		}
 	}
+}
+
+// RequireSession protects plain HTTP handlers that live outside the generated
+// contract (the tus upload endpoint).
+func (h *Handler) RequireSession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, ok := h.authenticate(r)
+		if !ok {
+			writeUnauthorized(w)
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), sessionKey{}, session)))
+	})
+}
+
+func (h *Handler) authenticate(r *http.Request) (domain.Session, bool) {
+	var token string
+	if c, err := r.Cookie(CookieName); err == nil {
+		token = c.Value
+	}
+	session, err := h.svc.Authenticate(r.Context(), token)
+	return session, err == nil
+}
+
+func writeUnauthorized(w http.ResponseWriter) {
+	httpx.WriteProblem(w, http.StatusUnauthorized, "Unauthorized", "Inicia sesión para continuar.")
 }
 
 // Login implements httpapi.StrictServerInterface.

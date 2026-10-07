@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"path/filepath"
+	"sync"
 	"time"
 
 	catalogapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/application"
@@ -15,6 +17,12 @@ import (
 	identityapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/identity/application"
 	identityinfra "github.com/CarlosSV923/GameExplorer/apps/api/internal/identity/infrastructure"
 	identityhttp "github.com/CarlosSV923/GameExplorer/apps/api/internal/identity/interfaces/http"
+	ingestionapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/application"
+	ingestiondomain "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain"
+	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/broker"
+	ingestionsqlite "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/sqlite"
+	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/tus"
+	ingestionhttp "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/interfaces/http"
 	metadataapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/application"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/infrastructure/igdb"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/infrastructure/imagecache"
@@ -39,6 +47,7 @@ type (
 	identityAPI = identityhttp.Handler
 	catalogAPI  = cataloghttp.Handler
 	metadataAPI = metadatahttp.Handler
+	jobsAPI     = ingestionhttp.Handler
 )
 
 // api assembles the bounded contexts' handlers into the generated interface.
@@ -48,19 +57,49 @@ type api struct {
 	*identityAPI
 	*catalogAPI
 	*metadataAPI
+	*jobsAPI
 }
 
 var _ httpapi.StrictServerInterface = api{}
 
 // app is the fully wired application.
 type app struct {
-	handler  http.Handler
-	db       *sql.DB
-	consoles *catalogapp.ConsoleService
-	metadata *metadataapp.Service
+	handler   http.Handler
+	db        *sql.DB
+	log       *slog.Logger
+	consoles  *catalogapp.ConsoleService
+	metadata  *metadataapp.Service
+	ingestion *ingestionapp.Service
+	uploads   *tus.Adapter // nil when the library is not writable
+
+	shutdown     chan struct{}
+	shutdownOnce sync.Once
 }
 
-func (a *app) Close() error { return a.db.Close() }
+func (a *app) Close() error {
+	a.beginShutdown()
+	return a.db.Close()
+}
+
+// beginShutdown ends long-lived responses (event streams) so the HTTP
+// server's graceful shutdown does not wait for them.
+func (a *app) beginShutdown() { a.shutdownOnce.Do(func() { close(a.shutdown) }) }
+
+// start runs the background work: upload events, the hourly purge of
+// abandoned uploads and the console metadata sync.
+func (a *app) start(ctx context.Context) {
+	if a.uploads != nil {
+		go a.uploads.Run(ctx, a.ingestion)
+		go a.ingestion.RunPurge(ctx, time.Hour)
+	}
+	go a.syncConsoles(ctx, a.log)
+}
+
+// uploadsDir is where tus stores incoming files: inside the library dataset,
+// so moving a finished game into place is a rename, not a copy.
+func uploadsDir(libraryPath string) string {
+	return filepath.Join(libraryPath, ".gameexplorer", "staging", "uploads")
+}
 
 // newApp wires every adapter. It is the only place that knows them all.
 func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, error) {
@@ -97,6 +136,17 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 
 	consoles := catalogapp.NewConsoleService(catalogsqlite.NewConsoleRepository(db))
 
+	events := broker.New()
+	uploads, uploadsErr := tus.New(uploadsDir(cfg.LibraryPath), "/api/uploads/", log, tus.FreeSpace)
+	var store ingestionapp.UploadStore = unavailableStore{}
+	if uploadsErr != nil {
+		log.Error("uploads disabled: library not writable", "error", uploadsErr)
+	} else {
+		store = uploads
+	}
+	ingestion := ingestionapp.NewService(ingestionsqlite.NewJobRepository(db), store, events, log, nil)
+	shutdown := make(chan struct{})
+
 	server := api{
 		systemAPI: system.NewHandler(
 			system.WritableDir("library-writable", cfg.LibraryPath),
@@ -105,6 +155,7 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 		identityAPI: identityHandler,
 		catalogAPI:  cataloghttp.NewHandler(consoles),
 		metadataAPI: metadatahttp.NewHandler(metadata, log),
+		jobsAPI:     ingestionhttp.NewHandler(ingestion, events, shutdown),
 	}
 
 	mux := http.NewServeMux()
@@ -126,6 +177,16 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 			httpx.WriteProblem(w, http.StatusBadRequest, "Bad Request", err.Error())
 		},
 	})
+	if uploadsErr == nil {
+		mux.Handle("/api/uploads/", identityHandler.RequireSession(
+			http.StripPrefix("/api/uploads/", uploads.Handler())))
+	} else {
+		mux.Handle("/api/uploads/", identityHandler.RequireSession(http.HandlerFunc(
+			func(w http.ResponseWriter, _ *http.Request) {
+				httpx.WriteProblem(w, http.StatusServiceUnavailable, "Service Unavailable",
+					"No se puede escribir en la biblioteca; revisa /api/health. "+uploadsErr.Error())
+			})))
+	}
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.WriteProblem(w, http.StatusNotFound, "Not Found", "")
 	})
@@ -137,8 +198,24 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 		httpx.SecurityHeaders,
 		httpx.WithClientIP,
 	)
-	return &app{handler: handler, db: db, consoles: consoles, metadata: metadata}, nil
+	a := &app{
+		handler: handler, db: db, log: log, consoles: consoles, metadata: metadata,
+		ingestion: ingestion, shutdown: shutdown,
+	}
+	if uploadsErr == nil {
+		a.uploads = uploads
+	}
+	return a, nil
 }
+
+// unavailableStore stands in for the tus store when the library is not writable.
+type unavailableStore struct{}
+
+func (unavailableStore) Delete(context.Context, ingestiondomain.JobID) error {
+	return errors.New("uploads are disabled: the library is not writable")
+}
+
+func (unavailableStore) IDs(context.Context) ([]ingestiondomain.JobID, error) { return nil, nil }
 
 // syncConsoles refreshes console logos and release years from IGDB. It runs in
 // the background at startup; failures only log, the app keeps the seeded data.

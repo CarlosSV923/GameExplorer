@@ -20,6 +20,7 @@ tags:
   - name: auth
   - name: consoles
   - name: metadata
+  - name: uploads
 security:
   - sessionCookie: []
 paths:
@@ -186,6 +187,87 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /jobs:
+    get:
+      tags: [uploads]
+      operationId: listJobs
+      summary: Recent upload jobs, newest first
+      description: |
+        A job is created when the browser starts a tus upload at /api/uploads/
+        (metadata `filename`, optional `consoleSlug`) and follows the file
+        through extraction, review and commit.
+      responses:
+        '200':
+          description: Up to 100 jobs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UploadJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /jobs/events:
+    get:
+      tags: [uploads]
+      operationId: streamJobEvents
+      summary: Live job changes (server-sent events)
+      description: |
+        `text/event-stream`. Each change is sent as `event: job` with an
+        UploadJob JSON in `data`. On connect the server first replays every
+        non-terminal job, then streams changes; a comment line is sent every
+        25 seconds to keep proxies from closing the connection.
+      responses:
+        '200':
+          description: Event stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /jobs/{id}:
+    get:
+      tags: [uploads]
+      operationId: getJob
+      summary: One upload job
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /jobs/{id}/cancel:
+    post:
+      tags: [uploads]
+      operationId: cancelJob
+      summary: Cancel a job and delete its uploaded data
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: The cancelled job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
   /images/{size}/{imageId}:
     get:
       tags: [metadata]
@@ -239,7 +321,22 @@ components:
       in: cookie
       name: ge_session
 
+  parameters:
+    JobId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-zA-Z0-9_-]{1,64}$'
+
   responses:
+    Conflict:
+      description: The resource is in a state that does not allow this operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
     Unauthorized:
       description: Missing, invalid or expired session, or wrong password.
       content:
@@ -410,6 +507,57 @@ components:
       type: string
       description: IGDB image size preset.
       enum: [cover_small, cover_big, logo_med, screenshot_med]
+
+    JobStatus:
+      type: string
+      description: |
+        uploading → uploaded → (extracting ⇄ needs_password) → review →
+        committing → done; failed and cancelled are terminal.
+      enum:
+        [
+          uploading,
+          uploaded,
+          extracting,
+          needs_password,
+          review,
+          committing,
+          done,
+          failed,
+          cancelled,
+        ]
+
+    UploadJob:
+      type: object
+      required: [id, fileName, size, received, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          description: Equals the tus upload id.
+        fileName:
+          type: string
+          example: INSIDE-Switch-NSP-Base-Game.rar
+        size:
+          type: integer
+          format: int64
+        received:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        error:
+          type: string
+          nullable: true
+          description: Human readable reason when status is failed.
+        originConsole:
+          type: string
+          nullable: true
+          description: Slug of the console screen the upload started from.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
     ItemKind:
       type: string

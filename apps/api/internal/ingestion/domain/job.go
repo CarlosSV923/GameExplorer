@@ -1,0 +1,156 @@
+// Package domain is the ingestion model: an UploadJob follows one uploaded
+// file from the first byte to its place in the library.
+package domain
+
+import (
+	"errors"
+	"fmt"
+	"path"
+	"strings"
+	"time"
+	"unicode/utf8"
+)
+
+// JobID identifies a job. It is the tus upload id, so the browser can resume
+// an upload and the server can relate both without a mapping table.
+type JobID string
+
+// Status is a step of the ingestion pipeline (spec §3, RF-01..RF-13).
+type Status string
+
+// Pipeline steps. Phase 3 drives Uploading → Uploaded; extraction, review and
+// commit (phases 4-5) move the job further.
+const (
+	StatusUploading     Status = "uploading"
+	StatusUploaded      Status = "uploaded"
+	StatusExtracting    Status = "extracting"
+	StatusNeedsPassword Status = "needs_password"
+	StatusReview        Status = "review"
+	StatusCommitting    Status = "committing"
+	StatusDone          Status = "done"
+	StatusFailed        Status = "failed"
+	StatusCancelled     Status = "cancelled"
+)
+
+// transitions lists the allowed next states of each state.
+var transitions = map[Status][]Status{
+	StatusUploading:     {StatusUploaded, StatusFailed, StatusCancelled},
+	StatusUploaded:      {StatusExtracting, StatusReview, StatusFailed, StatusCancelled},
+	StatusExtracting:    {StatusReview, StatusNeedsPassword, StatusFailed, StatusCancelled},
+	StatusNeedsPassword: {StatusExtracting, StatusFailed, StatusCancelled},
+	StatusReview:        {StatusCommitting, StatusFailed, StatusCancelled},
+	StatusCommitting:    {StatusDone, StatusReview, StatusFailed},
+}
+
+// Terminal reports whether no further transition is possible.
+func (s Status) Terminal() bool {
+	_, ok := transitions[s]
+	return !ok
+}
+
+// CanTransitionTo reports whether s → next is a valid move.
+func (s Status) CanTransitionTo(next Status) bool {
+	for _, allowed := range transitions[s] {
+		if allowed == next {
+			return true
+		}
+	}
+	return false
+}
+
+var (
+	// ErrInvalidTransition is returned for moves the state machine forbids.
+	ErrInvalidTransition = errors.New("invalid job state transition")
+	// ErrJobNotFound is returned when a job does not exist.
+	ErrJobNotFound = errors.New("upload job not found")
+	// ErrInvalidFileName is returned for unusable upload file names.
+	ErrInvalidFileName = errors.New("invalid file name")
+)
+
+// UploadJob is the aggregate root of the ingestion context.
+type UploadJob struct {
+	ID        JobID
+	FileName  string
+	Size      int64
+	Received  int64
+	Status    Status
+	Error     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+
+	// OriginConsole is the console screen the upload started from (RF-08), if any.
+	OriginConsole *string
+	// StoragePath is where the uploaded bytes live (opaque to the domain).
+	StoragePath string
+}
+
+// NewUploadJob starts a job for a file the browser announced.
+func NewUploadJob(id JobID, fileName string, size int64, origin *string, now time.Time) (*UploadJob, error) {
+	name, err := CleanFileName(fileName)
+	if err != nil {
+		return nil, err
+	}
+	if size < 0 {
+		return nil, fmt.Errorf("negative size %d", size)
+	}
+	return &UploadJob{
+		ID: id, FileName: name, Size: size, Status: StatusUploading,
+		OriginConsole: origin, CreatedAt: now, UpdatedAt: now,
+	}, nil
+}
+
+// RecordProgress stores how many bytes arrived so far.
+func (j *UploadJob) RecordProgress(received int64, now time.Time) {
+	if j.Status != StatusUploading || received < j.Received {
+		return
+	}
+	j.Received = min(received, j.Size)
+	j.UpdatedAt = now
+}
+
+// MarkUploaded records that every byte arrived and where they are.
+func (j *UploadJob) MarkUploaded(storagePath string, now time.Time) error {
+	if err := j.moveTo(StatusUploaded, now); err != nil {
+		return err
+	}
+	j.Received = j.Size
+	j.StoragePath = storagePath
+	return nil
+}
+
+// Cancel stops the job at the user's request.
+func (j *UploadJob) Cancel(now time.Time) error {
+	return j.moveTo(StatusCancelled, now)
+}
+
+// Fail stops the job with a human-readable reason.
+func (j *UploadJob) Fail(reason string, now time.Time) error {
+	if err := j.moveTo(StatusFailed, now); err != nil {
+		return err
+	}
+	j.Error = reason
+	return nil
+}
+
+func (j *UploadJob) moveTo(next Status, now time.Time) error {
+	if !j.Status.CanTransitionTo(next) {
+		return fmt.Errorf("%w: %s → %s", ErrInvalidTransition, j.Status, next)
+	}
+	j.Status = next
+	j.UpdatedAt = now
+	return nil
+}
+
+// CleanFileName keeps only the base name the browser sent (never a path), so
+// it can be shown and later used to infer the console and item kind.
+func CleanFileName(name string) (string, error) {
+	name = strings.ReplaceAll(name, `\`, "/")
+	name = strings.TrimSpace(path.Base(name))
+	if name == "" || name == "." || name == "/" || name == ".." || !utf8.ValidString(name) || len(name) > 255 {
+		return "", fmt.Errorf("%w: %q", ErrInvalidFileName, name)
+	}
+	if strings.ContainsFunc(name, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
+		return "", fmt.Errorf("%w: control characters", ErrInvalidFileName)
+	}
+	return name, nil
+}

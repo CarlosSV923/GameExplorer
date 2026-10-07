@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -34,6 +35,7 @@ func newTestServer(t *testing.T, mutate func(*config.Config)) *httptest.Server {
 	if err != nil {
 		t.Fatalf("newApp: %v", err)
 	}
+	a.start(t.Context())
 	srv := httptest.NewServer(a.handler)
 	t.Cleanup(func() {
 		srv.Close()
@@ -112,9 +114,12 @@ func TestHealthIsPublicAndReportsChecks(t *testing.T) {
 
 func TestHealthDegradedWhenLibraryIsNotWritable(t *testing.T) {
 	t.Parallel()
-	srv := newTestServer(t, func(c *config.Config) {
-		c.LibraryPath = filepath.Join(t.TempDir(), "does-not-exist")
-	})
+	blocker := filepath.Join(t.TempDir(), "a-file")
+	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// A directory below a regular file can never be created or written.
+	srv := newTestServer(t, func(c *config.Config) { c.LibraryPath = filepath.Join(blocker, "library") })
 
 	h := decode[struct {
 		Status string `json:"status"`

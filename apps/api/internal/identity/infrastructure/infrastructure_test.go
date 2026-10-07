@@ -1,10 +1,14 @@
 package infrastructure_test
 
 import (
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/argon2"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/identity/domain"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/identity/infrastructure"
@@ -17,7 +21,7 @@ func TestArgon2idRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(phc, "$argon2id$v=19$m=65536,t=3,p=2$") {
+	if !strings.HasPrefix(phc, "$argon2id$v=19$m=19456,t=2,p=1$") {
 		t.Fatalf("unexpected PHC format: %s", phc)
 	}
 	v, err := infrastructure.NewArgon2idVerifier(phc)
@@ -34,6 +38,25 @@ func TestArgon2idRoundTrip(t *testing.T) {
 	other, _ := infrastructure.HashPassword("correct horse")
 	if other == phc {
 		t.Error("two hashes of the same password must differ (random salt)")
+	}
+}
+
+func TestArgon2idVerifiesHashesWithOtherParameters(t *testing.T) {
+	t.Parallel()
+
+	// A hash made with the phase-1 parameters (m=64 MiB, t=3, p=2) must keep
+	// working after the defaults changed: verification reads them from the hash.
+	salt := []byte("0123456789abcdef")
+	key := argon2.IDKey([]byte("legacy"), salt, 3, 64*1024, 2, 32)
+	enc := base64.RawStdEncoding
+	legacy := fmt.Sprintf("$argon2id$v=19$m=65536,t=3,p=2$%s$%s", enc.EncodeToString(salt), enc.EncodeToString(key))
+
+	v, err := infrastructure.NewArgon2idVerifier(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !v.Verify("legacy") || v.Verify("other") {
+		t.Fatal("hash with older parameters must verify exactly")
 	}
 }
 

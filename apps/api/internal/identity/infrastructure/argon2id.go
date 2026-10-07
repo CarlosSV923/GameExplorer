@@ -13,11 +13,15 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-// Argon2id parameters (OWASP-recommended range; ~64 MiB per verification).
+// Argon2id parameters: OWASP's minimum recommended configuration
+// (m=19 MiB, t=2, p=1). Measured on the NAS build, 64 MiB per verification
+// kept ~65 MB of heap resident after each login; with a 5/min login throttle
+// the lighter setting is still far beyond brute-force reach. Verification
+// reads the parameters stored in each hash, so older hashes keep working.
 const (
-	argonMemoryKiB = 64 * 1024
-	argonTime      = 3
-	argonThreads   = 2
+	argonMemoryKiB = 19 * 1024
+	argonTime      = 2
+	argonThreads   = 1
 	argonKeyLen    = 32
 	argonSaltLen   = 16
 )
@@ -26,7 +30,7 @@ const (
 var ErrInvalidHash = errors.New("invalid argon2id hash")
 
 // HashPassword returns an argon2id PHC string:
-// $argon2id$v=19$m=65536,t=3,p=2$<salt>$<key>.
+// $argon2id$v=19$m=19456,t=2,p=1$<salt>$<key>.
 func HashPassword(password string) (string, error) {
 	salt := make([]byte, argonSaltLen)
 	if _, err := rand.Read(salt); err != nil {

@@ -128,6 +128,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recent upload jobs, newest first
+         * @description A job is created when the browser starts a tus upload at /api/uploads/
+         *     (metadata `filename`, optional `consoleSlug`) and follows the file
+         *     through extraction, review and commit.
+         */
+        get: operations["listJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live job changes (server-sent events)
+         * @description `text/event-stream`. Each change is sent as `event: job` with an
+         *     UploadJob JSON in `data`. On connect the server first replays every
+         *     non-terminal job, then streams changes; a comment line is sent every
+         *     25 seconds to keep proxies from closing the connection.
+         */
+        get: operations["streamJobEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One upload job */
+        get: operations["getJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a job and delete its uploaded data */
+        post: operations["cancelJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/images/{size}/{imageId}": {
         parameters: {
             query?: never;
@@ -226,6 +305,31 @@ export interface components {
          */
         ImageSize: "cover_small" | "cover_big" | "logo_med" | "screenshot_med";
         /**
+         * @description uploading → uploaded → (extracting ⇄ needs_password) → review →
+         *     committing → done; failed and cancelled are terminal.
+         * @enum {string}
+         */
+        JobStatus: "uploading" | "uploaded" | "extracting" | "needs_password" | "review" | "committing" | "done" | "failed" | "cancelled";
+        UploadJob: {
+            /** @description Equals the tus upload id. */
+            id: string;
+            /** @example INSIDE-Switch-NSP-Base-Game.rar */
+            fileName: string;
+            /** Format: int64 */
+            size: number;
+            /** Format: int64 */
+            received: number;
+            status: components["schemas"]["JobStatus"];
+            /** @description Human readable reason when status is failed. */
+            error?: string | null;
+            /** @description Slug of the console screen the upload started from. */
+            originConsole?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /**
          * @description What a stored item is within a game folder.
          * @enum {string}
          */
@@ -239,6 +343,15 @@ export interface components {
         };
     };
     responses: {
+        /** @description The resource is in a state that does not allow this operation. */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
         /** @description Missing, invalid or expired session, or wrong password. */
         Unauthorized: {
             headers: {
@@ -294,7 +407,9 @@ export interface components {
             };
         };
     };
-    parameters: never;
+    parameters: {
+        JobId: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -460,6 +575,97 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             502: components["responses"]["BadGateway"];
             503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up to 100 jobs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadJob"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    streamJobEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadJob"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    cancelJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cancelled job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadJob"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getImage: {

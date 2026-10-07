@@ -19,7 +19,9 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: process.env.API_PROXY_TARGET ?? 'http://localhost:8080',
-        changeOrigin: true,
+        // Keep the browser's Host: tusd builds each upload's Location URL from
+        // it, so uploads stay on :5173 instead of jumping to :8080 (CORS).
+        changeOrigin: false,
       },
     },
   },

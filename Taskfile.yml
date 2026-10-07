@@ -109,7 +109,7 @@ tasks:
 
   test:api:
     cmds:
-      - '{{.DOCKER_GO}} {{.GO_IMAGE}} go test -race -count=1 ./...'
+      - '{{.DOCKER_GO}} {{.GO_IMAGE}} go test -race -count=1 -timeout 120s ./...'
 
   test:web:
     cmds:

@@ -75,6 +75,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 
 ## 4. Requisitos no funcionales
 
+- **RNF-01a Memoria medida** (Fase 3): proceso de la API en ~40 MB al arrancar y ~60 MB tras logins y subidas de 1,5–6,9 GB; la subida no añade memoria. argon2id usa los parámetros mínimos de OWASP (19 MiB, t=2, p=1), porque con 64 MiB cada login dejaba ~65 MB de heap residente.
 - **RNF-01 Archivos grandes**: los bytes de los juegos nunca se cargan en memoria. Se usan streams y `rename`, la extracción la hace `7zz` en un proceso hijo, y las descargas usan `http.ServeContent` o un zip *store* en streaming. Objetivo: saturar la red con RAM estable < 300 MB.
 - **RNF-02 Seguridad**: las rutas se construyen siempre en el servidor a partir de IDs y nunca se aceptan rutas del cliente. Protección contra zip-slip, nombres saneados y ningún secreto versionado.
 - **RNF-03 Permisos**: la app corre con `PUID/PGID`, y ese usuario necesita una entrada ACL propia en el dataset (*Modify*, *Inherit*), porque un contenedor no hereda grupos suplementarios. Los permisos de lo escrito vienen de la ACL heredada (en datasets con ACL el umask y `chmod` no aplican). Si la app no puede escribir al arrancar, lo muestra en la UI en lugar de reiniciarse en bucle.

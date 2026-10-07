@@ -40,9 +40,12 @@ Depende de: 1 · Cubre: RF-09, RF-20, RF-41, RF-61
 
 ## Fase 3 — Contexto `ingestion` I: subidas
 Depende de: 1 · Cubre: RF-01, RF-02, RF-12, RF-13
-- [ ] tusd montado en `/api/uploads/` (filestore + filelocker)
-- [ ] Agregado `UploadJob` (máquina de estados) persistido
-- [ ] SSE de progreso; purga de abandonados
+- [x] tusd montado en `/api/uploads/` (filestore + filelocker) dentro de la biblioteca, protegido por sesión; valida nombre y espacio libre (507)
+- [x] Agregado `UploadJob` con la máquina de estados completa del pipeline, persistido en SQLite; origen de consola (RF-08) por metadata `consoleSlug`
+- [x] `/api/jobs` (listar, detalle, cancelar) y SSE `/api/jobs/events` con snapshot inicial, heartbeat y cierre limpio al apagar
+- [x] Purga horaria: subidas inactivas 24 h y archivos huérfanos del store
+- [x] Si la biblioteca no es escribible, las subidas responden 503 y la app sigue en pie
+- [x] Medido con archivos reales: 1,5 GB a 72 MB/s; RAM del proceso plana durante la subida; argon2id bajado a los parámetros mínimos de OWASP (151 → 61 MB)
 
 ## Fase 4 — Contexto `ingestion` II: extracción y detección
 Depende de: 3 · Cubre: RF-03 a RF-08
