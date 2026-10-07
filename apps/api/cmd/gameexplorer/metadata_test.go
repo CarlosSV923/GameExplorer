@@ -11,6 +11,13 @@ import (
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/config"
 )
 
+// fakeGames are the games the fake IGDB returns by id.
+var fakeGames = map[string]string{
+	"26764":  `{"id":26764,"name":"Mario Kart 8 Deluxe","first_release_date":1493337600,"cover":{"image_id":"co213p"},"genres":[{"name":"Racing"}],"platforms":[130]}`,
+	"427":    `{"id":427,"name":"Final Fantasy VII","first_release_date":854668800,"summary":"Cloud.","platforms":[7]}`,
+	"119388": `{"id":119388,"name":"The Legend of Zelda: Tears of the Kingdom","first_release_date":1683849600,"platforms":[130]}`,
+}
+
 // fakeIGDBServer answers the token endpoint, the API and the image CDN.
 func fakeIGDBServer(t *testing.T) *httptest.Server {
 	t.Helper()
@@ -18,7 +25,13 @@ func fakeIGDBServer(t *testing.T) *httptest.Server {
 	mux.HandleFunc("POST /token", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{"access_token":"tok","expires_in":3600}`)
 	})
-	mux.HandleFunc("POST /v4/games", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("POST /v4/games", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if _, id, ok := strings.Cut(string(body), "where id = "); ok {
+			id, _, _ = strings.Cut(id, ";")
+			_, _ = io.WriteString(w, "["+fakeGames[id]+"]")
+			return
+		}
 		_, _ = io.WriteString(w, `[
 			{"id":191419,"name":"Mario Kart 8 Deluxe: Booster Course Pass","platforms":[130]},
 			{"id":26764,"name":"Mario Kart 8 Deluxe","first_release_date":1493337600,"cover":{"image_id":"co213p"},"genres":[{"name":"Racing"}],"platforms":[130]}]`)

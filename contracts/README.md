@@ -7,7 +7,7 @@ so the two implementations cannot drift apart.
 
 | File | Rule | Go consumer | TS consumer |
 |---|---|---|---|
-| `naming-cases.json` | Folder/file naming for each item kind, including filename sanitization | `catalog/domain` `NamingPolicy` | `modules/ingestion/domain` |
+| `naming-cases.json` | Folder/file naming for each item kind, filename sanitization, rejected inputs (`expected.error` names the field) and Redump-style track names (`trackCases`) | `catalog/domain` `NamingPolicy` | `modules/ingestion/domain` |
 | `detection-cases.json` | Console and item-kind suggestion from file name/extension (header sniffing is covered by synthetic fixtures in each suite) | `ingestion/domain/detection` | `modules/ingestion/domain` |
 
 `consoles` in detection cases is a **set**: order is irrelevant.

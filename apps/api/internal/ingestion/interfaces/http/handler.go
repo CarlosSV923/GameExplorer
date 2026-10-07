@@ -32,6 +32,7 @@ type Handler struct {
 	svc       *application.Service
 	passwords PasswordSubmitter
 	sub       Subscriber
+	commits   CommitService
 	shutdown  <-chan struct{}
 }
 

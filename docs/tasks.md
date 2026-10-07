@@ -62,8 +62,14 @@ Depende de: 3 · Cubre: RF-03 a RF-08
 
 ## Fase 5 — Commit al contexto `catalog`
 Depende de: 2, 4 · Cubre: RF-09 a RF-11
-- [ ] `NamingPolicy` + vectores `naming-cases.json`; `DuplicatePolicy`
-- [ ] Commit con journal y rollback; reescritura de `.cue`; PUID/PGID/UMASK
+- [x] Nombres (spec §5) + vectores `naming-cases.json` (incluye pistas estilo Redump y errores); carpeta del juego con año o id de IGDB si el título ya está ocupado (por otro juego o por una carpeta creada por SMB)
+- [x] Política de duplicados (RF-10): Base, mismo Disco N, Update con la misma versión (sin importar la "v") o cualquier elemento con el mismo nombre de archivo (DLC incluidos); los elementos en la papelera no cuentan
+- [x] `POST /api/jobs/{id}/plan` (vista previa: carpeta, nombres, duplicados y elementos actuales) y `POST /api/jobs/{id}/commit`
+- [x] Commit con journal en SQLite (`library_operations`) y deshacer: si falla un movimiento o el registro, todo vuelve al staging; al arrancar se deshacen los cambios interrumpidos y el trabajo vuelve a revisión (o queda `done` si sus elementos ya estaban registrados). Nunca se sobrescribe un archivo existente
+- [x] Reescritura de las líneas `FILE` de los `.cue` (se escribe una copia; el original del staging no cambia hasta confirmar)
+- [x] Papelera mínima (decisión): "Reemplazar" mueve el elemento anterior a `.gameexplorer/trash/<operación>-<elemento>/` y lo marca en la BD (`trashed_at`); listar, restaurar y purgar llegan en la fase 7
+- [x] PUID/PGID/UMASK: no hace falta código. Los permisos vienen del usuario del contenedor y de la ACL heredada (hallazgo de la fase 0.5); carpetas 0775 y archivos 0664 para los datasets sin ACL
+- [x] Probado con los 7 RAR reales de Switch contra IGDB real: base, update y 3 DLC de Animal Crossing, Inside + update, Rogue Prince + update (~0,4 s por commit, casi todo la consulta a IGDB)
 
 ## Fase 6 — Lectura del catálogo y descargas
 Depende de: 5 · Cubre: RF-20 a RF-23

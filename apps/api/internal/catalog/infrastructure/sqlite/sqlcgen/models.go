@@ -21,6 +21,44 @@ type Console struct {
 	CreatedAt      string
 }
 
+type Game struct {
+	ID           int64
+	ConsoleID    int64
+	IgdbID       int64
+	Title        string
+	Folder       string
+	ReleaseYear  sql.NullInt64
+	CoverImageID sql.NullString
+	Summary      sql.NullString
+	Genres       string
+	CreatedAt    string
+	UpdatedAt    string
+}
+
+type GameItem struct {
+	ID         int64
+	GameID     int64
+	Kind       string
+	Label      string
+	DiscNumber int64
+	Shape      string
+	Files      string
+	Size       int64
+	TitleID    string
+	SourceJob  string
+	CreatedAt  string
+	TrashedAt  sql.NullString
+	TrashDir   string
+}
+
+type LibraryOperation struct {
+	ID          string
+	Source      string
+	Moves       string
+	CreatedDirs string
+	CreatedAt   string
+}
+
 type StagedItem struct {
 	JobID          string
 	Path           string

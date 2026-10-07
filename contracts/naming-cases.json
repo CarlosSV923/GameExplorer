@@ -1,10 +1,17 @@
 {
-  "description": "Expected folder and file names. sanitizedTitle is the game folder name; fileName is relative to it.",
+  "description": "Expected folder and file names. sanitizedTitle is the game folder name; fileName is relative to it. expected.error names the rejected field. trackCases name the tracks of a .cue disc (Redump style).",
   "cases": [
     {
       "name": "base game keeps only the title",
-      "input": { "title": "Mario Kart 8 Deluxe", "kind": "base", "extension": ".nsp" },
-      "expected": { "sanitizedTitle": "Mario Kart 8 Deluxe", "fileName": "Mario Kart 8 Deluxe.nsp" }
+      "input": {
+        "title": "Mario Kart 8 Deluxe",
+        "kind": "base",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "sanitizedTitle": "Mario Kart 8 Deluxe",
+        "fileName": "Mario Kart 8 Deluxe.nsp"
+      }
     },
     {
       "name": "colon becomes space-dash",
@@ -71,7 +78,11 @@
     },
     {
       "name": "trailing dots and spaces are trimmed",
-      "input": { "title": "Shadow of the Colossus... ", "kind": "base", "extension": ".iso" },
+      "input": {
+        "title": "Shadow of the Colossus... ",
+        "kind": "base",
+        "extension": ".iso"
+      },
       "expected": {
         "sanitizedTitle": "Shadow of the Colossus",
         "fileName": "Shadow of the Colossus.iso"
@@ -79,7 +90,11 @@
     },
     {
       "name": "whitespace runs collapse to one space",
-      "input": { "title": "  Super   Mario\tSunshine ", "kind": "base", "extension": ".rvz" },
+      "input": {
+        "title": "  Super   Mario\tSunshine ",
+        "kind": "base",
+        "extension": ".rvz"
+      },
       "expected": {
         "sanitizedTitle": "Super Mario Sunshine",
         "fileName": "Super Mario Sunshine.rvz"
@@ -87,7 +102,11 @@
     },
     {
       "name": "unicode is normalized to NFC and kept",
-      "input": { "title": "Pokémon Legends: Arceus", "kind": "base", "extension": ".nsp" },
+      "input": {
+        "title": "Pokémon Legends: Arceus",
+        "kind": "base",
+        "extension": ".nsp"
+      },
       "expected": {
         "sanitizedTitle": "Pokémon Legends - Arceus",
         "fileName": "Pokémon Legends - Arceus.nsp"
@@ -95,7 +114,11 @@
     },
     {
       "name": "real: modifier-letter colon (U+A789) is treated like a colon, trademark sign is kept",
-      "input": { "title": "Animal Crossing™꞉ New Horizons", "kind": "base", "extension": ".nsp" },
+      "input": {
+        "title": "Animal Crossing™꞉ New Horizons",
+        "kind": "base",
+        "extension": ".nsp"
+      },
       "expected": {
         "sanitizedTitle": "Animal Crossing™ - New Horizons",
         "fileName": "Animal Crossing™ - New Horizons.nsp"
@@ -103,13 +126,123 @@
     },
     {
       "name": "update label uses the human display version",
-      "input": { "title": "INSIDE", "kind": "update", "label": "v1.0.3", "extension": ".nsp" },
-      "expected": { "sanitizedTitle": "INSIDE", "fileName": "INSIDE [Update v1.0.3].nsp" }
+      "input": {
+        "title": "INSIDE",
+        "kind": "update",
+        "label": "v1.0.3",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "sanitizedTitle": "INSIDE",
+        "fileName": "INSIDE [Update v1.0.3].nsp"
+      }
     },
     {
       "name": "extension is lowercased",
-      "input": { "title": "Metroid Prime", "kind": "base", "extension": ".ISO" },
-      "expected": { "sanitizedTitle": "Metroid Prime", "fileName": "Metroid Prime.iso" }
+      "input": {
+        "title": "Metroid Prime",
+        "kind": "base",
+        "extension": ".ISO"
+      },
+      "expected": {
+        "sanitizedTitle": "Metroid Prime",
+        "fileName": "Metroid Prime.iso"
+      }
+    },
+    {
+      "name": "empty update label is rejected",
+      "input": {
+        "title": "INSIDE",
+        "kind": "update",
+        "label": "  ",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "error": "label"
+      }
+    },
+    {
+      "name": "title made only of forbidden characters is rejected",
+      "input": {
+        "title": "???",
+        "kind": "base",
+        "extension": ".iso"
+      },
+      "expected": {
+        "error": "title"
+      }
+    },
+    {
+      "name": "folder-format game has no extension",
+      "input": {
+        "title": "Demon's Souls",
+        "kind": "base",
+        "extension": ""
+      },
+      "expected": {
+        "sanitizedTitle": "Demon's Souls",
+        "fileName": "Demon's Souls"
+      }
+    }
+  ],
+  "trackCases": [
+    {
+      "name": "single track takes the disc name",
+      "input": {
+        "stem": "Final Fantasy VII (Disc 1)",
+        "extensions": [".bin"]
+      },
+      "expected": ["Final Fantasy VII (Disc 1).bin"]
+    },
+    {
+      "name": "several tracks are numbered from 1",
+      "input": {
+        "stem": "Tomb Raider",
+        "extensions": [".bin", ".bin", ".BIN"]
+      },
+      "expected": [
+        "Tomb Raider (Track 1).bin",
+        "Tomb Raider (Track 2).bin",
+        "Tomb Raider (Track 3).bin"
+      ]
+    },
+    {
+      "name": "ten or more tracks use two digits",
+      "input": {
+        "stem": "Wipeout",
+        "extensions": [
+          ".bin",
+          ".bin",
+          ".bin",
+          ".bin",
+          ".bin",
+          ".bin",
+          ".bin",
+          ".bin",
+          ".bin",
+          ".bin"
+        ]
+      },
+      "expected": [
+        "Wipeout (Track 01).bin",
+        "Wipeout (Track 02).bin",
+        "Wipeout (Track 03).bin",
+        "Wipeout (Track 04).bin",
+        "Wipeout (Track 05).bin",
+        "Wipeout (Track 06).bin",
+        "Wipeout (Track 07).bin",
+        "Wipeout (Track 08).bin",
+        "Wipeout (Track 09).bin",
+        "Wipeout (Track 10).bin"
+      ]
+    },
+    {
+      "name": "audio tracks keep their own extension",
+      "input": {
+        "stem": "Rayman",
+        "extensions": [".bin", ".wav"]
+      },
+      "expected": ["Rayman (Track 1).bin", "Rayman (Track 2).wav"]
     }
   ]
 }

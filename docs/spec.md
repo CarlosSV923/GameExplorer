@@ -36,8 +36,9 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
   - búsqueda en IGDB filtrada por la plataforma elegida, con portada y año;
   - por cada elemento: tipo (Base/Update/DLC/Disco), versión, nombre del DLC o número de disco;
   - vista previa de la ruta final.
-- **RF-10** Duplicados (IGDB id + consola + tipo): al elegir un juego que ya existe se muestran sus elementos actuales. Una Base, un Disco N o un Update con la misma versión ya existentes cuentan como duplicado, con las opciones **Reemplazar** (el anterior va a la papelera) u **Omitir**.
-- **RF-11** Al confirmar, la app crea o reutiliza el juego, mueve los archivos a `[slug]/[Juego]/[archivo]` con los nombres de §5, reescribe las referencias `FILE` de los `.cue` y limpia el staging. La operación se puede revertir si falla a mitad.
+- **RF-10** Duplicados (IGDB id + consola + tipo): al elegir un juego que ya existe se muestran sus elementos actuales. Una Base, un Disco N o un Update con la misma versión ya existentes cuentan como duplicado, con las opciones **Reemplazar** (el anterior va a la papelera) u **Omitir**. También es duplicado cualquier elemento que tendría el mismo nombre de archivo (p. ej. un DLC con el mismo nombre). La versión se compara sin mayúsculas, espacios ni "v" inicial. Los elementos en la papelera no cuentan.
+- **RF-11** Al confirmar, la app crea o reutiliza el juego, mueve los archivos a `[slug]/[Juego]/[archivo]` con los nombres de §5, reescribe las referencias `FILE` de los `.cue` y limpia el staging. La operación se puede revertir si falla a mitad: los movimientos se anotan antes en un journal y, si algo falla (o la app se reinicia a mitad), se deshacen y la subida vuelve a revisión. Nunca se sobrescribe un archivo que ya esté en la carpeta del juego. Antes de confirmar, la revisión puede pedir una vista previa con los nombres finales y los duplicados.
+- **RF-11a** Carpeta del juego: el título saneado. Si otro juego de la misma consola ya la usa (o existe una carpeta con ese nombre creada por SMB), se agrega el año: `Resident Evil (2002)`; si también está ocupado, el id de IGDB: `Resident Evil (2002) [1234]`. Un juego que ya está en la biblioteca conserva su carpeta y su título.
 - **RF-12** Las subidas abandonadas y el staging huérfano se purgan tras 24 h.
 - **RF-13** El progreso (subida, extracción, commit) se ve en vivo en un panel persistente.
 
@@ -101,6 +102,8 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 | DLC | `Juego [DLC] <nombre>.ext` |
 | Disco | `Juego (Disc N).ext` |
 
+Pistas de un `.cue` (estilo Redump): con una sola pista, el `.bin` toma el nombre del disco (`Juego (Disc 1).bin`); con varias, `Juego (Disc 1) (Track 1).bin`…, con dos dígitos a partir de 10 pistas. Cada pista conserva su extensión. Los juegos en carpeta (PS3) se nombran como el elemento, sin extensión.
+
 Saneamiento del título (carpeta y archivos), en este orden:
 1. Unicode NFC.
 2. `:` y `꞉` (U+A789, sustituto habitual de `:` en Windows) → ` -`. Otros símbolos válidos, como `™`, se conservan.
@@ -109,6 +112,8 @@ Saneamiento del título (carpeta y archivos), en este orden:
 5. Los bloques de espacios en blanco se reducen a uno.
 6. Se recortan los espacios y puntos finales y los espacios iniciales.
 7. La extensión va en minúsculas.
+
+La versión del Update y el nombre del DLC se sanean igual y son obligatorios. Un nombre que supera 255 bytes se rechaza.
 
 ## 6. Detección (vectores: `contracts/detection-cases.json`)
 

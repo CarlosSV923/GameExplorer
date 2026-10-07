@@ -26,6 +26,15 @@ func (f *fakeProvider) SearchPlatforms(context.Context, string, int) ([]domain.P
 	return []domain.Platform{{ID: 41, Name: "Wii U"}}, nil
 }
 
+func (f *fakeProvider) GameByID(_ context.Context, id int64) (*domain.Game, error) {
+	for _, g := range f.games {
+		if g.ID == id {
+			return &g, nil
+		}
+	}
+	return nil, domain.ErrNotFound
+}
+
 func (f *fakeProvider) PlatformsByID(context.Context, []int64) ([]domain.Platform, error) {
 	return nil, nil
 }

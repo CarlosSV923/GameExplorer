@@ -112,6 +112,21 @@ func (c *Client) SearchGames(ctx context.Context, query string, platformID *int6
 	return mapGames(raw), nil
 }
 
+// GameByID implements application.Provider.
+func (c *Client) GameByID(ctx context.Context, id int64) (*domain.Game, error) {
+	body := fmt.Sprintf("%s where id = %d; limit 1;", gameFields, id)
+	var raw []apiGame
+	if err := c.query(ctx, "games", body, &raw); err != nil {
+		return nil, err
+	}
+	for _, g := range mapGames(raw) {
+		if g.ID == id {
+			return &g, nil
+		}
+	}
+	return nil, domain.ErrNotFound
+}
+
 // TopGames returns the most rated playable games of a platform. Used by the
 // demo catalog generator, not by the app.
 func (c *Client) TopGames(ctx context.Context, platformID int64, limit int) ([]domain.Game, error) {

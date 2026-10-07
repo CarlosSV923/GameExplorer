@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-> **Estado:** desarrollo inicial (fase 1 de [`docs/tasks.md`](docs/tasks.md) completada). Todavía no hay nada utilizable.
+> **Estado:** desarrollo inicial (fases 0–5 de [`docs/tasks.md`](docs/tasks.md) completadas: la API sube, extrae, detecta y guarda juegos; la interfaz llega en las fases 8–9). Todavía no hay nada utilizable desde el navegador.
 
 App web autoalojada para un NAS doméstico (TrueNAS SCALE) que permite **subir, descomprimir, clasificar, renombrar, explorar y descargar juegos de emulación** desde cualquier navegador: escritorio, tablet, pantalla táctil o gamepad. La interfaz está inspirada en EmulationStation.
 

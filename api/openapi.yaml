@@ -322,6 +322,84 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
+  /jobs/{id}/plan:
+    post:
+      tags: [uploads]
+      operationId: planJobCommit
+      summary: Preview where a reviewed upload would be stored
+      description: |
+        Computes the final folder and file names (spec §5) and the duplicates
+        against the game's current items (RF-10), without changing anything.
+        `onDuplicate` may be left out; such items come back as `undecided`.
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitRequest'
+      responses:
+        '200':
+          description: The plan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitPlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /jobs/{id}/commit:
+    post:
+      tags: [uploads]
+      operationId: commitJob
+      summary: Store a reviewed upload in the library
+      description: |
+        Moves the items to `<console>/<game>/` with their final names, rewrites
+        the FILE lines of .cue sheets, sends replaced duplicates to the trash and
+        deletes the staging area (RF-11). Every duplicate needs `onDuplicate`.
+        If anything fails, every move is undone and the job returns to review
+        with the reason in `error`.
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitRequest'
+      responses:
+        '200':
+          description: Stored; the job is done.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
   /images/{size}/{imageId}:
     get:
       tags: [metadata]
@@ -417,6 +495,12 @@ components:
             $ref: '#/components/schemas/Problem'
     BadGateway:
       description: IGDB failed or could not be reached.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalError:
+      description: The operation failed; `detail` explains what happened.
       content:
         application/problem+json:
           schema:
@@ -697,6 +781,139 @@ components:
       type: string
       description: What a stored item is within a game folder.
       enum: [base, update, dlc, disc]
+
+    CommitRequest:
+      type: object
+      required: [console, igdbGameId, items]
+      properties:
+        console:
+          type: string
+          description: Console slug.
+          example: switch
+        igdbGameId:
+          type: integer
+          format: int64
+        items:
+          type: array
+          description: One entry per staged item that is not ignored.
+          items:
+            $ref: '#/components/schemas/CommitItem'
+
+    CommitItem:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+          description: StagedItem.path.
+        skip:
+          type: boolean
+          description: Leave this item out of the library (it is deleted with the staging area).
+        kind:
+          $ref: '#/components/schemas/ItemKind'
+        label:
+          type: string
+          description: Update version (v1.0.3) or DLC name.
+        discNumber:
+          type: integer
+          minimum: 1
+          maximum: 99
+        onDuplicate:
+          type: string
+          enum: [replace, skip]
+          description: replace sends the existing item to the trash; skip keeps it and drops this one.
+
+    LibraryItem:
+      type: object
+      required: [id, kind, files, size]
+      properties:
+        id:
+          type: integer
+          format: int64
+        kind:
+          $ref: '#/components/schemas/ItemKind'
+        label:
+          type: string
+          nullable: true
+        discNumber:
+          type: integer
+          nullable: true
+        files:
+          type: array
+          description: Relative to the game folder; the first is the main entry.
+          items:
+            type: string
+        size:
+          type: integer
+          format: int64
+
+    PlannedItem:
+      type: object
+      required: [path, files, action]
+      properties:
+        path:
+          type: string
+        files:
+          type: array
+          description: Final names inside the game folder (a .cue sheet first, then its tracks).
+          items:
+            type: string
+        action:
+          type: string
+          enum: [store, replace, skip, undecided]
+        duplicate:
+          allOf:
+            - $ref: '#/components/schemas/LibraryItem'
+          nullable: true
+
+    CommitPlan:
+      type: object
+      required: [console, title, folder, existing, items]
+      properties:
+        console:
+          type: string
+        title:
+          type: string
+          description: Game title used for the names.
+        folder:
+          type: string
+          description: Game folder inside the console folder.
+          example: The Legend of Zelda - Tears of the Kingdom
+        gameId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Set when the game is already in the library.
+        existing:
+          type: array
+          description: The game's current items.
+          items:
+            $ref: '#/components/schemas/LibraryItem'
+        items:
+          type: array
+          description: Items that are not skipped by the user.
+          items:
+            $ref: '#/components/schemas/PlannedItem'
+
+    CommitResult:
+      type: object
+      required: [job, gameId, path, stored, replaced, skipped]
+      properties:
+        job:
+          $ref: '#/components/schemas/UploadJob'
+        gameId:
+          type: integer
+          format: int64
+        path:
+          type: string
+          description: Library-relative game folder.
+          example: switch/Mario Kart 8 Deluxe
+        stored:
+          type: integer
+        replaced:
+          type: integer
+        skipped:
+          type: integer
 
     Problem:
       type: object

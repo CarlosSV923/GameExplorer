@@ -205,6 +205,30 @@ func (j *UploadJob) MergeInto(primary JobID, now time.Time) error {
 	return nil
 }
 
+// StartCommit begins moving the reviewed items into the library.
+func (j *UploadJob) StartCommit(now time.Time) error {
+	if err := j.moveTo(StatusCommitting, now); err != nil {
+		return err
+	}
+	j.Error = ""
+	return nil
+}
+
+// FinishCommit records that the items are in the library.
+func (j *UploadJob) FinishCommit(now time.Time) error {
+	return j.moveTo(StatusDone, now)
+}
+
+// AbortCommit returns the job to review after the commit was undone; reason
+// ("" when the request was simply refused) is shown in the review.
+func (j *UploadJob) AbortCommit(reason string, now time.Time) error {
+	if err := j.moveTo(StatusReview, now); err != nil {
+		return err
+	}
+	j.Error = reason
+	return nil
+}
+
 // Cancel stops the job at the user's request.
 func (j *UploadJob) Cancel(now time.Time) error {
 	return j.moveTo(StatusCancelled, now)

@@ -13,6 +13,8 @@ type Provider interface {
 	SearchGames(ctx context.Context, query string, platformID *int64, limit int) ([]domain.Game, error)
 	SearchPlatforms(ctx context.Context, query string, limit int) ([]domain.Platform, error)
 	PlatformsByID(ctx context.Context, ids []int64) ([]domain.Platform, error)
+	// GameByID returns domain.ErrNotFound for unknown ids.
+	GameByID(ctx context.Context, id int64) (*domain.Game, error)
 }
 
 // ImageStore returns images, fetching and caching them on first use.
@@ -82,6 +84,17 @@ func (s *Service) PlatformsByID(ctx context.Context, ids []int64) ([]domain.Plat
 		return nil, nil
 	}
 	return s.provider.PlatformsByID(ctx, ids)
+}
+
+// GameByID loads one game by IGDB id.
+func (s *Service) GameByID(ctx context.Context, id int64) (*domain.Game, error) {
+	if s.provider == nil {
+		return nil, domain.ErrNotConfigured
+	}
+	if id <= 0 {
+		return nil, domain.ErrNotFound
+	}
+	return s.provider.GameByID(ctx, id)
 }
 
 // Image opens a cached (or freshly downloaded) image.

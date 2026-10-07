@@ -12,6 +12,7 @@ import (
 	"time"
 
 	catalogapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/application"
+	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/infrastructure/libraryfs"
 	catalogsqlite "github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/infrastructure/sqlite"
 	cataloghttp "github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/interfaces/http"
 	identityapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/identity/application"
@@ -75,6 +76,7 @@ type app struct {
 	metadata  *metadataapp.Service
 	ingestion *ingestionapp.Service
 	processor *ingestionapp.Processor
+	committer *ingestionapp.Committer
 	uploads   *tus.Adapter // nil when the library is not writable
 	cfg       config.Config
 
@@ -92,8 +94,12 @@ func (a *app) Close() error {
 func (a *app) beginShutdown() { a.shutdownOnce.Do(func() { close(a.shutdown) }) }
 
 // start runs the background work: upload events, the hourly purge of
-// abandoned uploads and the console metadata sync.
+// abandoned uploads and the console metadata sync. Library changes that a
+// restart interrupted are undone first, before anything else touches files.
 func (a *app) start(ctx context.Context) {
+	if err := a.committer.Recover(ctx); err != nil {
+		a.log.Error("recover interrupted commits", "error", err)
+	}
 	if a.uploads != nil {
 		go a.uploads.Run(ctx, a.ingestion)
 		go a.ingestion.RunPurge(ctx, time.Hour)
@@ -105,6 +111,11 @@ func (a *app) start(ctx context.Context) {
 // stagingDir holds each job's extracted files until they are committed.
 func stagingDir(libraryPath string) string {
 	return filepath.Join(libraryPath, ".gameexplorer", "staging", "extracted")
+}
+
+// trashDir keeps replaced and deleted items until they are purged (RF-30).
+func trashDir(libraryPath string) string {
+	return filepath.Join(libraryPath, ".gameexplorer", "trash")
 }
 
 // volumesDir gathers the parts of multi-volume archives until all arrive.
@@ -164,12 +175,17 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 	jobs := ingestionsqlite.NewJobRepository(db)
 	items := ingestionsqlite.NewItemRepository(db)
 	extractor := sevenzip.New("")
+	stagingArea := staging.New(stagingDir(cfg.LibraryPath), volumesDir(cfg.LibraryPath))
 	ingestion := ingestionapp.NewService(jobs, store, events, log, nil).WithItems(items)
+	library := catalogapp.NewLibraryService(
+		catalogsqlite.NewConsoleRepository(db), catalogsqlite.NewLibraryRepository(db), gameDirectory{metadata},
+		libraryfs.New(cfg.LibraryPath, trashDir(cfg.LibraryPath)), log, nil)
+	committer := ingestionapp.NewCommitter(jobs, items, stagingArea, libraryPort{library}, events, log, nil)
 	var processor *ingestionapp.Processor
 	if uploadsErr == nil {
 		processor = ingestionapp.NewProcessor(ingestionapp.ProcessorDeps{
 			Jobs: jobs, Items: items, Uploads: uploads, Extractor: extractor,
-			Staging: staging.New(stagingDir(cfg.LibraryPath), volumesDir(cfg.LibraryPath)), Profiles: consoleProfiles{consoles},
+			Staging: stagingArea, Profiles: consoleProfiles{consoles},
 			Publisher: events, Log: log,
 		})
 		ingestion.WithQueue(processor)
@@ -190,7 +206,7 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 		identityAPI: identityHandler,
 		catalogAPI:  cataloghttp.NewHandler(consoles),
 		metadataAPI: metadatahttp.NewHandler(metadata, log),
-		jobsAPI:     ingestionhttp.NewHandler(ingestion, passwordSubmitter{processor}, events, shutdown),
+		jobsAPI:     ingestionhttp.NewHandler(ingestion, passwordSubmitter{processor}, events, shutdown).WithCommits(committer),
 	}
 
 	mux := http.NewServeMux()
@@ -235,7 +251,7 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 	)
 	a := &app{
 		handler: handler, db: db, log: log, consoles: consoles, metadata: metadata,
-		ingestion: ingestion, processor: processor, shutdown: shutdown, cfg: cfg,
+		ingestion: ingestion, processor: processor, committer: committer, shutdown: shutdown, cfg: cfg,
 	}
 	if uploadsErr == nil {
 		a.uploads = uploads

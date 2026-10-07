@@ -170,3 +170,24 @@ func TestDetectArchive(t *testing.T) {
 		}
 	}
 }
+
+func TestCommitLifecycle(t *testing.T) {
+	t.Parallel()
+
+	j := &domain.UploadJob{ID: "abc", Status: domain.StatusReview, Error: "old"}
+	if err := j.StartCommit(t0); err != nil || j.Status != domain.StatusCommitting || j.Error != "" {
+		t.Fatalf("start = %+v, %v", j, err)
+	}
+	if err := j.AbortCommit("disk full", t0); err != nil || j.Status != domain.StatusReview || j.Error != "disk full" {
+		t.Fatalf("abort = %+v, %v", j, err)
+	}
+	if err := j.StartCommit(t0); err != nil {
+		t.Fatal(err)
+	}
+	if err := j.FinishCommit(t0); err != nil || j.Status != domain.StatusDone {
+		t.Fatalf("finish = %+v, %v", j, err)
+	}
+	if err := j.StartCommit(t0); !errors.Is(err, domain.ErrInvalidTransition) {
+		t.Fatalf("commit after done err = %v", err)
+	}
+}

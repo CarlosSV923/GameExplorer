@@ -248,6 +248,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/{id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview where a reviewed upload would be stored
+         * @description Computes the final folder and file names (spec §5) and the duplicates
+         *     against the game's current items (RF-10), without changing anything.
+         *     `onDuplicate` may be left out; such items come back as `undecided`.
+         */
+        post: operations["planJobCommit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Store a reviewed upload in the library
+         * @description Moves the items to `<console>/<game>/` with their final names, rewrites
+         *     the FILE lines of .cue sheets, sends replaced duplicates to the trash and
+         *     deletes the staging area (RF-11). Every duplicate needs `onDuplicate`.
+         *     If anything fails, every move is undone and the job returns to review
+         *     with the reason in `error`.
+         */
+        post: operations["commitJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/images/{size}/{imageId}": {
         parameters: {
             query?: never;
@@ -418,6 +464,83 @@ export interface components {
          * @enum {string}
          */
         ItemKind: "base" | "update" | "dlc" | "disc";
+        CommitRequest: {
+            /**
+             * @description Console slug.
+             * @example switch
+             */
+            console: string;
+            /** Format: int64 */
+            igdbGameId: number;
+            /** @description One entry per staged item that is not ignored. */
+            items: components["schemas"]["CommitItem"][];
+        };
+        CommitItem: {
+            /** @description StagedItem.path. */
+            path: string;
+            /** @description Leave this item out of the library (it is deleted with the staging area). */
+            skip?: boolean;
+            kind?: components["schemas"]["ItemKind"];
+            /** @description Update version (v1.0.3) or DLC name. */
+            label?: string;
+            discNumber?: number;
+            /**
+             * @description replace sends the existing item to the trash; skip keeps it and drops this one.
+             * @enum {string}
+             */
+            onDuplicate?: "replace" | "skip";
+        };
+        LibraryItem: {
+            /** Format: int64 */
+            id: number;
+            kind: components["schemas"]["ItemKind"];
+            label?: string | null;
+            discNumber?: number | null;
+            /** @description Relative to the game folder; the first is the main entry. */
+            files: string[];
+            /** Format: int64 */
+            size: number;
+        };
+        PlannedItem: {
+            path: string;
+            /** @description Final names inside the game folder (a .cue sheet first, then its tracks). */
+            files: string[];
+            /** @enum {string} */
+            action: "store" | "replace" | "skip" | "undecided";
+            duplicate?: components["schemas"]["LibraryItem"] | null;
+        };
+        CommitPlan: {
+            console: string;
+            /** @description Game title used for the names. */
+            title: string;
+            /**
+             * @description Game folder inside the console folder.
+             * @example The Legend of Zelda - Tears of the Kingdom
+             */
+            folder: string;
+            /**
+             * Format: int64
+             * @description Set when the game is already in the library.
+             */
+            gameId?: number | null;
+            /** @description The game's current items. */
+            existing: components["schemas"]["LibraryItem"][];
+            /** @description Items that are not skipped by the user. */
+            items: components["schemas"]["PlannedItem"][];
+        };
+        CommitResult: {
+            job: components["schemas"]["UploadJob"];
+            /** Format: int64 */
+            gameId: number;
+            /**
+             * @description Library-relative game folder.
+             * @example switch/Mario Kart 8 Deluxe
+             */
+            path: string;
+            stored: number;
+            replaced: number;
+            skipped: number;
+        };
         /** @description RFC 9457 problem details. */
         Problem: {
             type?: string;
@@ -474,6 +597,15 @@ export interface components {
         };
         /** @description IGDB failed or could not be reached. */
         BadGateway: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The operation failed; `detail` explains what happened. */
+        InternalError: {
             headers: {
                 [name: string]: unknown;
             };
@@ -804,6 +936,71 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    planJobCommit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitRequest"];
+            };
+        };
+        responses: {
+            /** @description The plan. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommitPlan"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    commitJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Stored; the job is done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommitResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     getImage: {

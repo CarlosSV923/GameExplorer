@@ -18,6 +18,24 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for CommitItemOnDuplicate.
+const (
+	CommitItemOnDuplicateReplace CommitItemOnDuplicate = "replace"
+	CommitItemOnDuplicateSkip    CommitItemOnDuplicate = "skip"
+)
+
+// Valid indicates whether the value is a known member of the CommitItemOnDuplicate enum.
+func (e CommitItemOnDuplicate) Valid() bool {
+	switch e {
+	case CommitItemOnDuplicateReplace:
+		return true
+	case CommitItemOnDuplicateSkip:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Degraded HealthStatus = "degraded"
@@ -129,6 +147,30 @@ func (e JobStatus) Valid() bool {
 	}
 }
 
+// Defines values for PlannedItemAction.
+const (
+	PlannedItemActionReplace   PlannedItemAction = "replace"
+	PlannedItemActionSkip      PlannedItemAction = "skip"
+	PlannedItemActionStore     PlannedItemAction = "store"
+	PlannedItemActionUndecided PlannedItemAction = "undecided"
+)
+
+// Valid indicates whether the value is a known member of the PlannedItemAction enum.
+func (e PlannedItemAction) Valid() bool {
+	switch e {
+	case PlannedItemActionReplace:
+		return true
+	case PlannedItemActionSkip:
+		return true
+	case PlannedItemActionStore:
+		return true
+	case PlannedItemActionUndecided:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StagedItemConfidence.
 const (
 	Extension StagedItemConfidence = "extension"
@@ -169,6 +211,77 @@ func (e StagedItemShape) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// CommitItem defines model for CommitItem.
+type CommitItem struct {
+	DiscNumber *int `json:"discNumber,omitempty"`
+
+	// Kind What a stored item is within a game folder.
+	Kind *ItemKind `json:"kind,omitempty"`
+
+	// Label Update version (v1.0.3) or DLC name.
+	Label *string `json:"label,omitempty"`
+
+	// OnDuplicate replace sends the existing item to the trash; skip keeps it and drops this one.
+	OnDuplicate *CommitItemOnDuplicate `json:"onDuplicate,omitempty"`
+
+	// Path StagedItem.path.
+	Path string `json:"path"`
+
+	// Skip Leave this item out of the library (it is deleted with the staging area).
+	Skip *bool `json:"skip,omitempty"`
+}
+
+// CommitItemOnDuplicate replace sends the existing item to the trash; skip keeps it and drops this one.
+type CommitItemOnDuplicate string
+
+// CommitPlan defines model for CommitPlan.
+type CommitPlan struct {
+	Console string `json:"console"`
+
+	// Existing The game's current items.
+	Existing []LibraryItem `json:"existing"`
+
+	// Folder Game folder inside the console folder.
+	//
+	// Example: The Legend of Zelda - Tears of the Kingdom
+	Folder string `json:"folder"`
+
+	// GameId Set when the game is already in the library.
+	GameId *int64 `json:"gameId,omitempty"`
+
+	// Items Items that are not skipped by the user.
+	Items []PlannedItem `json:"items"`
+
+	// Title Game title used for the names.
+	Title string `json:"title"`
+}
+
+// CommitRequest defines model for CommitRequest.
+type CommitRequest struct {
+	// Console Console slug.
+	//
+	// Example: switch
+	Console    string `json:"console"`
+	IgdbGameId int64  `json:"igdbGameId"`
+
+	// Items One entry per staged item that is not ignored.
+	Items []CommitItem `json:"items"`
+}
+
+// CommitResult defines model for CommitResult.
+type CommitResult struct {
+	GameId int64     `json:"gameId"`
+	Job    UploadJob `json:"job"`
+
+	// Path Library-relative game folder.
+	//
+	// Example: switch/Mario Kart 8 Deluxe
+	Path     string `json:"path"`
+	Replaced int    `json:"replaced"`
+	Skipped  int    `json:"skipped"`
+	Stored   int    `json:"stored"`
 }
 
 // Console defines model for Console.
@@ -223,6 +336,20 @@ type ItemKind string
 // set is complete the first volume continues and the rest become merged.
 type JobStatus string
 
+// LibraryItem defines model for LibraryItem.
+type LibraryItem struct {
+	DiscNumber *int `json:"discNumber,omitempty"`
+
+	// Files Relative to the game folder; the first is the main entry.
+	Files []string `json:"files"`
+	Id    int64    `json:"id"`
+
+	// Kind What a stored item is within a game folder.
+	Kind  ItemKind `json:"kind"`
+	Label *string  `json:"label,omitempty"`
+	Size  int64    `json:"size"`
+}
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Password string `json:"password"`
@@ -261,6 +388,19 @@ type MetadataPlatform struct {
 type PasswordRequest struct {
 	Password string `json:"password"`
 }
+
+// PlannedItem defines model for PlannedItem.
+type PlannedItem struct {
+	Action    PlannedItemAction `json:"action"`
+	Duplicate *LibraryItem      `json:"duplicate,omitempty"`
+
+	// Files Final names inside the game folder (a .cue sheet first, then its tracks).
+	Files []string `json:"files"`
+	Path  string   `json:"path"`
+}
+
+// PlannedItemAction defines model for PlannedItem.Action.
+type PlannedItemAction string
 
 // Problem RFC 9457 problem details.
 type Problem struct {
@@ -363,6 +503,9 @@ type BadRequest = Problem
 // Conflict RFC 9457 problem details.
 type Conflict = Problem
 
+// InternalError RFC 9457 problem details.
+type InternalError = Problem
+
 // NotFound RFC 9457 problem details.
 type NotFound = Problem
 
@@ -392,8 +535,14 @@ type SearchPlatformsParams struct {
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
+// CommitJobJSONRequestBody defines body for CommitJob for application/json ContentType.
+type CommitJobJSONRequestBody = CommitRequest
+
 // SubmitJobPasswordJSONRequestBody defines body for SubmitJobPassword for application/json ContentType.
 type SubmitJobPasswordJSONRequestBody = PasswordRequest
+
+// PlanJobCommitJSONRequestBody defines body for PlanJobCommit for application/json ContentType.
+type PlanJobCommitJSONRequestBody = CommitRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -427,12 +576,18 @@ type ServerInterface interface {
 	// CancelJob Cancel a job and delete its uploaded data
 	// (POST /jobs/{id}/cancel)
 	CancelJob(w http.ResponseWriter, r *http.Request, id JobId)
+	// CommitJob Store a reviewed upload in the library
+	// (POST /jobs/{id}/commit)
+	CommitJob(w http.ResponseWriter, r *http.Request, id JobId)
 	// ListJobItems Items found in an upload, with console and kind suggestions
 	// (GET /jobs/{id}/items)
 	ListJobItems(w http.ResponseWriter, r *http.Request, id JobId)
 	// SubmitJobPassword Retry extraction of an encrypted archive with its password
 	// (POST /jobs/{id}/password)
 	SubmitJobPassword(w http.ResponseWriter, r *http.Request, id JobId)
+	// PlanJobCommit Preview where a reviewed upload would be stored
+	// (POST /jobs/{id}/plan)
+	PlanJobCommit(w http.ResponseWriter, r *http.Request, id JobId)
 	// SearchGames Search games on IGDB, optionally limited to one platform
 	// (GET /metadata/games)
 	SearchGames(w http.ResponseWriter, r *http.Request, params SearchGamesParams)
@@ -635,6 +790,32 @@ func (siw *ServerInterfaceWrapper) CancelJob(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// CommitJob operation middleware
+func (siw *ServerInterfaceWrapper) CommitJob(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id JobId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CommitJob(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListJobItems operation middleware
 func (siw *ServerInterfaceWrapper) ListJobItems(w http.ResponseWriter, r *http.Request) {
 
@@ -678,6 +859,32 @@ func (siw *ServerInterfaceWrapper) SubmitJobPassword(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SubmitJobPassword(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PlanJobCommit operation middleware
+func (siw *ServerInterfaceWrapper) PlanJobCommit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id JobId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlanJobCommit(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -912,6 +1119,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/jobs/{id}/items", wrapper.ListJobItems)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/jobs/{id}/password", wrapper.SubmitJobPassword)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/jobs/{id}/cancel", wrapper.CancelJob)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/jobs/{id}/plan", wrapper.PlanJobCommit)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/jobs/{id}/commit", wrapper.CommitJob)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/images/{size}/{imageId}", wrapper.GetImage)
 
 	return m
@@ -922,6 +1131,8 @@ type BadGatewayApplicationProblemPlusJSONResponse Problem
 type BadRequestApplicationProblemPlusJSONResponse Problem
 
 type ConflictApplicationProblemPlusJSONResponse Problem
+
+type InternalErrorApplicationProblemPlusJSONResponse Problem
 
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
@@ -1457,6 +1668,141 @@ func (response CancelJob409ApplicationProblemPlusJSONResponse) VisitCancelJobRes
 	return err
 }
 
+type CommitJobRequestObject struct {
+	Id   JobId `json:"id"`
+	Body *CommitJobJSONRequestBody
+}
+
+type CommitJobResponseObject interface {
+	VisitCommitJobResponse(w http.ResponseWriter) error
+}
+
+type CommitJob200JSONResponse CommitResult
+
+func (response CommitJob200JSONResponse) VisitCommitJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitJob400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CommitJob400ApplicationProblemPlusJSONResponse) VisitCommitJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitJob401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CommitJob401ApplicationProblemPlusJSONResponse) VisitCommitJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitJob404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CommitJob404ApplicationProblemPlusJSONResponse) VisitCommitJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitJob409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CommitJob409ApplicationProblemPlusJSONResponse) VisitCommitJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitJob500ApplicationProblemPlusJSONResponse struct {
+	InternalErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CommitJob500ApplicationProblemPlusJSONResponse) VisitCommitJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitJob502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response CommitJob502ApplicationProblemPlusJSONResponse) VisitCommitJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitJob503ApplicationProblemPlusJSONResponse struct {
+	ServiceUnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response CommitJob503ApplicationProblemPlusJSONResponse) VisitCommitJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListJobItemsRequestObject struct {
 	Id JobId `json:"id"`
 }
@@ -1594,6 +1940,125 @@ func (response SubmitJobPassword409ApplicationProblemPlusJSONResponse) VisitSubm
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanJobCommitRequestObject struct {
+	Id   JobId `json:"id"`
+	Body *PlanJobCommitJSONRequestBody
+}
+
+type PlanJobCommitResponseObject interface {
+	VisitPlanJobCommitResponse(w http.ResponseWriter) error
+}
+
+type PlanJobCommit200JSONResponse CommitPlan
+
+func (response PlanJobCommit200JSONResponse) VisitPlanJobCommitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanJobCommit400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PlanJobCommit400ApplicationProblemPlusJSONResponse) VisitPlanJobCommitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanJobCommit401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PlanJobCommit401ApplicationProblemPlusJSONResponse) VisitPlanJobCommitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanJobCommit404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PlanJobCommit404ApplicationProblemPlusJSONResponse) VisitPlanJobCommitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanJobCommit409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PlanJobCommit409ApplicationProblemPlusJSONResponse) VisitPlanJobCommitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanJobCommit502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response PlanJobCommit502ApplicationProblemPlusJSONResponse) VisitPlanJobCommitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanJobCommit503ApplicationProblemPlusJSONResponse struct {
+	ServiceUnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response PlanJobCommit503ApplicationProblemPlusJSONResponse) VisitPlanJobCommitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1802,12 +2267,18 @@ type StrictServerInterface interface {
 	// CancelJob Cancel a job and delete its uploaded data
 	// (POST /jobs/{id}/cancel)
 	CancelJob(ctx context.Context, request CancelJobRequestObject) (CancelJobResponseObject, error)
+	// CommitJob Store a reviewed upload in the library
+	// (POST /jobs/{id}/commit)
+	CommitJob(ctx context.Context, request CommitJobRequestObject) (CommitJobResponseObject, error)
 	// ListJobItems Items found in an upload, with console and kind suggestions
 	// (GET /jobs/{id}/items)
 	ListJobItems(ctx context.Context, request ListJobItemsRequestObject) (ListJobItemsResponseObject, error)
 	// SubmitJobPassword Retry extraction of an encrypted archive with its password
 	// (POST /jobs/{id}/password)
 	SubmitJobPassword(ctx context.Context, request SubmitJobPasswordRequestObject) (SubmitJobPasswordResponseObject, error)
+	// PlanJobCommit Preview where a reviewed upload would be stored
+	// (POST /jobs/{id}/plan)
+	PlanJobCommit(ctx context.Context, request PlanJobCommitRequestObject) (PlanJobCommitResponseObject, error)
 	// SearchGames Search games on IGDB, optionally limited to one platform
 	// (GET /metadata/games)
 	SearchGames(ctx context.Context, request SearchGamesRequestObject) (SearchGamesResponseObject, error)
@@ -2109,6 +2580,39 @@ func (sh *strictHandler) CancelJob(w http.ResponseWriter, r *http.Request, id Jo
 	}
 }
 
+// CommitJob operation middleware
+func (sh *strictHandler) CommitJob(w http.ResponseWriter, r *http.Request, id JobId) {
+	var request CommitJobRequestObject
+
+	request.Id = id
+
+	var body CommitJobJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CommitJob(ctx, request.(CommitJobRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CommitJob")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CommitJobResponseObject); ok {
+		if err := validResponse.VisitCommitJobResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListJobItems operation middleware
 func (sh *strictHandler) ListJobItems(w http.ResponseWriter, r *http.Request, id JobId) {
 	var request ListJobItemsRequestObject
@@ -2161,6 +2665,39 @@ func (sh *strictHandler) SubmitJobPassword(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SubmitJobPasswordResponseObject); ok {
 		if err := validResponse.VisitSubmitJobPasswordResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PlanJobCommit operation middleware
+func (sh *strictHandler) PlanJobCommit(w http.ResponseWriter, r *http.Request, id JobId) {
+	var request PlanJobCommitRequestObject
+
+	request.Id = id
+
+	var body PlanJobCommitJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PlanJobCommit(ctx, request.(PlanJobCommitRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PlanJobCommit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PlanJobCommitResponseObject); ok {
+		if err := validResponse.VisitPlanJobCommitResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
