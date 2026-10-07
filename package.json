@@ -1,0 +1,22 @@
+{
+  "name": "gameexplorer",
+  "private": true,
+  "description": "Self-hosted web app to upload, organize and download emulation game files on a home NAS.",
+  "license": "MIT",
+  "packageManager": "pnpm@12.9.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @gameexplorer/web dev",
+    "build:web": "pnpm --filter @gameexplorer/web build",
+    "lint:web": "pnpm --filter @gameexplorer/web lint",
+    "typecheck:web": "pnpm --filter @gameexplorer/web typecheck",
+    "test:web": "pnpm --filter @gameexplorer/web test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9"
+  }
+}

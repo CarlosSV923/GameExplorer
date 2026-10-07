@@ -1,0 +1,80 @@
+{
+  "description": "Console and item-kind suggestions derived from the file name only. consoles lists every candidate slug; an empty list means unknown. Ambiguous extensions (.iso, .bin, .chd) return several candidates and are resolved by header sniffing.",
+  "cases": [
+    {
+      "name": "switch base from title id ending in 000",
+      "input": { "fileName": "Mario Kart 8 Deluxe [0100152000022000][v0].nsp" },
+      "expected": {
+        "consoles": ["switch"],
+        "kind": "base",
+        "titleId": "0100152000022000",
+        "version": "v0"
+      }
+    },
+    {
+      "name": "switch update from title id ending in 800",
+      "input": { "fileName": "Mario Kart 8 Deluxe [0100152000022800][v3.0.1].nsp" },
+      "expected": {
+        "consoles": ["switch"],
+        "kind": "update",
+        "titleId": "0100152000022800",
+        "version": "v3.0.1"
+      }
+    },
+    {
+      "name": "switch dlc from any other title id suffix",
+      "input": { "fileName": "MK8D Booster Course Pass [0100152000023001].nsp" },
+      "expected": { "consoles": ["switch"], "kind": "dlc", "titleId": "0100152000023001" }
+    },
+    {
+      "name": "switch xci without title id has no kind suggestion",
+      "input": { "fileName": "Metroid Dread.xci" },
+      "expected": { "consoles": ["switch"] }
+    },
+    {
+      "name": "wbfs is wii",
+      "input": { "fileName": "Super Mario Galaxy.wbfs" },
+      "expected": { "consoles": ["wii"] }
+    },
+    {
+      "name": "rvz is gamecube or wii",
+      "input": { "fileName": "Super Mario Sunshine.rvz" },
+      "expected": { "consoles": ["gc", "wii"] }
+    },
+    {
+      "name": "gcm is gamecube",
+      "input": { "fileName": "Metroid Prime.gcm" },
+      "expected": { "consoles": ["gc"] }
+    },
+    {
+      "name": "iso is ambiguous",
+      "input": { "fileName": "Shadow of the Colossus.iso" },
+      "expected": { "consoles": ["gc", "wii", "ps2", "ps3"] }
+    },
+    {
+      "name": "cue is ps1 or ps2",
+      "input": { "fileName": "Final Fantasy VII (Disc 1).cue" },
+      "expected": { "consoles": ["psx", "ps2"], "kind": "disc", "discNumber": 1 }
+    },
+    {
+      "name": "pbp is ps1",
+      "input": { "fileName": "Crash Bandicoot.pbp" },
+      "expected": { "consoles": ["psx"] }
+    },
+    {
+      "name": "pkg is ps3",
+      "input": { "fileName": "Demons Souls.pkg" },
+      "expected": { "consoles": ["ps3"] }
+    },
+    {
+      "name": "extension match is case-insensitive",
+      "input": { "fileName": "ZELDA.NSP" },
+      "expected": { "consoles": ["switch"] }
+    },
+    {
+      "name": "unknown extension",
+      "input": { "fileName": "readme.txt" },
+      "expected": { "consoles": [] }
+    }
+  ]
+}

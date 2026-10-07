@@ -1,0 +1,102 @@
+{
+  "description": "Expected folder and file names. sanitizedTitle is the game folder name; fileName is relative to it.",
+  "cases": [
+    {
+      "name": "base game keeps only the title",
+      "input": { "title": "Mario Kart 8 Deluxe", "kind": "base", "extension": ".nsp" },
+      "expected": { "sanitizedTitle": "Mario Kart 8 Deluxe", "fileName": "Mario Kart 8 Deluxe.nsp" }
+    },
+    {
+      "name": "colon becomes space-dash",
+      "input": {
+        "title": "The Legend of Zelda: Tears of the Kingdom",
+        "kind": "base",
+        "extension": ".xci"
+      },
+      "expected": {
+        "sanitizedTitle": "The Legend of Zelda - Tears of the Kingdom",
+        "fileName": "The Legend of Zelda - Tears of the Kingdom.xci"
+      }
+    },
+    {
+      "name": "update carries its version tag",
+      "input": {
+        "title": "Mario Kart 8 Deluxe",
+        "kind": "update",
+        "label": "v3.0.1",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "sanitizedTitle": "Mario Kart 8 Deluxe",
+        "fileName": "Mario Kart 8 Deluxe [Update v3.0.1].nsp"
+      }
+    },
+    {
+      "name": "dlc carries its name",
+      "input": {
+        "title": "Mario Kart 8 Deluxe",
+        "kind": "dlc",
+        "label": "Booster Course Pass",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "sanitizedTitle": "Mario Kart 8 Deluxe",
+        "fileName": "Mario Kart 8 Deluxe [DLC] Booster Course Pass.nsp"
+      }
+    },
+    {
+      "name": "disc carries its number",
+      "input": {
+        "title": "Final Fantasy VII",
+        "kind": "disc",
+        "discNumber": 2,
+        "extension": ".cue"
+      },
+      "expected": {
+        "sanitizedTitle": "Final Fantasy VII",
+        "fileName": "Final Fantasy VII (Disc 2).cue"
+      }
+    },
+    {
+      "name": "characters forbidden on SMB/Windows are removed",
+      "input": {
+        "title": "What?! <Bad> \"Name\" | A/B \\ C*",
+        "kind": "base",
+        "extension": ".iso"
+      },
+      "expected": {
+        "sanitizedTitle": "What! Bad Name A B C",
+        "fileName": "What! Bad Name A B C.iso"
+      }
+    },
+    {
+      "name": "trailing dots and spaces are trimmed",
+      "input": { "title": "Shadow of the Colossus... ", "kind": "base", "extension": ".iso" },
+      "expected": {
+        "sanitizedTitle": "Shadow of the Colossus",
+        "fileName": "Shadow of the Colossus.iso"
+      }
+    },
+    {
+      "name": "whitespace runs collapse to one space",
+      "input": { "title": "  Super   Mario\tSunshine ", "kind": "base", "extension": ".rvz" },
+      "expected": {
+        "sanitizedTitle": "Super Mario Sunshine",
+        "fileName": "Super Mario Sunshine.rvz"
+      }
+    },
+    {
+      "name": "unicode is normalized to NFC and kept",
+      "input": { "title": "Pokémon Legends: Arceus", "kind": "base", "extension": ".nsp" },
+      "expected": {
+        "sanitizedTitle": "Pokémon Legends - Arceus",
+        "fileName": "Pokémon Legends - Arceus.nsp"
+      }
+    },
+    {
+      "name": "extension is lowercased",
+      "input": { "title": "Metroid Prime", "kind": "base", "extension": ".ISO" },
+      "expected": { "sanitizedTitle": "Metroid Prime", "fileName": "Metroid Prime.iso" }
+    }
+  ]
+}

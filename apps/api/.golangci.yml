@@ -1,0 +1,38 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - bodyclose
+    - errorlint
+    - gocritic
+    - gosec
+    - misspell
+    - noctx
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+  settings:
+    revive:
+      rules:
+        - name: exported
+        - name: package-comments
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/CarlosSV923/GameExplorer

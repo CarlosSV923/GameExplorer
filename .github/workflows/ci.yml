@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.mod
+      - name: Install 7-Zip (used by integration tests)
+        run: sudo apt-get update && sudo apt-get install -y 7zip
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14
+          working-directory: apps/api
+      - name: Test
+        run: go test -race ./...
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: Build
+        run: go build -o bin/gameexplorer ./cmd/gameexplorer
+
+  web:
+    name: Web (React)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint:web
+      - run: pnpm typecheck:web
+      - run: pnpm format:check
+      - run: pnpm test:web
+      - name: Build (api mode)
+        run: pnpm build:web
+      - name: Build (demo mode)
+        run: pnpm build:web
+        env:
+          VITE_DATA_SOURCE: demo

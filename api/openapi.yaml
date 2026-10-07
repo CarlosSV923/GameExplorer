@@ -1,0 +1,64 @@
+openapi: 3.0.3
+info:
+  title: GameExplorer API
+  version: 0.1.0
+  description: |
+    Single source of truth for the GameExplorer HTTP contract.
+    Go handlers (oapi-codegen strict server) and the TypeScript client
+    (openapi-typescript) are generated from this file; never edit generated code.
+
+    Uploads are NOT described here: they use the tus resumable upload protocol
+    (https://tus.io/protocols/resumable-upload) mounted at /api/uploads/.
+  license:
+    name: MIT
+servers:
+  - url: /api
+tags:
+  - name: system
+paths:
+  /health:
+    get:
+      tags: [system]
+      operationId: getHealth
+      summary: Liveness probe
+      security: []
+      responses:
+        '200':
+          description: The process is up.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: ge_session
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+    ItemKind:
+      type: string
+      description: What a stored item is within a game folder.
+      enum: [base, update, dlc, disc]
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      required: [title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+security:
+  - sessionCookie: []

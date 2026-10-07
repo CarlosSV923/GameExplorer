@@ -1,0 +1,77 @@
+version: '3'
+
+vars:
+  API_DIR: apps/api
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  install:
+    desc: Install JS dependencies and download Go modules
+    cmds:
+      - pnpm install --frozen-lockfile
+      - go -C {{.API_DIR}} mod download
+
+  dev:api:
+    desc: Run the Go API (http://localhost:8080)
+    cmds:
+      - go -C {{.API_DIR}} run ./cmd/gameexplorer
+
+  dev:web:
+    desc: Run the Vite dev server (http://localhost:5173), proxying /api to the Go API
+    cmds:
+      - pnpm dev:web
+
+  dev:demo:
+    desc: Run the web app in demo mode (no backend)
+    env:
+      VITE_DATA_SOURCE: demo
+    cmds:
+      - pnpm dev:web
+
+  lint:
+    desc: Lint Go and TypeScript code
+    cmds:
+      - task: lint:api
+      - task: lint:web
+
+  lint:api:
+    dir: '{{.API_DIR}}'
+    cmds:
+      - golangci-lint run ./...
+
+  lint:web:
+    cmds:
+      - pnpm lint:web
+      - pnpm typecheck:web
+      - pnpm format:check
+
+  test:
+    desc: Run all tests
+    cmds:
+      - task: test:api
+      - task: test:web
+
+  test:api:
+    cmds:
+      - go -C {{.API_DIR}} test ./...
+
+  test:web:
+    cmds:
+      - pnpm test:web
+
+  build:
+    desc: Build the web app and the Go binary
+    cmds:
+      - pnpm build:web
+      - go -C {{.API_DIR}} build -o bin/gameexplorer ./cmd/gameexplorer
+
+  check:
+    desc: Everything CI runs
+    cmds:
+      - task: lint
+      - task: test
+      - task: build
