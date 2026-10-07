@@ -28,6 +28,23 @@ func WriteProblem(w http.ResponseWriter, status int, title, detail string) {
 	_ = json.NewEncoder(w).Encode(Problem{Title: title, Status: status, Detail: detail})
 }
 
+type requestKey struct{}
+
+// Request returns the request stored by WithRequest. Generated strict
+// handlers only receive a context; downloads need the request itself for
+// Range and conditional headers (http.ServeContent).
+func Request(ctx context.Context) (*http.Request, bool) {
+	r, ok := ctx.Value(requestKey{}).(*http.Request)
+	return r, ok
+}
+
+// WithRequest stores the request in its own context.
+func WithRequest(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestKey{}, r)))
+	})
+}
+
 type clientIPKey struct{}
 
 // ClientIP returns the client address stored by WithClientIP.

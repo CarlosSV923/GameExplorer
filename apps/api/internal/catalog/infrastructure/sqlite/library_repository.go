@@ -30,9 +30,55 @@ func NewLibraryRepository(db *sql.DB) *LibraryRepository {
 	return &LibraryRepository{db: db, q: sqlcgen.New(db)}
 }
 
+// ListGames implements domain.LibraryRepository.
+func (r *LibraryRepository) ListGames(ctx context.Context) ([]domain.GameSummary, error) {
+	rows, err := r.q.ListGameSummaries(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.GameSummary, 0, len(rows))
+	for _, row := range rows {
+		s := domain.GameSummary{
+			ID: domain.GameID(row.ID), ConsoleID: domain.ConsoleID(row.ConsoleID), Title: row.Title, Folder: row.Folder,
+			ItemCount: int(row.ItemCount), Size: row.Size,
+		}
+		if row.ReleaseYear.Valid {
+			y := int(row.ReleaseYear.Int64)
+			s.ReleaseYear = &y
+		}
+		if row.CoverImageID.Valid {
+			s.CoverImageID = &row.CoverImageID.String
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+// GameByID implements domain.LibraryRepository.
+func (r *LibraryRepository) GameByID(ctx context.Context, id domain.GameID) (*domain.Game, error) {
+	row, err := r.q.GetGame(ctx, int64(id))
+	return r.withItems(ctx, row, err)
+}
+
+// ItemByID implements domain.LibraryRepository.
+func (r *LibraryRepository) ItemByID(ctx context.Context, id domain.ItemID) (domain.GameItem, error) {
+	row, err := r.q.GetGameItem(ctx, int64(id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.GameItem{}, domain.ErrItemNotFound
+	}
+	if err != nil {
+		return domain.GameItem{}, err
+	}
+	return itemToDomain(row)
+}
+
 // FindGame implements domain.LibraryRepository.
 func (r *LibraryRepository) FindGame(ctx context.Context, console domain.ConsoleID, igdbID int64) (*domain.Game, error) {
 	row, err := r.q.FindGameByIGDB(ctx, sqlcgen.FindGameByIGDBParams{ConsoleID: int64(console), IgdbID: igdbID})
+	return r.withItems(ctx, row, err)
+}
+
+func (r *LibraryRepository) withItems(ctx context.Context, row sqlcgen.Game, err error) (*domain.Game, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrGameNotFound
 	}

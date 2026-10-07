@@ -157,7 +157,10 @@ func planToAPI(p application.CommitPlan) httpapi.CommitPlan {
 }
 
 func libraryItemToAPI(e application.ExistingItem) httpapi.LibraryItem {
-	out := httpapi.LibraryItem{Id: e.ID, Kind: httpapi.ItemKind(e.Kind), Files: e.Files, Size: e.Size}
+	out := httpapi.LibraryItem{
+		Id: e.ID, Kind: httpapi.ItemKind(e.Kind), Shape: httpapi.LibraryItemShape(e.Shape),
+		Files: e.Files, Size: e.Size, CreatedAt: e.CreatedAt,
+	}
 	if e.Label != "" {
 		l := e.Label
 		out.Label = &l

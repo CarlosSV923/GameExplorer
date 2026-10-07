@@ -51,6 +51,7 @@ func toDomain(row sqlcgen.ListConsolesRow) (domain.Console, error) {
 		DisplayName: row.DisplayName,
 		Extensions:  exts,
 		SortOrder:   int(row.SortOrder),
+		GameCount:   int(row.GameCount),
 	}
 	if row.IgdbPlatformID.Valid {
 		id := row.IgdbPlatformID.Int64

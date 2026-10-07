@@ -177,8 +177,30 @@ type TrashedItem struct {
 	TrashDir string
 }
 
+// GameSummary is a game as listed in the library (read model).
+type GameSummary struct {
+	ID           GameID
+	ConsoleID    ConsoleID
+	Title        string
+	Folder       string
+	ReleaseYear  *int
+	CoverImageID *string
+	ItemCount    int
+	Size         int64
+}
+
+// ErrItemNotFound is returned when an item does not exist.
+var ErrItemNotFound = errors.New("item not found")
+
 // LibraryRepository persists games, items and the operation journal.
 type LibraryRepository interface {
+	// ListGames returns the games with items outside the trash, by title.
+	ListGames(ctx context.Context) ([]GameSummary, error)
+	// GameByID returns a game with every item (ErrGameNotFound).
+	GameByID(ctx context.Context, id GameID) (*Game, error)
+	// ItemByID returns one item (ErrItemNotFound).
+	ItemByID(ctx context.Context, id ItemID) (GameItem, error)
+
 	// FindGame returns the console's game for an IGDB id, with every item.
 	FindGame(ctx context.Context, console ConsoleID, igdbID int64) (*Game, error)
 	// FolderTaken reports whether another game of the console uses the folder.

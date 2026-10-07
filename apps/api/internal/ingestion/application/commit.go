@@ -54,6 +54,8 @@ type LibraryRequest struct {
 type ExistingItem struct {
 	ID         int64
 	Kind       string
+	Shape      domain.ItemShape
+	CreatedAt  time.Time
 	Label      string
 	DiscNumber int
 	Files      []string

@@ -15,6 +15,7 @@ import (
 var fakeGames = map[string]string{
 	"26764":  `{"id":26764,"name":"Mario Kart 8 Deluxe","first_release_date":1493337600,"cover":{"image_id":"co213p"},"genres":[{"name":"Racing"}],"platforms":[130]}`,
 	"427":    `{"id":427,"name":"Final Fantasy VII","first_release_date":854668800,"summary":"Cloud.","platforms":[7]}`,
+	"166778": `{"id":166778,"name":"Pokémon Legends: Arceus","first_release_date":1643328000,"platforms":[130]}`,
 	"119388": `{"id":119388,"name":"The Legend of Zelda: Tears of the Kingdom","first_release_date":1683849600,"platforms":[130]}`,
 }
 

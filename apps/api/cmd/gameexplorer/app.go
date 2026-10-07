@@ -177,9 +177,11 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 	extractor := sevenzip.New("")
 	stagingArea := staging.New(stagingDir(cfg.LibraryPath), volumesDir(cfg.LibraryPath))
 	ingestion := ingestionapp.NewService(jobs, store, events, log, nil).WithItems(items)
+	libraryRepo := catalogsqlite.NewLibraryRepository(db)
+	libraryFiles := libraryfs.New(cfg.LibraryPath, trashDir(cfg.LibraryPath))
 	library := catalogapp.NewLibraryService(
-		catalogsqlite.NewConsoleRepository(db), catalogsqlite.NewLibraryRepository(db), gameDirectory{metadata},
-		libraryfs.New(cfg.LibraryPath, trashDir(cfg.LibraryPath)), log, nil)
+		catalogsqlite.NewConsoleRepository(db), libraryRepo, gameDirectory{metadata}, libraryFiles, log, nil)
+	browse := catalogapp.NewBrowseService(catalogsqlite.NewConsoleRepository(db), libraryRepo, libraryFiles)
 	committer := ingestionapp.NewCommitter(jobs, items, stagingArea, libraryPort{library}, events, log, nil)
 	var processor *ingestionapp.Processor
 	if uploadsErr == nil {
@@ -204,7 +206,7 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 			}},
 		),
 		identityAPI: identityHandler,
-		catalogAPI:  cataloghttp.NewHandler(consoles),
+		catalogAPI:  cataloghttp.NewHandler(consoles).WithLibrary(browse, log),
 		metadataAPI: metadatahttp.NewHandler(metadata, log),
 		jobsAPI:     ingestionhttp.NewHandler(ingestion, passwordSubmitter{processor}, events, shutdown).WithCommits(committer),
 	}
@@ -248,6 +250,7 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 		httpx.Logging(log),
 		httpx.SecurityHeaders,
 		httpx.WithClientIP,
+		httpx.WithRequest,
 	)
 	a := &app{
 		handler: handler, db: db, log: log, consoles: consoles, metadata: metadata,

@@ -45,9 +45,9 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 ### Biblioteca
 - **RF-20** Inicio: carrusel de consolas con logo de IGDB (o el nombre en texto si no hay logo), año de lanzamiento y número de juegos. El logo es el del **modelo original** de la consola (la versión lanzada primero), porque el logo general de IGDB suele ser el de la última revisión (p. ej. "Switch OLED Model"). Logo y año se actualizan desde IGDB al arrancar.
 - **RF-20a** Búsqueda de juegos en IGDB: solo tipos jugables (juego principal, expansión independiente, remake, remaster, expandido y port; sin bundles, DLC ni packs) y resultados reordenados por coincidencia del nombre (exacto > prefijo > palabra completa). Las imágenes se sirven desde una caché local, de modo que el navegador nunca contacta a terceros.
-- **RF-21** Pantalla de consola: lista de juegos y panel de detalle (portada, año, géneros, resumen, carpeta, elementos con tipo y tamaño).
-- **RF-22** Búsqueda global en la biblioteca.
-- **RF-23** Descargar un elemento (reanudable con HTTP Range) o el juego completo como zip sin compresión. Los juegos en carpeta se descargan siempre como zip.
+- **RF-21** Pantalla de consola: lista de juegos por título y panel de detalle (portada, año, géneros, resumen, carpeta, elementos con tipo y tamaño). Los elementos se ordenan: base, discos por número, updates por fecha y DLC por nombre. Un juego cuyos elementos están todos en la papelera no aparece.
+- **RF-22** Búsqueda global en la biblioteca: cada palabra debe aparecer en el título, sin importar mayúsculas ni acentos ("pokemon" encuentra "Pokémon").
+- **RF-23** Descargar un elemento (reanudable con HTTP Range) o el juego completo como zip sin compresión. Los juegos en carpeta y los discos (`.cue` + pistas) se descargan siempre como zip. Dentro del zip los archivos van en `<carpeta del juego>/`. El zip se arma mientras se envía, pero anuncia su tamaño exacto (el navegador muestra el progreso). No se puede reanudar. Si falta un archivo en disco (borrado por SMB), la descarga falla antes de empezar con un mensaje claro.
 - **RF-24** Re-emparejar un juego con otro resultado de IGDB, lo que renombra la carpeta y todos los archivos (reversible si falla).
 - **RF-25** Enviar un elemento o un juego a la papelera.
 - **RF-26** Chequeo periódico de integridad: marca como *faltante* lo borrado por fuera de la app (por SMB).

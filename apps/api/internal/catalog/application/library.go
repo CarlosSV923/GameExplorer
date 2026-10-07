@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"path"
 	"path/filepath"
@@ -56,6 +57,18 @@ type Files interface {
 	ReadFile(path string, limit int64) ([]byte, error)
 	WriteFile(path string, data []byte) error
 	Remove(path string) error
+	// Tree lists the regular files at path: the file itself, or every file
+	// under a directory (sorted, Rel with "/" separators).
+	Tree(path string) ([]TreeFile, error)
+	Open(path string) (io.ReadSeekCloser, error)
+}
+
+// TreeFile is a regular file found by Files.Tree.
+type TreeFile struct {
+	Path     string // absolute
+	Rel      string // relative to the listed directory; "" for a file
+	Size     int64
+	Modified time.Time
 }
 
 // RejectReason classifies why a request was refused.

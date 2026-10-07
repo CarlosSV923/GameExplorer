@@ -147,6 +147,27 @@ func (e JobStatus) Valid() bool {
 	}
 }
 
+// Defines values for LibraryItemShape.
+const (
+	LibraryItemShapeDisc   LibraryItemShape = "disc"
+	LibraryItemShapeFile   LibraryItemShape = "file"
+	LibraryItemShapeFolder LibraryItemShape = "folder"
+)
+
+// Valid indicates whether the value is a known member of the LibraryItemShape enum.
+func (e LibraryItemShape) Valid() bool {
+	switch e {
+	case LibraryItemShapeDisc:
+		return true
+	case LibraryItemShapeFile:
+		return true
+	case LibraryItemShapeFolder:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PlannedItemAction.
 const (
 	PlannedItemActionReplace   PlannedItemAction = "replace"
@@ -287,10 +308,13 @@ type CommitResult struct {
 // Console defines model for Console.
 type Console struct {
 	// DisplayName Example: PlayStation 2
-	DisplayName    string   `json:"displayName"`
-	Extensions     []string `json:"extensions"`
-	Id             int64    `json:"id"`
-	IgdbPlatformId *int64   `json:"igdbPlatformId,omitempty"`
+	DisplayName string   `json:"displayName"`
+	Extensions  []string `json:"extensions"`
+
+	// GameCount Games with at least one item in the library.
+	GameCount      int    `json:"gameCount"`
+	Id             int64  `json:"id"`
+	IgdbPlatformId *int64 `json:"igdbPlatformId,omitempty"`
 
 	// LogoImageId IGDB image id; render with /api/images/logo_med/{logoImageId}.
 	LogoImageId *string `json:"logoImageId,omitempty"`
@@ -303,6 +327,55 @@ type Console struct {
 	// Example: ps2
 	Slug      string `json:"slug"`
 	SortOrder int    `json:"sortOrder"`
+}
+
+// GameDetail defines model for GameDetail.
+type GameDetail struct {
+	// Console Console slug.
+	Console string `json:"console"`
+
+	// CoverImageId Render with /api/images/cover_big/{coverImageId}.
+	CoverImageId *string `json:"coverImageId,omitempty"`
+
+	// Folder Folder inside the console folder.
+	Folder    string   `json:"folder"`
+	Genres    []string `json:"genres"`
+	Id        int64    `json:"id"`
+	IgdbId    int64    `json:"igdbId"`
+	ItemCount int      `json:"itemCount"`
+
+	// Items Items in the library (not in the trash), base first.
+	Items []LibraryItem `json:"items"`
+
+	// Path Library-relative folder.
+	//
+	// Example: switch/Inside
+	Path        string `json:"path"`
+	ReleaseYear *int   `json:"releaseYear,omitempty"`
+
+	// Size Bytes of every item in the library.
+	Size    int64   `json:"size"`
+	Summary *string `json:"summary,omitempty"`
+	Title   string  `json:"title"`
+}
+
+// GameSummary defines model for GameSummary.
+type GameSummary struct {
+	// Console Console slug.
+	Console string `json:"console"`
+
+	// CoverImageId Render with /api/images/cover_big/{coverImageId}.
+	CoverImageId *string `json:"coverImageId,omitempty"`
+
+	// Folder Folder inside the console folder.
+	Folder      string `json:"folder"`
+	Id          int64  `json:"id"`
+	ItemCount   int    `json:"itemCount"`
+	ReleaseYear *int   `json:"releaseYear,omitempty"`
+
+	// Size Bytes of every item in the library.
+	Size  int64  `json:"size"`
+	Title string `json:"title"`
 }
 
 // Health defines model for Health.
@@ -338,7 +411,8 @@ type JobStatus string
 
 // LibraryItem defines model for LibraryItem.
 type LibraryItem struct {
-	DiscNumber *int `json:"discNumber,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
+	DiscNumber *int      `json:"discNumber,omitempty"`
 
 	// Files Relative to the game folder; the first is the main entry.
 	Files []string `json:"files"`
@@ -347,8 +421,14 @@ type LibraryItem struct {
 	// Kind What a stored item is within a game folder.
 	Kind  ItemKind `json:"kind"`
 	Label *string  `json:"label,omitempty"`
-	Size  int64    `json:"size"`
+
+	// Shape file downloads as is (resumable); disc and folder download as a zip.
+	Shape LibraryItemShape `json:"shape"`
+	Size  int64            `json:"size"`
 }
+
+// LibraryItemShape file downloads as is (resumable); disc and folder download as a zip.
+type LibraryItemShape string
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
@@ -491,6 +571,9 @@ type UploadJob struct {
 	Warning *string `json:"warning,omitempty"`
 }
 
+// GameId defines model for GameId.
+type GameId = int64
+
 // JobId defines model for JobId.
 type JobId = string
 
@@ -517,6 +600,11 @@ type TooManyRequests = Problem
 
 // Unauthorized RFC 9457 problem details.
 type Unauthorized = Problem
+
+// SearchLibraryParams defines parameters for SearchLibrary.
+type SearchLibraryParams struct {
+	Q string `form:"q" json:"q"`
+}
 
 // SearchGamesParams defines parameters for SearchGames.
 type SearchGamesParams struct {
@@ -558,12 +646,27 @@ type ServerInterface interface {
 	// ListConsoles Consoles in carousel order
 	// (GET /consoles)
 	ListConsoles(w http.ResponseWriter, r *http.Request)
+	// ListConsoleGames Games of one console, by title
+	// (GET /consoles/{slug}/games)
+	ListConsoleGames(w http.ResponseWriter, r *http.Request, slug string)
+	// SearchLibrary Search the library by title, across consoles (RF-22)
+	// (GET /games)
+	SearchLibrary(w http.ResponseWriter, r *http.Request, params SearchLibraryParams)
+	// GetGame Game detail with its items (RF-21)
+	// (GET /games/{id})
+	GetGame(w http.ResponseWriter, r *http.Request, id GameId)
+	// DownloadGame The whole game as an uncompressed zip, streamed (RF-23)
+	// (GET /games/{id}/download)
+	DownloadGame(w http.ResponseWriter, r *http.Request, id GameId)
 	// GetHealth Liveness probe and startup diagnostics
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
 	// GetImage IGDB image (cover or logo) served from the local cache
 	// (GET /images/{size}/{imageId})
 	GetImage(w http.ResponseWriter, r *http.Request, size ImageSize, imageId string)
+	// DownloadItem Download one item (RF-23)
+	// (GET /items/{id}/download)
+	DownloadItem(w http.ResponseWriter, r *http.Request, id int64)
 	// ListJobs Recent upload jobs, newest first
 	// (GET /jobs)
 	ListJobs(w http.ResponseWriter, r *http.Request)
@@ -661,6 +764,117 @@ func (siw *ServerInterfaceWrapper) ListConsoles(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ListConsoleGames operation middleware
+func (siw *ServerInterfaceWrapper) ListConsoleGames(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "slug" -------------
+	var slug string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "slug", r.PathValue("slug"), &slug, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slug", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListConsoleGames(w, r, slug)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SearchLibrary operation middleware
+func (siw *ServerInterfaceWrapper) SearchLibrary(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchLibraryParams
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SearchLibrary(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetGame operation middleware
+func (siw *ServerInterfaceWrapper) GetGame(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GameId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetGame(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadGame operation middleware
+func (siw *ServerInterfaceWrapper) DownloadGame(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GameId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadGame(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
@@ -701,6 +915,32 @@ func (siw *ServerInterfaceWrapper) GetImage(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetImage(w, r, size, imageId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadItem operation middleware
+func (siw *ServerInterfaceWrapper) DownloadItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadItem(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1121,6 +1361,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/jobs/{id}/cancel", wrapper.CancelJob)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/jobs/{id}/plan", wrapper.PlanJobCommit)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/jobs/{id}/commit", wrapper.CommitJob)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/consoles/{slug}/games", wrapper.ListConsoleGames)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/games", wrapper.SearchLibrary)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/games/{id}", wrapper.GetGame)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/games/{id}/download", wrapper.DownloadGame)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/items/{id}/download", wrapper.DownloadItem)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/images/{size}/{imageId}", wrapper.GetImage)
 
 	return m
@@ -1295,6 +1540,228 @@ func (response ListConsoles401ApplicationProblemPlusJSONResponse) VisitListConso
 	return err
 }
 
+type ListConsoleGamesRequestObject struct {
+	Slug string `json:"slug"`
+}
+
+type ListConsoleGamesResponseObject interface {
+	VisitListConsoleGamesResponse(w http.ResponseWriter) error
+}
+
+type ListConsoleGames200JSONResponse []GameSummary
+
+func (response ListConsoleGames200JSONResponse) VisitListConsoleGamesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleGames401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListConsoleGames401ApplicationProblemPlusJSONResponse) VisitListConsoleGamesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListConsoleGames404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListConsoleGames404ApplicationProblemPlusJSONResponse) VisitListConsoleGamesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchLibraryRequestObject struct {
+	Params SearchLibraryParams
+}
+
+type SearchLibraryResponseObject interface {
+	VisitSearchLibraryResponse(w http.ResponseWriter) error
+}
+
+type SearchLibrary200JSONResponse []GameSummary
+
+func (response SearchLibrary200JSONResponse) VisitSearchLibraryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchLibrary400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SearchLibrary400ApplicationProblemPlusJSONResponse) VisitSearchLibraryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchLibrary401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SearchLibrary401ApplicationProblemPlusJSONResponse) VisitSearchLibraryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGameRequestObject struct {
+	Id GameId `json:"id"`
+}
+
+type GetGameResponseObject interface {
+	VisitGetGameResponse(w http.ResponseWriter) error
+}
+
+type GetGame200JSONResponse GameDetail
+
+func (response GetGame200JSONResponse) VisitGetGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGame401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetGame401ApplicationProblemPlusJSONResponse) VisitGetGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGame404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetGame404ApplicationProblemPlusJSONResponse) VisitGetGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadGameRequestObject struct {
+	Id GameId `json:"id"`
+}
+
+type DownloadGameResponseObject interface {
+	VisitDownloadGameResponse(w http.ResponseWriter) error
+}
+
+type DownloadGame200ApplicationzipResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response DownloadGame200ApplicationzipResponse) VisitDownloadGameResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/zip")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type DownloadGame401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadGame401ApplicationProblemPlusJSONResponse) VisitDownloadGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadGame404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadGame404ApplicationProblemPlusJSONResponse) VisitDownloadGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetHealthRequestObject struct {
 }
 
@@ -1439,6 +1906,114 @@ func (response GetImage502ApplicationProblemPlusJSONResponse) VisitGetImageRespo
 	w.WriteHeader(502)
 	_, err := buf.WriteTo(w)
 	return err
+}
+
+type DownloadItemRequestObject struct {
+	Id int64 `json:"id"`
+}
+
+type DownloadItemResponseObject interface {
+	VisitDownloadItemResponse(w http.ResponseWriter) error
+}
+
+type DownloadItem200ApplicationoctetStreamResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response DownloadItem200ApplicationoctetStreamResponse) VisitDownloadItemResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type DownloadItem200ApplicationzipResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response DownloadItem200ApplicationzipResponse) VisitDownloadItemResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/zip")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type DownloadItem206ApplicationoctetStreamResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response DownloadItem206ApplicationoctetStreamResponse) VisitDownloadItemResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(206)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type DownloadItem401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadItem401ApplicationProblemPlusJSONResponse) VisitDownloadItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadItem404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadItem404ApplicationProblemPlusJSONResponse) VisitDownloadItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadItem416Response struct {
+}
+
+func (response DownloadItem416Response) VisitDownloadItemResponse(w http.ResponseWriter) error {
+	w.WriteHeader(416)
+	return nil
 }
 
 type ListJobsRequestObject struct {
@@ -2249,12 +2824,27 @@ type StrictServerInterface interface {
 	// ListConsoles Consoles in carousel order
 	// (GET /consoles)
 	ListConsoles(ctx context.Context, request ListConsolesRequestObject) (ListConsolesResponseObject, error)
+	// ListConsoleGames Games of one console, by title
+	// (GET /consoles/{slug}/games)
+	ListConsoleGames(ctx context.Context, request ListConsoleGamesRequestObject) (ListConsoleGamesResponseObject, error)
+	// SearchLibrary Search the library by title, across consoles (RF-22)
+	// (GET /games)
+	SearchLibrary(ctx context.Context, request SearchLibraryRequestObject) (SearchLibraryResponseObject, error)
+	// GetGame Game detail with its items (RF-21)
+	// (GET /games/{id})
+	GetGame(ctx context.Context, request GetGameRequestObject) (GetGameResponseObject, error)
+	// DownloadGame The whole game as an uncompressed zip, streamed (RF-23)
+	// (GET /games/{id}/download)
+	DownloadGame(ctx context.Context, request DownloadGameRequestObject) (DownloadGameResponseObject, error)
 	// GetHealth Liveness probe and startup diagnostics
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
 	// GetImage IGDB image (cover or logo) served from the local cache
 	// (GET /images/{size}/{imageId})
 	GetImage(ctx context.Context, request GetImageRequestObject) (GetImageResponseObject, error)
+	// DownloadItem Download one item (RF-23)
+	// (GET /items/{id}/download)
+	DownloadItem(ctx context.Context, request DownloadItemRequestObject) (DownloadItemResponseObject, error)
 	// ListJobs Recent upload jobs, newest first
 	// (GET /jobs)
 	ListJobs(ctx context.Context, request ListJobsRequestObject) (ListJobsResponseObject, error)
@@ -2429,6 +3019,110 @@ func (sh *strictHandler) ListConsoles(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListConsoleGames operation middleware
+func (sh *strictHandler) ListConsoleGames(w http.ResponseWriter, r *http.Request, slug string) {
+	var request ListConsoleGamesRequestObject
+
+	request.Slug = slug
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListConsoleGames(ctx, request.(ListConsoleGamesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListConsoleGames")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListConsoleGamesResponseObject); ok {
+		if err := validResponse.VisitListConsoleGamesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SearchLibrary operation middleware
+func (sh *strictHandler) SearchLibrary(w http.ResponseWriter, r *http.Request, params SearchLibraryParams) {
+	var request SearchLibraryRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SearchLibrary(ctx, request.(SearchLibraryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SearchLibrary")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SearchLibraryResponseObject); ok {
+		if err := validResponse.VisitSearchLibraryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetGame operation middleware
+func (sh *strictHandler) GetGame(w http.ResponseWriter, r *http.Request, id GameId) {
+	var request GetGameRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetGame(ctx, request.(GetGameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetGame")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetGameResponseObject); ok {
+		if err := validResponse.VisitGetGameResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DownloadGame operation middleware
+func (sh *strictHandler) DownloadGame(w http.ResponseWriter, r *http.Request, id GameId) {
+	var request DownloadGameRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DownloadGame(ctx, request.(DownloadGameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DownloadGame")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DownloadGameResponseObject); ok {
+		if err := validResponse.VisitDownloadGameResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHealth operation middleware
 func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthRequestObject
@@ -2473,6 +3167,32 @@ func (sh *strictHandler) GetImage(w http.ResponseWriter, r *http.Request, size I
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetImageResponseObject); ok {
 		if err := validResponse.VisitGetImageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DownloadItem operation middleware
+func (sh *strictHandler) DownloadItem(w http.ResponseWriter, r *http.Request, id int64) {
+	var request DownloadItemRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DownloadItem(ctx, request.(DownloadItemRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DownloadItem")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DownloadItemResponseObject); ok {
+		if err := validResponse.VisitDownloadItemResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

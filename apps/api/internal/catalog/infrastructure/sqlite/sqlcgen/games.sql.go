@@ -65,6 +65,58 @@ func (q *Queries) FolderTaken(ctx context.Context, arg FolderTakenParams) (bool,
 	return exists, err
 }
 
+const getGame = `-- name: GetGame :one
+SELECT id, console_id, igdb_id, title, folder, release_year, cover_image_id, summary, genres, created_at, updated_at
+FROM games
+WHERE id = ?
+`
+
+func (q *Queries) GetGame(ctx context.Context, id int64) (Game, error) {
+	row := q.db.QueryRowContext(ctx, getGame, id)
+	var i Game
+	err := row.Scan(
+		&i.ID,
+		&i.ConsoleID,
+		&i.IgdbID,
+		&i.Title,
+		&i.Folder,
+		&i.ReleaseYear,
+		&i.CoverImageID,
+		&i.Summary,
+		&i.Genres,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getGameItem = `-- name: GetGameItem :one
+SELECT id, game_id, kind, label, disc_number, shape, files, size, title_id, source_job, created_at, trashed_at, trash_dir
+FROM game_items
+WHERE id = ?
+`
+
+func (q *Queries) GetGameItem(ctx context.Context, id int64) (GameItem, error) {
+	row := q.db.QueryRowContext(ctx, getGameItem, id)
+	var i GameItem
+	err := row.Scan(
+		&i.ID,
+		&i.GameID,
+		&i.Kind,
+		&i.Label,
+		&i.DiscNumber,
+		&i.Shape,
+		&i.Files,
+		&i.Size,
+		&i.TitleID,
+		&i.SourceJob,
+		&i.CreatedAt,
+		&i.TrashedAt,
+		&i.TrashDir,
+	)
+	return i, err
+}
+
 const hasItemsFromSource = `-- name: HasItemsFromSource :one
 SELECT EXISTS (SELECT 1 FROM game_items WHERE source_job = ?)
 `
@@ -201,6 +253,59 @@ func (q *Queries) ListGameItems(ctx context.Context, gameID int64) ([]GameItem, 
 			&i.CreatedAt,
 			&i.TrashedAt,
 			&i.TrashDir,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGameSummaries = `-- name: ListGameSummaries :many
+SELECT g.id, g.console_id, g.title, g.folder, g.release_year, g.cover_image_id,
+       COUNT(i.id) AS item_count, CAST(TOTAL(i.size) AS INTEGER) AS size
+FROM games g
+JOIN game_items i ON i.game_id = g.id AND i.trashed_at IS NULL
+GROUP BY g.id
+ORDER BY g.title COLLATE NOCASE, g.id
+`
+
+type ListGameSummariesRow struct {
+	ID           int64
+	ConsoleID    int64
+	Title        string
+	Folder       string
+	ReleaseYear  sql.NullInt64
+	CoverImageID sql.NullString
+	ItemCount    int64
+	Size         int64
+}
+
+// Games with at least one item outside the trash, by title.
+func (q *Queries) ListGameSummaries(ctx context.Context) ([]ListGameSummariesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listGameSummaries)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGameSummariesRow
+	for rows.Next() {
+		var i ListGameSummariesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ConsoleID,
+			&i.Title,
+			&i.Folder,
+			&i.ReleaseYear,
+			&i.CoverImageID,
+			&i.ItemCount,
+			&i.Size,
 		); err != nil {
 			return nil, err
 		}

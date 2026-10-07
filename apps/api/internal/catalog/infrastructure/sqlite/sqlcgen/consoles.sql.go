@@ -11,7 +11,11 @@ import (
 )
 
 const listConsoles = `-- name: ListConsoles :many
-SELECT id, slug, display_name, igdb_platform_id, release_year, logo_image_id, extensions, detector_key, sort_order
+SELECT id, slug, display_name, igdb_platform_id, release_year, logo_image_id, extensions, detector_key, sort_order,
+       (SELECT COUNT(DISTINCT g.id)
+        FROM games g
+        JOIN game_items i ON i.game_id = g.id AND i.trashed_at IS NULL
+        WHERE g.console_id = consoles.id) AS game_count
 FROM consoles
 ORDER BY sort_order, id
 `
@@ -26,6 +30,7 @@ type ListConsolesRow struct {
 	Extensions     string
 	DetectorKey    sql.NullString
 	SortOrder      int64
+	GameCount      int64
 }
 
 func (q *Queries) ListConsoles(ctx context.Context) ([]ListConsolesRow, error) {
@@ -47,6 +52,7 @@ func (q *Queries) ListConsoles(ctx context.Context) ([]ListConsolesRow, error) {
 			&i.Extensions,
 			&i.DetectorKey,
 			&i.SortOrder,
+			&i.GameCount,
 		); err != nil {
 			return nil, err
 		}

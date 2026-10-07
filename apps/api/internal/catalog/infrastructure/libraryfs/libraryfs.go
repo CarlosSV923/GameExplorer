@@ -208,6 +208,48 @@ func (f *FS) WriteFile(p string, data []byte) error {
 	return os.WriteFile(p, data, 0o664) //nolint:gosec // library files must stay editable over SMB
 }
 
+// Tree implements application.Files.
+func (f *FS) Tree(p string) ([]application.TreeFile, error) {
+	if err := f.inside(p); err != nil {
+		return nil, err
+	}
+	info, err := os.Lstat(p)
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode().IsRegular() {
+		return []application.TreeFile{{Path: p, Size: info.Size(), Modified: info.ModTime()}}, nil
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%s: not a regular file or directory", p)
+	}
+	var out []application.TreeFile
+	err = filepath.WalkDir(p, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || !d.Type().IsRegular() {
+			return err // links and devices are skipped
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(p, path)
+		if err != nil {
+			return err
+		}
+		out = append(out, application.TreeFile{Path: path, Rel: filepath.ToSlash(rel), Size: info.Size(), Modified: info.ModTime()})
+		return nil
+	})
+	return out, err
+}
+
+// Open implements application.Files.
+func (f *FS) Open(p string) (io.ReadSeekCloser, error) {
+	if err := f.inside(p); err != nil {
+		return nil, err
+	}
+	return os.Open(p) //nolint:gosec // checked by inside()
+}
+
 // Remove implements application.Files.
 func (f *FS) Remove(p string) error {
 	if err := f.inside(p); err != nil {

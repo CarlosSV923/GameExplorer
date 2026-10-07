@@ -73,8 +73,10 @@ Depende de: 2, 4 · Cubre: RF-09 a RF-11
 
 ## Fase 6 — Lectura del catálogo y descargas
 Depende de: 5 · Cubre: RF-20 a RF-23
-- [ ] Listados, búsqueda global y detalle
-- [ ] Descarga con Range y zip *store* en streaming
+- [x] `gameCount` por consola en `GET /api/consoles`; `GET /api/consoles/{slug}/games`, `GET /api/games?q=` (sin mayúsculas ni acentos) y `GET /api/games/{id}`
+- [x] `GET /api/items/{id}/download`: archivo suelto con `http.ServeContent` (Range, If-Range); discos y juegos en carpeta como zip
+- [x] `GET /api/games/{id}/download`: zip *store* en streaming (`platform/zipstream`) con `Content-Length` exacto, calculado de antemano y fijado con pruebas contra el escritor real de Go, zip64 incluido
+- [x] Probado con la biblioteca de la fase 5: zip de 12 GB con el tamaño anunciado exacto (~112 MB/s en Docker Desktop), archivo de 6,7 GB a ~130 MB/s, Range sobre el final del archivo, memoria plana; zip validado con `7zz t`
 
 ## Fase 7 — Re-emparejar, papelera, consolas e integridad
 Depende de: 6 · Cubre: RF-24 a RF-26, RF-30, RF-41

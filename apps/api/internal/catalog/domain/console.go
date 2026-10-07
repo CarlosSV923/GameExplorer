@@ -59,6 +59,8 @@ type Console struct {
 	// consoles added by the user (detected by extension only).
 	DetectorKey string
 	SortOrder   int
+	// GameCount is how many games have items in the library (read model).
+	GameCount int
 }
 
 // ConsoleRepository persists consoles.

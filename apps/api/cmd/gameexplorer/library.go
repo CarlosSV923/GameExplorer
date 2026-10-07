@@ -99,7 +99,8 @@ func shape(s ingestiondomain.ItemShape) catalogdomain.Shape {
 
 func existingItem(e catalogdomain.GameItem) ingestionapp.ExistingItem {
 	return ingestionapp.ExistingItem{
-		ID: int64(e.ID), Kind: string(e.Kind), Label: e.Label, DiscNumber: e.DiscNumber, Files: e.Files, Size: e.Size,
+		ID: int64(e.ID), Kind: string(e.Kind), Shape: ingestiondomain.ItemShape(e.Shape), CreatedAt: e.CreatedAt,
+		Label: e.Label, DiscNumber: e.DiscNumber, Files: e.Files, Size: e.Size,
 	}
 }
 

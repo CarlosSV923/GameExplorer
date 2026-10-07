@@ -3,6 +3,7 @@ package http
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/application"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
@@ -12,6 +13,8 @@ import (
 // Handler implements the catalog operations of httpapi.StrictServerInterface.
 type Handler struct {
 	consoles *application.ConsoleService
+	browse   *application.BrowseService
+	log      *slog.Logger
 }
 
 // NewHandler builds the handler.
@@ -42,5 +45,6 @@ func toAPI(c domain.Console) httpapi.Console {
 		LogoImageId:    c.LogoImageID,
 		Extensions:     c.Extensions,
 		SortOrder:      c.SortOrder,
+		GameCount:      c.GameCount,
 	}
 }

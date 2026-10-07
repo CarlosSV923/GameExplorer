@@ -45,3 +45,22 @@ ORDER BY created_at, id;
 
 -- name: DeleteOperation :exec
 DELETE FROM library_operations WHERE id = ?;
+
+-- name: ListGameSummaries :many
+-- Games with at least one item outside the trash, by title.
+SELECT g.id, g.console_id, g.title, g.folder, g.release_year, g.cover_image_id,
+       COUNT(i.id) AS item_count, CAST(TOTAL(i.size) AS INTEGER) AS size
+FROM games g
+JOIN game_items i ON i.game_id = g.id AND i.trashed_at IS NULL
+GROUP BY g.id
+ORDER BY g.title COLLATE NOCASE, g.id;
+
+-- name: GetGame :one
+SELECT id, console_id, igdb_id, title, folder, release_year, cover_image_id, summary, genres, created_at, updated_at
+FROM games
+WHERE id = ?;
+
+-- name: GetGameItem :one
+SELECT id, game_id, kind, label, disc_number, shape, files, size, title_id, source_job, created_at, trashed_at, trash_dir
+FROM game_items
+WHERE id = ?;

@@ -294,6 +294,104 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/consoles/{slug}/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Games of one console, by title */
+        get: operations["listConsoleGames"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search the library by title, across consoles (RF-22)
+         * @description Every word must appear in the title; case and accents are ignored.
+         */
+        get: operations["searchLibrary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game detail with its items (RF-21) */
+        get: operations["getGame"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The whole game as an uncompressed zip, streamed (RF-23)
+         * @description Entries are "<game folder>/<file>". The zip is built while it is sent,
+         *     so it cannot be resumed; Content-Length is announced, and files over
+         *     4 GB use zip64.
+         */
+        get: operations["downloadGame"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download one item (RF-23)
+         * @description A single-file item is sent as is and supports HTTP Range (resumable
+         *     downloads). Discs (.cue + tracks) and folder games are sent as a zip,
+         *     like /games/{id}/download.
+         */
+        get: operations["downloadItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/images/{size}/{imageId}": {
         parameters: {
             query?: never;
@@ -358,6 +456,8 @@ export interface components {
             logoImageId?: string | null;
             extensions: string[];
             sortOrder: number;
+            /** @description Games with at least one item in the library. */
+            gameCount: number;
         };
         MetadataGame: {
             /**
@@ -496,10 +596,48 @@ export interface components {
             kind: components["schemas"]["ItemKind"];
             label?: string | null;
             discNumber?: number | null;
+            /**
+             * @description file downloads as is (resumable); disc and folder download as a zip.
+             * @enum {string}
+             */
+            shape: "file" | "disc" | "folder";
             /** @description Relative to the game folder; the first is the main entry. */
             files: string[];
             /** Format: int64 */
             size: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        GameSummary: {
+            /** Format: int64 */
+            id: number;
+            /** @description Console slug. */
+            console: string;
+            title: string;
+            /** @description Folder inside the console folder. */
+            folder: string;
+            releaseYear?: number | null;
+            /** @description Render with /api/images/cover_big/{coverImageId}. */
+            coverImageId?: string | null;
+            itemCount: number;
+            /**
+             * Format: int64
+             * @description Bytes of every item in the library.
+             */
+            size: number;
+        };
+        GameDetail: components["schemas"]["GameSummary"] & {
+            /** Format: int64 */
+            igdbId: number;
+            /**
+             * @description Library-relative folder.
+             * @example switch/Inside
+             */
+            path: string;
+            summary?: string | null;
+            genres: string[];
+            /** @description Items in the library (not in the trash), base first. */
+            items: components["schemas"]["LibraryItem"][];
         };
         PlannedItem: {
             path: string;
@@ -624,6 +762,7 @@ export interface components {
         };
     };
     parameters: {
+        GameId: number;
         JobId: string;
     };
     requestBodies: never;
@@ -1001,6 +1140,143 @@ export interface operations {
             500: components["responses"]["InternalError"];
             502: components["responses"]["BadGateway"];
             503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listConsoleGames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Games with at least one item in the library (trashed items do not count). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameSummary"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    searchLibrary: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching games, by title. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameSummary"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getGame: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GameId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The game. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadGame: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GameId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The zip. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file, or a zip for multi-file items. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                    "application/zip": string;
+                };
+            };
+            /** @description The requested range of a single-file item. */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description The requested range is not satisfiable. */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getImage: {

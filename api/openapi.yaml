@@ -21,6 +21,7 @@ tags:
   - name: consoles
   - name: metadata
   - name: uploads
+  - name: library
 security:
   - sessionCookie: []
 paths:
@@ -400,6 +401,145 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /consoles/{slug}/games:
+    get:
+      tags: [library]
+      operationId: listConsoleGames
+      summary: Games of one console, by title
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9][a-z0-9_-]{0,31}$'
+      responses:
+        '200':
+          description: Games with at least one item in the library (trashed items do not count).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GameSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /games:
+    get:
+      tags: [library]
+      operationId: searchLibrary
+      summary: Search the library by title, across consoles (RF-22)
+      description: Every word must appear in the title; case and accents are ignored.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+      responses:
+        '200':
+          description: Matching games, by title.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GameSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /games/{id}:
+    get:
+      tags: [library]
+      operationId: getGame
+      summary: Game detail with its items (RF-21)
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      responses:
+        '200':
+          description: The game.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /games/{id}/download:
+    get:
+      tags: [library]
+      operationId: downloadGame
+      summary: The whole game as an uncompressed zip, streamed (RF-23)
+      description: |
+        Entries are "<game folder>/<file>". The zip is built while it is sent,
+        so it cannot be resumed; Content-Length is announced, and files over
+        4 GB use zip64.
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      responses:
+        '200':
+          description: The zip.
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /items/{id}/download:
+    get:
+      tags: [library]
+      operationId: downloadItem
+      summary: Download one item (RF-23)
+      description: |
+        A single-file item is sent as is and supports HTTP Range (resumable
+        downloads). Discs (.cue + tracks) and folder games are sent as a zip,
+        like /games/{id}/download.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: The file, or a zip for multi-file items.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: The requested range of a single-file item.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '416':
+          description: The requested range is not satisfiable.
+
   /images/{size}/{imageId}:
     get:
       tags: [metadata]
@@ -454,6 +594,13 @@ components:
       name: ge_session
 
   parameters:
+    GameId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
     JobId:
       name: id
       in: path
@@ -557,7 +704,7 @@ components:
 
     Console:
       type: object
-      required: [id, slug, displayName, extensions, sortOrder]
+      required: [id, slug, displayName, extensions, sortOrder, gameCount]
       properties:
         id:
           type: integer
@@ -588,6 +735,9 @@ components:
             example: .iso
         sortOrder:
           type: integer
+        gameCount:
+          type: integer
+          description: Games with at least one item in the library.
 
     MetadataGame:
       type: object
@@ -825,7 +975,7 @@ components:
 
     LibraryItem:
       type: object
-      required: [id, kind, files, size]
+      required: [id, kind, shape, files, size, createdAt]
       properties:
         id:
           type: integer
@@ -838,6 +988,10 @@ components:
         discNumber:
           type: integer
           nullable: true
+        shape:
+          type: string
+          enum: [file, disc, folder]
+          description: file downloads as is (resumable); disc and folder download as a zip.
         files:
           type: array
           description: Relative to the game folder; the first is the main entry.
@@ -846,6 +1000,64 @@ components:
         size:
           type: integer
           format: int64
+        createdAt:
+          type: string
+          format: date-time
+
+    GameSummary:
+      type: object
+      required: [id, console, title, folder, itemCount, size]
+      properties:
+        id:
+          type: integer
+          format: int64
+        console:
+          type: string
+          description: Console slug.
+        title:
+          type: string
+        folder:
+          type: string
+          description: Folder inside the console folder.
+        releaseYear:
+          type: integer
+          nullable: true
+        coverImageId:
+          type: string
+          nullable: true
+          description: Render with /api/images/cover_big/{coverImageId}.
+        itemCount:
+          type: integer
+        size:
+          type: integer
+          format: int64
+          description: Bytes of every item in the library.
+
+    GameDetail:
+      allOf:
+        - $ref: '#/components/schemas/GameSummary'
+        - type: object
+          required: [igdbId, path, genres, items]
+          properties:
+            igdbId:
+              type: integer
+              format: int64
+            path:
+              type: string
+              description: Library-relative folder.
+              example: switch/Inside
+            summary:
+              type: string
+              nullable: true
+            genres:
+              type: array
+              items:
+                type: string
+            items:
+              type: array
+              description: Items in the library (not in the trash), base first.
+              items:
+                $ref: '#/components/schemas/LibraryItem'
 
     PlannedItem:
       type: object
