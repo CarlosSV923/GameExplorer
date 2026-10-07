@@ -1,6 +1,6 @@
 # Fase 0.5 — Resultados del spike de archivos grandes
 
-Fecha: 2026-10-06/07 · Código: [`spikes/large-files`](../spikes/large-files) · Imagen: `ghcr.io/carlossv923/gameexplorer-spike`
+Fecha: 2026-10-06/07 · Código: [`spikes/large-files` @ 8479d64](https://github.com/CarlosSV923/GameExplorer/tree/8479d64/spikes/large-files) (eliminado del árbol al cerrar la fase) · Imagen: `ghcr.io/carlossv923/gameexplorer-spike`
 
 ## Entorno
 - **NAS**: TrueNAS SCALE, Custom App (Docker), dataset de prueba con ACL SMB y app corriendo como `3000:3000`.
@@ -36,5 +36,5 @@ Fecha: 2026-10-06/07 · Código: [`spikes/large-files`](../spikes/large-files) �
    → Vectores actualizados en `contracts/detection-cases.json` y `contracts/naming-cases.json`; reglas en `spec.md` §5 y §6.
 6. **Nombres con `[` `]`.** Herramientas como curl los interpretan como patrones; en la app no aplica porque la subida va por tus desde el navegador. → Solo cuidar el escape en scripts y tests.
 
-## Pendiente de confirmar por el usuario
-- [ ] Renombrar un archivo de `spike-output/` por Samba y devolverle su nombre (valida que la ACL heredada permite editar desde SMB).
+## Confirmación del usuario
+- [x] Archivo creado por la app renombrado por Samba (2026-10-07); la app ve el cambio. La ACL heredada permite editar en ambos sentidos.

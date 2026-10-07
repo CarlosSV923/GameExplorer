@@ -17,7 +17,7 @@ Depende de: —
 Depende de: Fase 0 · Cubre: RNF-01, RNF-03, RNF-04
 - [x] Prototipo desechable: tusd + 7zz + `http.ServeContent` + zip *store* (`spikes/large-files`, validado en local)
 - [x] Medir en el NAS con 15 GB reales de Switch: subida, reanudación, extracción, verificación CRC32, descarga con Range y como zip (pico de RAM 14,7 MB)
-- [~] Verificar permisos SMB y `rename` dentro del dataset — `rename` OK; falta confirmar edición por Samba
+- [x] Verificar permisos SMB y `rename` dentro del dataset (archivo creado por la app renombrado por Samba y visto por la app)
 - [x] Registrar los resultados en `docs/spike-results.md`
 
 ## Fase 1 — API base
