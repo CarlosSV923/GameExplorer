@@ -9,18 +9,28 @@ info:
 
     Uploads are NOT described here: they use the tus resumable upload protocol
     (https://tus.io/protocols/resumable-upload) mounted at /api/uploads/.
+
+    Every operation requires the session cookie unless it declares `security: []`.
   license:
     name: MIT
 servers:
   - url: /api
 tags:
   - name: system
+  - name: auth
+  - name: consoles
+security:
+  - sessionCookie: []
 paths:
   /health:
     get:
       tags: [system]
       operationId: getHealth
-      summary: Liveness probe
+      summary: Liveness probe and startup diagnostics
+      description: |
+        Always answers 200 while the process is up. `status` is `degraded` when
+        a check fails (for example the library is not writable), so the UI can
+        explain the problem instead of the container crash-looping.
       security: []
       responses:
         '200':
@@ -29,24 +39,176 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Health'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Start a session with the shared password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '204':
+          description: Session started; the cookie is set.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: End the session on this device
+      security: []
+      responses:
+        '204':
+          description: Session cookie cleared.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+
+  /auth/session:
+    get:
+      tags: [auth]
+      operationId: getSession
+      summary: Current session
+      responses:
+        '200':
+          description: The session is valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /consoles:
+    get:
+      tags: [consoles]
+      operationId: listConsoles
+      summary: Consoles in carousel order
+      responses:
+        '200':
+          description: All consoles.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Console'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     sessionCookie:
       type: apiKey
       in: cookie
       name: ge_session
+
+  responses:
+    Unauthorized:
+      description: Missing, invalid or expired session, or wrong password.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: Too many login attempts from this client; retry later.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
   schemas:
     Health:
       type: object
-      required: [status]
+      required: [status, checks]
       properties:
         status:
           type: string
-          enum: [ok]
+          enum: [ok, degraded]
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/HealthCheck'
+
+    HealthCheck:
+      type: object
+      required: [name, ok]
+      properties:
+        name:
+          type: string
+          example: library-writable
+        ok:
+          type: boolean
+        message:
+          type: string
+          description: Human readable explanation when the check fails.
+
+    LoginRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 1
+          format: password
+
+    Session:
+      type: object
+      required: [expiresAt]
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+
+    Console:
+      type: object
+      required: [id, slug, displayName, extensions, sortOrder]
+      properties:
+        id:
+          type: integer
+          format: int64
+        slug:
+          type: string
+          description: Folder name in the library (ES-DE style).
+          example: ps2
+        displayName:
+          type: string
+          example: PlayStation 2
+        igdbPlatformId:
+          type: integer
+          format: int64
+          nullable: true
+        releaseYear:
+          type: integer
+          nullable: true
+          example: 2000
+        extensions:
+          type: array
+          items:
+            type: string
+            example: .iso
+        sortOrder:
+          type: integer
+
     ItemKind:
       type: string
       description: What a stored item is within a game folder.
       enum: [base, update, dlc, disc]
+
     Problem:
       type: object
       description: RFC 9457 problem details.
@@ -60,5 +222,3 @@ components:
           type: integer
         detail:
           type: string
-security:
-  - sessionCookie: []

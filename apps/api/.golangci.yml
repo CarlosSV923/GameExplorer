@@ -27,6 +27,14 @@ linters:
       - path: _test\.go
         linters:
           - gosec
+          # Test helpers close response bodies through t.Cleanup, which bodyclose cannot see.
+          - bodyclose
+      - path: internal/platform/httpapi/gen\.go
+        linters:
+          - revive
+          - gocritic
+          - errorlint
+          - unparam
 
 formatters:
   enable:

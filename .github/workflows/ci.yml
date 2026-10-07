@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: apps/api/go.mod
-          cache-dependency-path: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
       - name: Install 7-Zip (used by integration tests)
         run: sudo apt-get update && sudo apt-get install -y 7zip
       - uses: golangci/golangci-lint-action@v9
@@ -37,6 +37,33 @@ jobs:
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       - name: Build
         run: go build -o bin/gameexplorer ./cmd/gameexplorer
+
+  generated:
+    name: Generated code is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: oapi-codegen (Go server types)
+        working-directory: apps/api/internal/platform/httpapi
+        run: go tool oapi-codegen -config oapi-codegen.yaml ../../../../../api/openapi.yaml
+      - name: sqlc (typed queries)
+        run: docker run --rm -v "$PWD/apps/api:/src" -w /src sqlc/sqlc:1.31.1 generate
+      - name: openapi-typescript (TS client types)
+        run: pnpm gen:web
+      - name: Fail if anything changed
+        run: |
+          git status --porcelain
+          test -z "$(git status --porcelain)" || { echo "::error::Generated code is stale. Run 'task gen' and commit."; git diff; exit 1; }
 
   web:
     name: Web (React)

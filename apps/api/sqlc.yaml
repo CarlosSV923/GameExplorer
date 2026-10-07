@@ -1,0 +1,12 @@
+# Typed queries per bounded context. Run `task gen:sql` (sqlc runs in Docker).
+version: "2"
+sql:
+  - engine: sqlite
+    schema: db/migrations
+    queries: internal/catalog/infrastructure/sqlite/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/catalog/infrastructure/sqlite/sqlcgen
+        emit_interface: false
+        emit_json_tags: false

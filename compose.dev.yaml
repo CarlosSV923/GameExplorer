@@ -1,0 +1,32 @@
+# Local development: the Go API runs in a container (same Linux paths and
+# tooling as production; also sidesteps Windows Application Control blocking
+# freshly built Go binaries). The SPA runs natively with `task dev:web`.
+#
+# Values come from .env.local (loaded by Task) with safe dev defaults.
+services:
+  api:
+    image: golang:1.27
+    working_dir: /src/apps/api
+    command: go run ./cmd/gameexplorer
+    environment:
+      PORT: '8080'
+      LIBRARY_PATH: /dev-data/library
+      DATA_PATH: /dev-data/data
+      APP_PASSWORD: ${APP_PASSWORD:-gameexplorer}
+      APP_PASSWORD_HASH: ${APP_PASSWORD_HASH:-}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-only-session-secret-change-me-0123456789}
+      SESSION_TTL: ${SESSION_TTL:-720h}
+      IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
+      IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    ports:
+      - '8080:8080'
+    volumes:
+      - .:/src
+      - ./.dev:/dev-data
+      - ge-gomod:/go/pkg/mod
+      - ge-gocache:/root/.cache/go-build
+
+volumes:
+  ge-gomod:
+  ge-gocache:

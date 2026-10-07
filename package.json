@@ -14,7 +14,8 @@
     "typecheck:web": "pnpm --filter @gameexplorer/web typecheck",
     "test:web": "pnpm --filter @gameexplorer/web test",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "gen:web": "pnpm --filter @gameexplorer/web gen:api"
   },
   "devDependencies": {
     "prettier": "^3.9.9"

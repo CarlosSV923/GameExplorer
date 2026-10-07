@@ -2,7 +2,7 @@
 
 [Español](README.es.md)
 
-> **Status:** early development (phase 0 of [`docs/tasks.md`](docs/tasks.md)). Nothing usable yet.
+> **Status:** early development (phase 1 of [`docs/tasks.md`](docs/tasks.md) done). Nothing usable yet.
 
 Self-hosted web app for a home NAS (TrueNAS SCALE) to **upload, extract, classify, rename, browse and download emulation game files** from any browser: desktop, tablet, touch screen or gamepad. The UI is inspired by EmulationStation.
 
@@ -24,13 +24,14 @@ Drop a `.rar`, `.zip`, `.7z` or a raw game file. GameExplorer extracts it, detec
 | Design | Domain-Driven Design on both sides, ports and adapters, shared golden test vectors |
 
 ## Development
-Requirements: Go 1.27+, Node 24+, pnpm, [Task](https://taskfile.dev), golangci-lint v2.
+Requirements: Docker, Node 24+, pnpm and [Task](https://taskfile.dev). Go tooling (tests, lint, code generation, build) runs in Docker, so a local Go install is optional.
 
 ```bash
 task install
-task dev:api     # http://localhost:8080
+task dev:api     # Go API in Docker, http://localhost:8080 (dev password: gameexplorer)
 task dev:web     # http://localhost:5173 (proxies /api)
 task dev:demo    # frontend only, simulated backend
+task gen         # regenerate code after editing api/openapi.yaml or SQL queries
 task check       # lint + test + build, same as CI
 ```
 

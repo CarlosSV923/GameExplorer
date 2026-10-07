@@ -4,3 +4,4 @@ dist
 coverage
 apps/api
 *.md
+apps/web/src/shared/api/schema.d.ts

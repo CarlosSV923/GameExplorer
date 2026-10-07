@@ -58,7 +58,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 - **RF-41** Se pueden agregar consolas buscando la plataforma en IGDB y definiendo slug, nombre visible y extensiones; también se pueden reordenar. Las consolas agregadas se detectan solo por extensión.
 
 ### Acceso y preferencias
-- **RF-50** Contraseña única (configurada en el entorno). La sesión se recuerda por dispositivo con una cookie httpOnly, firmada y `SameSite=Strict`. El login tiene rate-limit.
+- **RF-50** Contraseña única, configurada en el entorno como `APP_PASSWORD_HASH` (argon2id, recomendado) o `APP_PASSWORD` (texto plano, se hashea en memoria al arrancar). Todas las operaciones requieren sesión salvo las marcadas como públicas (salud, login, logout). La sesión se recuerda por dispositivo con una cookie httpOnly, firmada y `SameSite=Strict`. El login tiene rate-limit.
 - **RF-51** Interfaz en español (por defecto) e inglés. La elección se recuerda en el navegador.
 
 ### Modo demo

@@ -29,8 +29,8 @@ Bounded contexts: `catalog`, `ingestion`, `trash`, `metadata` (IGDB anti-corrupt
 - UI copy: Spanish default, English available (i18n keys, no hardcoded strings once i18n lands in phase 8).
 
 ## Commands
-`task check` runs everything CI runs. Also: `task dev:api`, `task dev:web`, `task dev:demo`, `task lint`, `task test`, `task build`.
-On Windows, `go test -race` needs cgo; CI runs the race detector on Linux.
+`task check` runs everything CI runs. Also: `task dev:api` (Go API in Docker, password `gameexplorer`), `task dev:web`, `task dev:demo`, `task gen`, `task lint`, `task test`, `task build`, `task hash-password`.
+Go tooling (tests, lint, oapi-codegen, sqlc, build) runs in Docker through the Taskfile: Windows Application Control on the dev machine blocks freshly compiled Go binaries, and Docker matches CI. After editing `api/openapi.yaml` or SQL queries run `task gen`; CI fails on stale generated code.
 
 ## Conventions
 - Go: gofumpt + goimports, golangci-lint v2 config in `apps/api/.golangci.yml`, table tests, `t.Parallel()`.

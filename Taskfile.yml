@@ -1,7 +1,18 @@
 version: '3'
 
+# Optional local overrides (ignored when missing). See .env.example.
+dotenv: ['.env.local']
+
 vars:
   API_DIR: apps/api
+  GO_IMAGE: golang:1.27
+  SQLC_IMAGE: sqlc/sqlc:1.31.1
+  LINT_IMAGE: golangci/golangci-lint:v2.14.0
+  # Go tooling runs in Docker: identical to CI on every OS, and avoids Windows
+  # Application Control blocking freshly compiled Go binaries.
+  DOCKER_GO: >-
+    docker run --rm -v "{{.ROOT_DIR}}:/src" -v ge-gomod:/go/pkg/mod
+    -v ge-gocache:/root/.cache/go-build -w /src/{{.API_DIR}}
 
 tasks:
   default:
@@ -13,12 +24,13 @@ tasks:
     desc: Install JS dependencies and download Go modules
     cmds:
       - pnpm install --frozen-lockfile
-      - go -C {{.API_DIR}} mod download
+      - '{{.DOCKER_GO}} {{.GO_IMAGE}} go mod download'
 
+  # ---------- development ----------
   dev:api:
-    desc: Run the Go API (http://localhost:8080)
+    desc: Run the Go API in Docker (http://localhost:8080). Default password "gameexplorer"
     cmds:
-      - go -C {{.API_DIR}} run ./cmd/gameexplorer
+      - docker compose -f compose.dev.yaml up api
 
   dev:web:
     desc: Run the Vite dev server (http://localhost:5173), proxying /api to the Go API
@@ -32,6 +44,31 @@ tasks:
     cmds:
       - pnpm dev:web
 
+  hash-password:
+    desc: 'Hash a password for APP_PASSWORD_HASH (usage: echo "pw" | task hash-password)'
+    interactive: true
+    cmds:
+      - docker run --rm -i -v "{{.ROOT_DIR}}:/src" -v ge-gomod:/go/pkg/mod -v ge-gocache:/root/.cache/go-build -w /src/{{.API_DIR}} {{.GO_IMAGE}} go run ./cmd/gameexplorer hash-password
+
+  # ---------- code generation ----------
+  gen:
+    desc: Regenerate code from api/openapi.yaml and the SQL queries
+    cmds:
+      - task: gen:api
+      - task: gen:sql
+
+  gen:api:
+    desc: Go server types + TS client types from api/openapi.yaml
+    cmds:
+      - '{{.DOCKER_GO}}/internal/platform/httpapi {{.GO_IMAGE}} go tool oapi-codegen -config oapi-codegen.yaml ../../../../../api/openapi.yaml'
+      - pnpm gen:web
+
+  gen:sql:
+    desc: Typed Go queries from SQL (sqlc)
+    cmds:
+      - docker run --rm -v "{{.ROOT_DIR}}/{{.API_DIR}}:/src" -w /src {{.SQLC_IMAGE}} generate
+
+  # ---------- quality ----------
   lint:
     desc: Lint Go and TypeScript code
     cmds:
@@ -39,9 +76,8 @@ tasks:
       - task: lint:web
 
   lint:api:
-    dir: '{{.API_DIR}}'
     cmds:
-      - golangci-lint run ./...
+      - docker run --rm -v "{{.ROOT_DIR}}:/src" -v ge-gomod:/go/pkg/mod -v ge-lintcache:/root/.cache -w /src/{{.API_DIR}} {{.LINT_IMAGE}} golangci-lint run ./...
 
   lint:web:
     cmds:
@@ -57,17 +93,24 @@ tasks:
 
   test:api:
     cmds:
-      - go -C {{.API_DIR}} test ./...
+      - '{{.DOCKER_GO}} {{.GO_IMAGE}} go test -race -count=1 ./...'
 
   test:web:
     cmds:
       - pnpm test:web
 
+  # ---------- build ----------
   build:
-    desc: Build the web app and the Go binary
+    desc: Build the SPA and a Linux Go binary with the SPA embedded (apps/api/bin/gameexplorer)
     cmds:
       - pnpm build:web
-      - go -C {{.API_DIR}} build -o bin/gameexplorer ./cmd/gameexplorer
+      - task: embed:web
+      - '{{.DOCKER_GO}} -e CGO_ENABLED=0 {{.GO_IMAGE}} go build -trimpath -o bin/gameexplorer ./cmd/gameexplorer'
+
+  embed:web:
+    internal: true
+    cmds:
+      - node -e "const fs=require('fs');const d='{{.API_DIR}}/internal/platform/web/dist';for(const f of fs.readdirSync(d))if(f!=='.gitkeep')fs.rmSync(d+'/'+f,{recursive:true});fs.cpSync('apps/web/dist',d,{recursive:true})"
 
   check:
     desc: Everything CI runs

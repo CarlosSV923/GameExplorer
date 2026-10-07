@@ -31,3 +31,8 @@ pnpm-debug.log*
 # Playwright
 playwright-report/
 test-results/
+
+# SPA copied into the Go binary by `task build` (only .gitkeep is versioned)
+!apps/api/internal/platform/web/dist/
+apps/api/internal/platform/web/dist/*
+!apps/api/internal/platform/web/dist/.gitkeep

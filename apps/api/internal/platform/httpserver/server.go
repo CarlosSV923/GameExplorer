@@ -2,7 +2,6 @@
 package httpserver
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 )
@@ -19,16 +18,4 @@ func New(addr string, handler http.Handler) *http.Server {
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-}
-
-type healthResponse struct {
-	Status string `json:"status"`
-}
-
-// HealthHandler reports that the process is up.
-func HealthHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(healthResponse{Status: "ok"})
-	})
 }

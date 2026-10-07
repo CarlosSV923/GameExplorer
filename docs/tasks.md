@@ -22,11 +22,13 @@ Depende de: Fase 0 · Cubre: RNF-01, RNF-03, RNF-04
 
 ## Fase 1 — API base
 Depende de: 0.5 · Cubre: RF-40, RF-50, RNF-02
-- [ ] Configuración con `caarlos0/env` y `slog`
-- [ ] SQLite (modernc) + goose + sqlc; seed de las 6 consolas
-- [ ] Contexto `identity`: login con argon2id, cookie firmada, rate-limit; helper para generar `APP_PASSWORD_HASH`
-- [ ] Generación con oapi-codegen (strict server) y cliente TS (openapi-typescript)
-- [ ] SPA incrustada con `embed.FS`; fallback a `index.html`
+- [x] Configuración con `caarlos0/env` y `slog` (validación con errores claros)
+- [x] SQLite (modernc, WAL) + goose + sqlc; seed de las 6 consolas; `GET /api/consoles`
+- [x] Contexto `identity`: login con argon2id, cookie HMAC httpOnly/SameSite=Strict, rate-limit (5/min por IP), `hash-password` y alternativa `APP_PASSWORD`
+- [x] Generación con oapi-codegen (strict server) y cliente TS (openapi-typescript + openapi-fetch); CI verifica que lo generado esté al día
+- [x] SPA incrustada con `embed.FS`; fallback a `index.html`, caché inmutable para assets
+- [x] `/api/health` con diagnósticos (escritura en biblioteca y datos) para RNF-03
+- [x] Entorno local con `compose.dev.yaml`; herramientas de Go en Docker (Control de aplicaciones de Windows bloquea binarios recién compilados)
 
 ## Fase 2 — Contexto `metadata` (IGDB)
 Depende de: 1 · Cubre: RF-09, RF-20, RF-41, RF-61
