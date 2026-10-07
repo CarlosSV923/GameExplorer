@@ -69,4 +69,16 @@ type ConsoleRepository interface {
 	List(ctx context.Context) ([]Console, error)
 	// UpdatePlatformMetadata stores the logo and, when known, the release year.
 	UpdatePlatformMetadata(ctx context.Context, id ConsoleID, logoImageID *string, releaseYear *int) error
+	// Create adds a console at the end of the carousel.
+	Create(ctx context.Context, c Console) (ConsoleID, error)
+	// Update stores slug, display name and extensions.
+	Update(ctx context.Context, c Console) error
+	Delete(ctx context.Context, id ConsoleID) error
+	// SetOrder stores the carousel order: ids[0] first.
+	SetOrder(ctx context.Context, ids []ConsoleID) error
+	// HasGames reports whether any game (even fully trashed) uses the console.
+	HasGames(ctx context.Context, id ConsoleID) (bool, error)
 }
+
+// ErrSlugTaken is returned when another console uses the slug or IGDB platform.
+var ErrSlugTaken = errors.New("console slug or platform already used")

@@ -80,9 +80,13 @@ Depende de: 5 · Cubre: RF-20 a RF-23
 
 ## Fase 7 — Re-emparejar, papelera, consolas e integridad
 Depende de: 6 · Cubre: RF-24 a RF-26, RF-30, RF-41
-- [ ] Re-emparejar con renombrado reversible
-- [ ] Contexto `trash`: mover, restaurar y purga programada
-- [ ] CRUD y orden de consolas; chequeo de integridad
+- [x] Motor de operaciones común (`catalog/application/engine.go`) para commit, papelera, restaurar y re-emparejar: journal, deshacer, recuperación al arrancar, renombrados que solo cambian mayúsculas (datasets SMB sin distinción de mayúsculas) vía nombre temporal, reescritura de `.cue` con el original guardado en `.gameexplorer/ops` hasta confirmar
+- [x] Re-emparejar con vista previa y renombrado reversible; fusión en el juego existente con decisiones de duplicado (decisión)
+- [x] Papelera (decisión: queda dentro de `catalog`, porque enviar y restaurar deben ser atómicos con la biblioteca): entradas por elemento o por juego completo, restaurar con "Reemplazar" si el lugar está ocupado, borrar una entrada, vaciar, purga cada hora tras `TRASH_RETENTION_DAYS` y barrido de carpetas huérfanas (respetando deshacer pendientes)
+- [x] Consolas: crear desde una plataforma de IGDB, editar (slug solo sin juegos), borrar (solo agregadas y vacías) y reordenar
+- [x] Integridad al arrancar, cada hora y a pedido (`POST /api/library/check`); `missingSince`/`missingCount`; "Olvidar" un elemento faltante
+- [x] Migración de los elementos reemplazados en la fase 5 a entradas de papelera
+- [x] Probado con la biblioteca real: papelera y restaurar (incluido el juego de 12 GB) en ~0,1 s, re-emparejar de ida y vuelta, integridad con un archivo movido por fuera
 
 ## Fase 8 — Diseño → código
 Depende de: 0 · Cubre: RNF-05 a RNF-07

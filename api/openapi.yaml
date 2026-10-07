@@ -22,6 +22,7 @@ tags:
   - name: metadata
   - name: uploads
   - name: library
+  - name: trash
 security:
   - sessionCookie: []
 paths:
@@ -112,6 +113,103 @@ paths:
                   $ref: '#/components/schemas/Console'
         '401':
           $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [consoles]
+      operationId: createConsole
+      summary: Add a console for an IGDB platform; it goes last (RF-41)
+      description: Consoles added by the user are detected by extension only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsoleCreate'
+      responses:
+        '201':
+          description: The new console.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Console'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /consoles/order:
+    put:
+      tags: [consoles]
+      operationId: reorderConsoles
+      summary: Set the carousel order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsoleOrder'
+      responses:
+        '200':
+          description: Consoles in the new order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Console'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /consoles/{id}:
+    patch:
+      tags: [consoles]
+      operationId: updateConsole
+      summary: Change a console's name, extensions or (without games) its folder
+      parameters:
+        - $ref: '#/components/parameters/ConsoleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsoleInput'
+      responses:
+        '200':
+          description: The console.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Console'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [consoles]
+      operationId: deleteConsole
+      summary: Delete a console added by the user that has no games
+      parameters:
+        - $ref: '#/components/parameters/ConsoleId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /metadata/games:
     get:
@@ -508,12 +606,7 @@ paths:
         downloads). Discs (.cue + tracks) and folder games are sent as a zip,
         like /games/{id}/download.
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
+        - $ref: '#/components/parameters/ItemId'
       responses:
         '200':
           description: The file, or a zip for multi-file items.
@@ -539,6 +632,216 @@ paths:
           $ref: '#/components/responses/NotFound'
         '416':
           description: The requested range is not satisfiable.
+
+  /games/{id}/trash:
+    post:
+      tags: [trash]
+      operationId: trashGame
+      summary: Send every item of a game to the trash, as one entry (RF-25)
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      responses:
+        '204':
+          description: In the trash.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /items/{id}/trash:
+    post:
+      tags: [trash]
+      operationId: trashItem
+      summary: Send one item to the trash (RF-25)
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '204':
+          description: In the trash.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /items/{id}/forget:
+    post:
+      tags: [library]
+      operationId: forgetItem
+      summary: Remove a missing item (deleted over SMB) from the library (RF-26)
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '204':
+          description: Forgotten.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /library/check:
+    post:
+      tags: [library]
+      operationId: checkLibrary
+      summary: Run the integrity check now (it also runs every hour)
+      responses:
+        '200':
+          description: What changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrityReport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /games/{id}/rematch/plan:
+    post:
+      tags: [library]
+      operationId: planRematch
+      summary: Preview matching a game to another IGDB entry (RF-24)
+      description: |
+        When the new IGDB game is already in the library (same console) the
+        games merge; items that are duplicates there come back `undecided`.
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RematchRequest'
+      responses:
+        '200':
+          description: The plan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RematchPlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /games/{id}/rematch:
+    post:
+      tags: [library]
+      operationId: rematchGame
+      summary: Match a game to another IGDB entry, renaming its folder and files (RF-24)
+      description: Reversible like a commit. Every duplicate of a merge needs a decision.
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RematchRequest'
+      responses:
+        '200':
+          description: Where the game is now.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RematchResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /trash:
+    get:
+      tags: [trash]
+      operationId: listTrash
+      summary: The trash, newest first (RF-30)
+      responses:
+        '200':
+          description: Entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrashEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [trash]
+      operationId: emptyTrash
+      summary: Delete everything in the trash for good
+      responses:
+        '204':
+          description: Emptied.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /trash/{id}:
+    delete:
+      tags: [trash]
+      operationId: deleteTrashEntry
+      summary: Delete one entry for good
+      parameters:
+        - $ref: '#/components/parameters/TrashEntryId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /trash/{id}/restore:
+    post:
+      tags: [trash]
+      operationId: restoreTrashEntry
+      summary: Put an entry back in its game
+      description: |
+        Files take the names of the game's current title. If an item's place
+        is taken (a duplicate was stored since), the answer is 409 unless
+        `onConflict` is `replace`: the current item then goes to the trash.
+      parameters:
+        - $ref: '#/components/parameters/TrashEntryId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreRequest'
+      responses:
+        '200':
+          description: Restored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestoreResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /images/{size}/{imageId}:
     get:
@@ -594,6 +897,27 @@ components:
       name: ge_session
 
   parameters:
+    ConsoleId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ItemId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    TrashEntryId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
     GameId:
       name: id
       in: path
@@ -1003,10 +1327,15 @@ components:
         createdAt:
           type: string
           format: date-time
+        missingSince:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set while a file of the item is missing from disk (deleted over SMB).
 
     GameSummary:
       type: object
-      required: [id, console, title, folder, itemCount, size]
+      required: [id, console, title, folder, itemCount, missingCount, size]
       properties:
         id:
           type: integer
@@ -1028,6 +1357,9 @@ components:
           description: Render with /api/images/cover_big/{coverImageId}.
         itemCount:
           type: integer
+        missingCount:
+          type: integer
+          description: Items with files missing from disk.
         size:
           type: integer
           format: int64
@@ -1058,6 +1390,190 @@ components:
               description: Items in the library (not in the trash), base first.
               items:
                 $ref: '#/components/schemas/LibraryItem'
+
+    ConsoleInput:
+      type: object
+      required: [slug, displayName, extensions]
+      properties:
+        slug:
+          type: string
+          description: Folder name; can only change while the console has no games.
+          example: n64
+        displayName:
+          type: string
+          example: Nintendo 64
+        extensions:
+          type: array
+          items:
+            type: string
+            example: .z64
+
+    ConsoleCreate:
+      allOf:
+        - $ref: '#/components/schemas/ConsoleInput'
+        - type: object
+          required: [igdbPlatformId]
+          properties:
+            igdbPlatformId:
+              type: integer
+              format: int64
+
+    ConsoleOrder:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          description: Every console id, first to last.
+          items:
+            type: integer
+            format: int64
+
+    IntegrityReport:
+      type: object
+      required: [checked, missing, found]
+      properties:
+        checked:
+          type: integer
+        missing:
+          type: integer
+          description: Items found missing in this check.
+        found:
+          type: integer
+          description: Missing items whose files are back.
+
+    RematchRequest:
+      type: object
+      required: [igdbGameId]
+      properties:
+        igdbGameId:
+          type: integer
+          format: int64
+        decisions:
+          type: array
+          description: For duplicates when merging into a game that already has the new IGDB id.
+          items:
+            $ref: '#/components/schemas/ItemDecision'
+
+    ItemDecision:
+      type: object
+      required: [itemId, onDuplicate]
+      properties:
+        itemId:
+          type: integer
+          format: int64
+        onDuplicate:
+          type: string
+          enum: [replace, skip]
+          description: replace sends the other game's item to the trash; skip sends this one.
+
+    RematchPlan:
+      type: object
+      required: [console, title, folder, items]
+      properties:
+        console:
+          type: string
+        title:
+          type: string
+        folder:
+          type: string
+          description: Folder after the re-match.
+        mergeInto:
+          type: integer
+          format: int64
+          nullable: true
+          description: Game that already has the new IGDB id; the games merge.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RematchItem'
+
+    RematchItem:
+      type: object
+      required: [item, files, action]
+      properties:
+        item:
+          $ref: '#/components/schemas/LibraryItem'
+        files:
+          type: array
+          description: New names.
+          items:
+            type: string
+        action:
+          type: string
+          enum: [store, replace, skip, undecided]
+        duplicate:
+          allOf:
+            - $ref: '#/components/schemas/LibraryItem'
+          nullable: true
+
+    RematchResult:
+      type: object
+      required: [gameId, path, merged]
+      properties:
+        gameId:
+          type: integer
+          format: int64
+        path:
+          type: string
+          example: switch/Inside
+        merged:
+          type: boolean
+
+    TrashEntry:
+      type: object
+      required:
+        [id, gameId, console, title, folder, wholeGame, reason, trashedAt, expiresAt, size, items]
+      properties:
+        id:
+          type: integer
+          format: int64
+        gameId:
+          type: integer
+          format: int64
+        console:
+          type: string
+        title:
+          type: string
+        folder:
+          type: string
+        wholeGame:
+          type: boolean
+        reason:
+          type: string
+          enum: [deleted, replaced]
+          description: deleted by the user, or replaced by a duplicate.
+        trashedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          description: When it is deleted for good (TRASH_RETENTION_DAYS).
+        size:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LibraryItem'
+
+    RestoreRequest:
+      type: object
+      properties:
+        onConflict:
+          type: string
+          enum: [replace]
+
+    RestoreResult:
+      type: object
+      required: [gameId, path]
+      properties:
+        gameId:
+          type: integer
+          format: int64
+        path:
+          type: string
 
     PlannedItem:
       type: object

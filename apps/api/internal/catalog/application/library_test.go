@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/application"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
@@ -19,11 +20,15 @@ import (
 
 type oneGame struct{}
 
+// games known to the fake IGDB: 429 differs from 427 only in letter case.
+var games = map[int64]string{427: "Final Fantasy VII", 428: "Final Fantasy VII Remake", 429: "FINAL FANTASY VII"}
+
 func (oneGame) GameByID(_ context.Context, id int64) (application.GameInfo, error) {
-	if id != 427 {
+	name, ok := games[id]
+	if !ok {
 		return application.GameInfo{}, application.ErrUnknownGame
 	}
-	return application.GameInfo{IGDBID: 427, Name: "Final Fantasy VII"}, nil
+	return application.GameInfo{IGDBID: id, Name: name}, nil
 }
 
 // flakyFiles fails (or panics, to simulate a crash) on chosen Move calls.
@@ -67,7 +72,7 @@ func newFixture(t *testing.T) fixture {
 		staging:  filepath.Join(root, ".gameexplorer", "staging", "job1"),
 		repo:     sqlite.NewLibraryRepository(db),
 		consoles: sqlite.NewConsoleRepository(db),
-		files:    libraryfs.New(root, filepath.Join(root, ".gameexplorer", "trash")),
+		files:    libraryfs.New(root, filepath.Join(root, ".gameexplorer", "trash"), filepath.Join(root, ".gameexplorer", "ops")),
 	}
 	write := func(name, content string) {
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(fx.staging, name)), 0o750); err != nil {
@@ -85,8 +90,13 @@ func newFixture(t *testing.T) fixture {
 
 func (fx fixture) service(t *testing.T, files application.Files) *application.LibraryService {
 	t.Helper()
+	return fx.serviceAt(t, files, nil)
+}
+
+func (fx fixture) serviceAt(t *testing.T, files application.Files, now func() time.Time) *application.LibraryService {
+	t.Helper()
 	return application.NewLibraryService(fx.consoles, fx.repo, oneGame{}, files,
-		slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+		slog.New(slog.NewTextHandler(io.Discard, nil)), now)
 }
 
 func (fx fixture) disc() application.StoreRequest {
@@ -154,7 +164,6 @@ func TestStoreKeepsTheJournalWhenUndoFails(t *testing.T) {
 	if n, err := fx.service(t, fx.files).Recover(t.Context()); n != 1 || err != nil {
 		t.Fatalf("recover = %d, %v", n, err)
 	}
-	_ = os.Remove(filepath.Join(fx.staging, "ff7.cue.gameexplorer-commit")) // see the crash test
 	fx.assertUntouched(t)
 }
 
@@ -168,16 +177,13 @@ func TestRecoverUndoesACommitInterruptedByACrash(t *testing.T) {
 		_, _ = svc.Store(t.Context(), fx.disc())
 		t.Fatal("expected the simulated crash")
 	}()
-	if _, err := os.Stat(filepath.Join(fx.root, "psx", "Final Fantasy VII", "Final Fantasy VII (Disc 1) (Track 1).bin")); err != nil {
+	if _, err := os.Stat(filepath.Join(fx.root, "psx", "Final Fantasy VII", "Final Fantasy VII (Disc 1).cue")); err != nil {
 		t.Fatalf("the crash should leave moved files behind: %v", err)
 	}
 
 	if n, err := fx.service(t, fx.files).Recover(t.Context()); n != 1 || err != nil {
 		t.Fatalf("recover = %d, %v", n, err)
 	}
-	// The rewritten cue sheet is a temporary file: it comes back next to the
-	// original and is overwritten by the next attempt.
-	_ = os.Remove(filepath.Join(fx.staging, "ff7.cue.gameexplorer-commit"))
 	fx.assertUntouched(t)
 }
 

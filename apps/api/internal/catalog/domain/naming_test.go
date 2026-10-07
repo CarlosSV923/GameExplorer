@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
 )
@@ -151,13 +150,13 @@ func TestGameFolder(t *testing.T) {
 
 func TestFindDuplicate(t *testing.T) {
 	t.Parallel()
-	trashed := time.Now()
+	entry := domain.TrashEntryID(1)
 	existing := []domain.GameItem{
 		{ID: 1, Kind: domain.KindBase, Files: []string{"Game.nsp"}},
 		{ID: 2, Kind: domain.KindUpdate, Label: "v1.0.3", Files: []string{"Game [Update v1.0.3].nsp"}},
 		{ID: 3, Kind: domain.KindDLC, Label: "Pack", Files: []string{"Game [DLC] Pack.nsp"}},
 		{ID: 4, Kind: domain.KindDisc, DiscNumber: 1, Files: []string{"Game (Disc 1).cue", "Game (Disc 1).bin"}},
-		{ID: 5, Kind: domain.KindUpdate, Label: "v2.0.0", Files: []string{"Game [Update v2.0.0].nsp"}, TrashedAt: &trashed},
+		{ID: 5, Kind: domain.KindUpdate, Label: "v2.0.0", Files: []string{"Game [Update v2.0.0].nsp"}, TrashEntry: &entry},
 	}
 	tests := []struct {
 		name string

@@ -78,6 +78,24 @@ func (e ImageSize) Valid() bool {
 	}
 }
 
+// Defines values for ItemDecisionOnDuplicate.
+const (
+	ItemDecisionOnDuplicateReplace ItemDecisionOnDuplicate = "replace"
+	ItemDecisionOnDuplicateSkip    ItemDecisionOnDuplicate = "skip"
+)
+
+// Valid indicates whether the value is a known member of the ItemDecisionOnDuplicate enum.
+func (e ItemDecisionOnDuplicate) Valid() bool {
+	switch e {
+	case ItemDecisionOnDuplicateReplace:
+		return true
+	case ItemDecisionOnDuplicateSkip:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ItemKind.
 const (
 	ItemKindBase   ItemKind = "base"
@@ -192,6 +210,45 @@ func (e PlannedItemAction) Valid() bool {
 	}
 }
 
+// Defines values for RematchItemAction.
+const (
+	RematchItemActionReplace   RematchItemAction = "replace"
+	RematchItemActionSkip      RematchItemAction = "skip"
+	RematchItemActionStore     RematchItemAction = "store"
+	RematchItemActionUndecided RematchItemAction = "undecided"
+)
+
+// Valid indicates whether the value is a known member of the RematchItemAction enum.
+func (e RematchItemAction) Valid() bool {
+	switch e {
+	case RematchItemActionReplace:
+		return true
+	case RematchItemActionSkip:
+		return true
+	case RematchItemActionStore:
+		return true
+	case RematchItemActionUndecided:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RestoreRequestOnConflict.
+const (
+	RestoreRequestOnConflictReplace RestoreRequestOnConflict = "replace"
+)
+
+// Valid indicates whether the value is a known member of the RestoreRequestOnConflict enum.
+func (e RestoreRequestOnConflict) Valid() bool {
+	switch e {
+	case RestoreRequestOnConflictReplace:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StagedItemConfidence.
 const (
 	Extension StagedItemConfidence = "extension"
@@ -228,6 +285,24 @@ func (e StagedItemShape) Valid() bool {
 	case StagedItemShapeFile:
 		return true
 	case StagedItemShapeFolder:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TrashEntryReason.
+const (
+	Deleted  TrashEntryReason = "deleted"
+	Replaced TrashEntryReason = "replaced"
+)
+
+// Valid indicates whether the value is a known member of the TrashEntryReason enum.
+func (e TrashEntryReason) Valid() bool {
+	switch e {
+	case Deleted:
+		return true
+	case Replaced:
 		return true
 	default:
 		return false
@@ -329,6 +404,37 @@ type Console struct {
 	SortOrder int    `json:"sortOrder"`
 }
 
+// ConsoleCreate defines model for ConsoleCreate.
+type ConsoleCreate struct {
+	// DisplayName Example: Nintendo 64
+	DisplayName    string   `json:"displayName"`
+	Extensions     []string `json:"extensions"`
+	IgdbPlatformId int64    `json:"igdbPlatformId"`
+
+	// Slug Folder name; can only change while the console has no games.
+	//
+	// Example: n64
+	Slug string `json:"slug"`
+}
+
+// ConsoleInput defines model for ConsoleInput.
+type ConsoleInput struct {
+	// DisplayName Example: Nintendo 64
+	DisplayName string   `json:"displayName"`
+	Extensions  []string `json:"extensions"`
+
+	// Slug Folder name; can only change while the console has no games.
+	//
+	// Example: n64
+	Slug string `json:"slug"`
+}
+
+// ConsoleOrder defines model for ConsoleOrder.
+type ConsoleOrder struct {
+	// Ids Every console id, first to last.
+	Ids []int64 `json:"ids"`
+}
+
 // GameDetail defines model for GameDetail.
 type GameDetail struct {
 	// Console Console slug.
@@ -346,6 +452,9 @@ type GameDetail struct {
 
 	// Items Items in the library (not in the trash), base first.
 	Items []LibraryItem `json:"items"`
+
+	// MissingCount Items with files missing from disk.
+	MissingCount int `json:"missingCount"`
 
 	// Path Library-relative folder.
 	//
@@ -368,10 +477,13 @@ type GameSummary struct {
 	CoverImageId *string `json:"coverImageId,omitempty"`
 
 	// Folder Folder inside the console folder.
-	Folder      string `json:"folder"`
-	Id          int64  `json:"id"`
-	ItemCount   int    `json:"itemCount"`
-	ReleaseYear *int   `json:"releaseYear,omitempty"`
+	Folder    string `json:"folder"`
+	Id        int64  `json:"id"`
+	ItemCount int    `json:"itemCount"`
+
+	// MissingCount Items with files missing from disk.
+	MissingCount int  `json:"missingCount"`
+	ReleaseYear  *int `json:"releaseYear,omitempty"`
 
 	// Size Bytes of every item in the library.
 	Size  int64  `json:"size"`
@@ -400,6 +512,28 @@ type HealthCheck struct {
 // ImageSize IGDB image size preset.
 type ImageSize string
 
+// IntegrityReport defines model for IntegrityReport.
+type IntegrityReport struct {
+	Checked int `json:"checked"`
+
+	// Found Missing items whose files are back.
+	Found int `json:"found"`
+
+	// Missing Items found missing in this check.
+	Missing int `json:"missing"`
+}
+
+// ItemDecision defines model for ItemDecision.
+type ItemDecision struct {
+	ItemId int64 `json:"itemId"`
+
+	// OnDuplicate replace sends the other game's item to the trash; skip sends this one.
+	OnDuplicate ItemDecisionOnDuplicate `json:"onDuplicate"`
+}
+
+// ItemDecisionOnDuplicate replace sends the other game's item to the trash; skip sends this one.
+type ItemDecisionOnDuplicate string
+
 // ItemKind What a stored item is within a game folder.
 type ItemKind string
 
@@ -421,6 +555,9 @@ type LibraryItem struct {
 	// Kind What a stored item is within a game folder.
 	Kind  ItemKind `json:"kind"`
 	Label *string  `json:"label,omitempty"`
+
+	// MissingSince Set while a file of the item is missing from disk (deleted over SMB).
+	MissingSince *time.Time `json:"missingSince,omitempty"`
 
 	// Shape file downloads as is (resumable); disc and folder download as a zip.
 	Shape LibraryItemShape `json:"shape"`
@@ -490,6 +627,62 @@ type Problem struct {
 	Type   *string `json:"type,omitempty"`
 }
 
+// RematchItem defines model for RematchItem.
+type RematchItem struct {
+	Action    RematchItemAction `json:"action"`
+	Duplicate *LibraryItem      `json:"duplicate,omitempty"`
+
+	// Files New names.
+	Files []string    `json:"files"`
+	Item  LibraryItem `json:"item"`
+}
+
+// RematchItemAction defines model for RematchItem.Action.
+type RematchItemAction string
+
+// RematchPlan defines model for RematchPlan.
+type RematchPlan struct {
+	Console string `json:"console"`
+
+	// Folder Folder after the re-match.
+	Folder string        `json:"folder"`
+	Items  []RematchItem `json:"items"`
+
+	// MergeInto Game that already has the new IGDB id; the games merge.
+	MergeInto *int64 `json:"mergeInto,omitempty"`
+	Title     string `json:"title"`
+}
+
+// RematchRequest defines model for RematchRequest.
+type RematchRequest struct {
+	// Decisions For duplicates when merging into a game that already has the new IGDB id.
+	Decisions  *[]ItemDecision `json:"decisions,omitempty"`
+	IgdbGameId int64           `json:"igdbGameId"`
+}
+
+// RematchResult defines model for RematchResult.
+type RematchResult struct {
+	GameId int64 `json:"gameId"`
+	Merged bool  `json:"merged"`
+
+	// Path Example: switch/Inside
+	Path string `json:"path"`
+}
+
+// RestoreRequest defines model for RestoreRequest.
+type RestoreRequest struct {
+	OnConflict *RestoreRequestOnConflict `json:"onConflict,omitempty"`
+}
+
+// RestoreRequestOnConflict defines model for RestoreRequest.OnConflict.
+type RestoreRequestOnConflict string
+
+// RestoreResult defines model for RestoreResult.
+type RestoreResult struct {
+	GameId int64  `json:"gameId"`
+	Path   string `json:"path"`
+}
+
 // Session defines model for Session.
 type Session struct {
 	ExpiresAt time.Time `json:"expiresAt"`
@@ -533,6 +726,28 @@ type StagedItemConfidence string
 // StagedItemShape file; disc = .cue plus its .bin tracks; folder = folder-format game (PS3), kept whole.
 type StagedItemShape string
 
+// TrashEntry defines model for TrashEntry.
+type TrashEntry struct {
+	Console string `json:"console"`
+
+	// ExpiresAt When it is deleted for good (TRASH_RETENTION_DAYS).
+	ExpiresAt time.Time     `json:"expiresAt"`
+	Folder    string        `json:"folder"`
+	GameId    int64         `json:"gameId"`
+	Id        int64         `json:"id"`
+	Items     []LibraryItem `json:"items"`
+
+	// Reason deleted by the user, or replaced by a duplicate.
+	Reason    TrashEntryReason `json:"reason"`
+	Size      int64            `json:"size"`
+	Title     string           `json:"title"`
+	TrashedAt time.Time        `json:"trashedAt"`
+	WholeGame bool             `json:"wholeGame"`
+}
+
+// TrashEntryReason deleted by the user, or replaced by a duplicate.
+type TrashEntryReason string
+
 // UploadJob defines model for UploadJob.
 type UploadJob struct {
 	CreatedAt time.Time `json:"createdAt"`
@@ -571,11 +786,20 @@ type UploadJob struct {
 	Warning *string `json:"warning,omitempty"`
 }
 
+// ConsoleId defines model for ConsoleId.
+type ConsoleId = int64
+
 // GameId defines model for GameId.
 type GameId = int64
 
+// ItemId defines model for ItemId.
+type ItemId = int64
+
 // JobId defines model for JobId.
 type JobId = string
+
+// TrashEntryId defines model for TrashEntryId.
+type TrashEntryId = int64
 
 // BadGateway RFC 9457 problem details.
 type BadGateway = Problem
@@ -623,6 +847,21 @@ type SearchPlatformsParams struct {
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
+// CreateConsoleJSONRequestBody defines body for CreateConsole for application/json ContentType.
+type CreateConsoleJSONRequestBody = ConsoleCreate
+
+// ReorderConsolesJSONRequestBody defines body for ReorderConsoles for application/json ContentType.
+type ReorderConsolesJSONRequestBody = ConsoleOrder
+
+// UpdateConsoleJSONRequestBody defines body for UpdateConsole for application/json ContentType.
+type UpdateConsoleJSONRequestBody = ConsoleInput
+
+// RematchGameJSONRequestBody defines body for RematchGame for application/json ContentType.
+type RematchGameJSONRequestBody = RematchRequest
+
+// PlanRematchJSONRequestBody defines body for PlanRematch for application/json ContentType.
+type PlanRematchJSONRequestBody = RematchRequest
+
 // CommitJobJSONRequestBody defines body for CommitJob for application/json ContentType.
 type CommitJobJSONRequestBody = CommitRequest
 
@@ -631,6 +870,9 @@ type SubmitJobPasswordJSONRequestBody = PasswordRequest
 
 // PlanJobCommitJSONRequestBody defines body for PlanJobCommit for application/json ContentType.
 type PlanJobCommitJSONRequestBody = CommitRequest
+
+// RestoreTrashEntryJSONRequestBody defines body for RestoreTrashEntry for application/json ContentType.
+type RestoreTrashEntryJSONRequestBody = RestoreRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -646,6 +888,18 @@ type ServerInterface interface {
 	// ListConsoles Consoles in carousel order
 	// (GET /consoles)
 	ListConsoles(w http.ResponseWriter, r *http.Request)
+	// CreateConsole Add a console for an IGDB platform; it goes last (RF-41)
+	// (POST /consoles)
+	CreateConsole(w http.ResponseWriter, r *http.Request)
+	// ReorderConsoles Set the carousel order
+	// (PUT /consoles/order)
+	ReorderConsoles(w http.ResponseWriter, r *http.Request)
+	// DeleteConsole Delete a console added by the user that has no games
+	// (DELETE /consoles/{id})
+	DeleteConsole(w http.ResponseWriter, r *http.Request, id ConsoleId)
+	// UpdateConsole Change a console's name, extensions or (without games) its folder
+	// (PATCH /consoles/{id})
+	UpdateConsole(w http.ResponseWriter, r *http.Request, id ConsoleId)
 	// ListConsoleGames Games of one console, by title
 	// (GET /consoles/{slug}/games)
 	ListConsoleGames(w http.ResponseWriter, r *http.Request, slug string)
@@ -658,6 +912,15 @@ type ServerInterface interface {
 	// DownloadGame The whole game as an uncompressed zip, streamed (RF-23)
 	// (GET /games/{id}/download)
 	DownloadGame(w http.ResponseWriter, r *http.Request, id GameId)
+	// RematchGame Match a game to another IGDB entry, renaming its folder and files (RF-24)
+	// (POST /games/{id}/rematch)
+	RematchGame(w http.ResponseWriter, r *http.Request, id GameId)
+	// PlanRematch Preview matching a game to another IGDB entry (RF-24)
+	// (POST /games/{id}/rematch/plan)
+	PlanRematch(w http.ResponseWriter, r *http.Request, id GameId)
+	// TrashGame Send every item of a game to the trash, as one entry (RF-25)
+	// (POST /games/{id}/trash)
+	TrashGame(w http.ResponseWriter, r *http.Request, id GameId)
 	// GetHealth Liveness probe and startup diagnostics
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -666,7 +929,13 @@ type ServerInterface interface {
 	GetImage(w http.ResponseWriter, r *http.Request, size ImageSize, imageId string)
 	// DownloadItem Download one item (RF-23)
 	// (GET /items/{id}/download)
-	DownloadItem(w http.ResponseWriter, r *http.Request, id int64)
+	DownloadItem(w http.ResponseWriter, r *http.Request, id ItemId)
+	// ForgetItem Remove a missing item (deleted over SMB) from the library (RF-26)
+	// (POST /items/{id}/forget)
+	ForgetItem(w http.ResponseWriter, r *http.Request, id ItemId)
+	// TrashItem Send one item to the trash (RF-25)
+	// (POST /items/{id}/trash)
+	TrashItem(w http.ResponseWriter, r *http.Request, id ItemId)
 	// ListJobs Recent upload jobs, newest first
 	// (GET /jobs)
 	ListJobs(w http.ResponseWriter, r *http.Request)
@@ -691,12 +960,27 @@ type ServerInterface interface {
 	// PlanJobCommit Preview where a reviewed upload would be stored
 	// (POST /jobs/{id}/plan)
 	PlanJobCommit(w http.ResponseWriter, r *http.Request, id JobId)
+	// CheckLibrary Run the integrity check now (it also runs every hour)
+	// (POST /library/check)
+	CheckLibrary(w http.ResponseWriter, r *http.Request)
 	// SearchGames Search games on IGDB, optionally limited to one platform
 	// (GET /metadata/games)
 	SearchGames(w http.ResponseWriter, r *http.Request, params SearchGamesParams)
 	// SearchPlatforms Search platforms on IGDB (used to add consoles)
 	// (GET /metadata/platforms)
 	SearchPlatforms(w http.ResponseWriter, r *http.Request, params SearchPlatformsParams)
+	// EmptyTrash Delete everything in the trash for good
+	// (DELETE /trash)
+	EmptyTrash(w http.ResponseWriter, r *http.Request)
+	// ListTrash The trash, newest first (RF-30)
+	// (GET /trash)
+	ListTrash(w http.ResponseWriter, r *http.Request)
+	// DeleteTrashEntry Delete one entry for good
+	// (DELETE /trash/{id})
+	DeleteTrashEntry(w http.ResponseWriter, r *http.Request, id TrashEntryId)
+	// RestoreTrashEntry Put an entry back in its game
+	// (POST /trash/{id}/restore)
+	RestoreTrashEntry(w http.ResponseWriter, r *http.Request, id TrashEntryId)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -755,6 +1039,86 @@ func (siw *ServerInterfaceWrapper) ListConsoles(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListConsoles(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateConsole operation middleware
+func (siw *ServerInterfaceWrapper) CreateConsole(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateConsole(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReorderConsoles operation middleware
+func (siw *ServerInterfaceWrapper) ReorderConsoles(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReorderConsoles(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteConsole operation middleware
+func (siw *ServerInterfaceWrapper) DeleteConsole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ConsoleId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteConsole(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateConsole operation middleware
+func (siw *ServerInterfaceWrapper) UpdateConsole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ConsoleId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateConsole(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -875,6 +1239,84 @@ func (siw *ServerInterfaceWrapper) DownloadGame(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// RematchGame operation middleware
+func (siw *ServerInterfaceWrapper) RematchGame(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GameId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RematchGame(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PlanRematch operation middleware
+func (siw *ServerInterfaceWrapper) PlanRematch(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GameId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlanRematch(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TrashGame operation middleware
+func (siw *ServerInterfaceWrapper) TrashGame(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GameId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TrashGame(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
@@ -931,7 +1373,7 @@ func (siw *ServerInterfaceWrapper) DownloadItem(w http.ResponseWriter, r *http.R
 	_ = err
 
 	// ------------- Path parameter "id" -------------
-	var id int64
+	var id ItemId
 
 	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
 	if err != nil {
@@ -941,6 +1383,58 @@ func (siw *ServerInterfaceWrapper) DownloadItem(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DownloadItem(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ForgetItem operation middleware
+func (siw *ServerInterfaceWrapper) ForgetItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ItemId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ForgetItem(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TrashItem operation middleware
+func (siw *ServerInterfaceWrapper) TrashItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ItemId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TrashItem(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1134,6 +1628,20 @@ func (siw *ServerInterfaceWrapper) PlanJobCommit(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// CheckLibrary operation middleware
+func (siw *ServerInterfaceWrapper) CheckLibrary(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CheckLibrary(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SearchGames operation middleware
 func (siw *ServerInterfaceWrapper) SearchGames(w http.ResponseWriter, r *http.Request) {
 
@@ -1217,6 +1725,86 @@ func (siw *ServerInterfaceWrapper) SearchPlatforms(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SearchPlatforms(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EmptyTrash operation middleware
+func (siw *ServerInterfaceWrapper) EmptyTrash(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EmptyTrash(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListTrash operation middleware
+func (siw *ServerInterfaceWrapper) ListTrash(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTrash(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteTrashEntry operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTrashEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id TrashEntryId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteTrashEntry(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreTrashEntry operation middleware
+func (siw *ServerInterfaceWrapper) RestoreTrashEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id TrashEntryId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreTrashEntry(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1351,6 +1939,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/session", wrapper.GetSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/consoles", wrapper.ListConsoles)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/consoles", wrapper.CreateConsole)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/consoles/order", wrapper.ReorderConsoles)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/consoles/{id}", wrapper.DeleteConsole)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/consoles/{id}", wrapper.UpdateConsole)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metadata/games", wrapper.SearchGames)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metadata/platforms", wrapper.SearchPlatforms)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/jobs", wrapper.ListJobs)
@@ -1366,6 +1958,16 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/games/{id}", wrapper.GetGame)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/games/{id}/download", wrapper.DownloadGame)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/items/{id}/download", wrapper.DownloadItem)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/games/{id}/trash", wrapper.TrashGame)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/items/{id}/trash", wrapper.TrashItem)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/items/{id}/forget", wrapper.ForgetItem)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/library/check", wrapper.CheckLibrary)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/games/{id}/rematch/plan", wrapper.PlanRematch)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/games/{id}/rematch", wrapper.RematchGame)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/trash", wrapper.EmptyTrash)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/trash", wrapper.ListTrash)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/trash/{id}", wrapper.DeleteTrashEntry)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/trash/{id}/restore", wrapper.RestoreTrashEntry)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/images/{size}/{imageId}", wrapper.GetImage)
 
 	return m
@@ -1536,6 +2138,313 @@ func (response ListConsoles401ApplicationProblemPlusJSONResponse) VisitListConso
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsoleRequestObject struct {
+	Body *CreateConsoleJSONRequestBody
+}
+
+type CreateConsoleResponseObject interface {
+	VisitCreateConsoleResponse(w http.ResponseWriter) error
+}
+
+type CreateConsole201JSONResponse Console
+
+func (response CreateConsole201JSONResponse) VisitCreateConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsole400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsole400ApplicationProblemPlusJSONResponse) VisitCreateConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsole401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsole401ApplicationProblemPlusJSONResponse) VisitCreateConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsole409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsole409ApplicationProblemPlusJSONResponse) VisitCreateConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsole502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsole502ApplicationProblemPlusJSONResponse) VisitCreateConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateConsole503ApplicationProblemPlusJSONResponse struct {
+	ServiceUnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response CreateConsole503ApplicationProblemPlusJSONResponse) VisitCreateConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderConsolesRequestObject struct {
+	Body *ReorderConsolesJSONRequestBody
+}
+
+type ReorderConsolesResponseObject interface {
+	VisitReorderConsolesResponse(w http.ResponseWriter) error
+}
+
+type ReorderConsoles200JSONResponse []Console
+
+func (response ReorderConsoles200JSONResponse) VisitReorderConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderConsoles400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ReorderConsoles400ApplicationProblemPlusJSONResponse) VisitReorderConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderConsoles401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ReorderConsoles401ApplicationProblemPlusJSONResponse) VisitReorderConsolesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteConsoleRequestObject struct {
+	Id ConsoleId `json:"id"`
+}
+
+type DeleteConsoleResponseObject interface {
+	VisitDeleteConsoleResponse(w http.ResponseWriter) error
+}
+
+type DeleteConsole204Response struct {
+}
+
+func (response DeleteConsole204Response) VisitDeleteConsoleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteConsole401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteConsole401ApplicationProblemPlusJSONResponse) VisitDeleteConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteConsole404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteConsole404ApplicationProblemPlusJSONResponse) VisitDeleteConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteConsole409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteConsole409ApplicationProblemPlusJSONResponse) VisitDeleteConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateConsoleRequestObject struct {
+	Id   ConsoleId `json:"id"`
+	Body *UpdateConsoleJSONRequestBody
+}
+
+type UpdateConsoleResponseObject interface {
+	VisitUpdateConsoleResponse(w http.ResponseWriter) error
+}
+
+type UpdateConsole200JSONResponse Console
+
+func (response UpdateConsole200JSONResponse) VisitUpdateConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateConsole400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateConsole400ApplicationProblemPlusJSONResponse) VisitUpdateConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateConsole401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateConsole401ApplicationProblemPlusJSONResponse) VisitUpdateConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateConsole404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateConsole404ApplicationProblemPlusJSONResponse) VisitUpdateConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateConsole409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateConsole409ApplicationProblemPlusJSONResponse) VisitUpdateConsoleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1762,6 +2671,308 @@ func (response DownloadGame404ApplicationProblemPlusJSONResponse) VisitDownloadG
 	return err
 }
 
+type RematchGameRequestObject struct {
+	Id   GameId `json:"id"`
+	Body *RematchGameJSONRequestBody
+}
+
+type RematchGameResponseObject interface {
+	VisitRematchGameResponse(w http.ResponseWriter) error
+}
+
+type RematchGame200JSONResponse RematchResult
+
+func (response RematchGame200JSONResponse) VisitRematchGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RematchGame400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RematchGame400ApplicationProblemPlusJSONResponse) VisitRematchGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RematchGame401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RematchGame401ApplicationProblemPlusJSONResponse) VisitRematchGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RematchGame404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RematchGame404ApplicationProblemPlusJSONResponse) VisitRematchGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RematchGame409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RematchGame409ApplicationProblemPlusJSONResponse) VisitRematchGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RematchGame500ApplicationProblemPlusJSONResponse struct {
+	InternalErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RematchGame500ApplicationProblemPlusJSONResponse) VisitRematchGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RematchGame502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response RematchGame502ApplicationProblemPlusJSONResponse) VisitRematchGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RematchGame503ApplicationProblemPlusJSONResponse struct {
+	ServiceUnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response RematchGame503ApplicationProblemPlusJSONResponse) VisitRematchGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanRematchRequestObject struct {
+	Id   GameId `json:"id"`
+	Body *PlanRematchJSONRequestBody
+}
+
+type PlanRematchResponseObject interface {
+	VisitPlanRematchResponse(w http.ResponseWriter) error
+}
+
+type PlanRematch200JSONResponse RematchPlan
+
+func (response PlanRematch200JSONResponse) VisitPlanRematchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanRematch400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PlanRematch400ApplicationProblemPlusJSONResponse) VisitPlanRematchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanRematch401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PlanRematch401ApplicationProblemPlusJSONResponse) VisitPlanRematchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanRematch404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PlanRematch404ApplicationProblemPlusJSONResponse) VisitPlanRematchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanRematch502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response PlanRematch502ApplicationProblemPlusJSONResponse) VisitPlanRematchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PlanRematch503ApplicationProblemPlusJSONResponse struct {
+	ServiceUnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response PlanRematch503ApplicationProblemPlusJSONResponse) VisitPlanRematchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrashGameRequestObject struct {
+	Id GameId `json:"id"`
+}
+
+type TrashGameResponseObject interface {
+	VisitTrashGameResponse(w http.ResponseWriter) error
+}
+
+type TrashGame204Response struct {
+}
+
+func (response TrashGame204Response) VisitTrashGameResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type TrashGame401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response TrashGame401ApplicationProblemPlusJSONResponse) VisitTrashGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrashGame404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response TrashGame404ApplicationProblemPlusJSONResponse) VisitTrashGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrashGame409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response TrashGame409ApplicationProblemPlusJSONResponse) VisitTrashGameResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetHealthRequestObject struct {
 }
 
@@ -1909,7 +3120,7 @@ func (response GetImage502ApplicationProblemPlusJSONResponse) VisitGetImageRespo
 }
 
 type DownloadItemRequestObject struct {
-	Id int64 `json:"id"`
+	Id ItemId `json:"id"`
 }
 
 type DownloadItemResponseObject interface {
@@ -2014,6 +3225,134 @@ type DownloadItem416Response struct {
 func (response DownloadItem416Response) VisitDownloadItemResponse(w http.ResponseWriter) error {
 	w.WriteHeader(416)
 	return nil
+}
+
+type ForgetItemRequestObject struct {
+	Id ItemId `json:"id"`
+}
+
+type ForgetItemResponseObject interface {
+	VisitForgetItemResponse(w http.ResponseWriter) error
+}
+
+type ForgetItem204Response struct {
+}
+
+func (response ForgetItem204Response) VisitForgetItemResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ForgetItem401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ForgetItem401ApplicationProblemPlusJSONResponse) VisitForgetItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ForgetItem404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ForgetItem404ApplicationProblemPlusJSONResponse) VisitForgetItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ForgetItem409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ForgetItem409ApplicationProblemPlusJSONResponse) VisitForgetItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrashItemRequestObject struct {
+	Id ItemId `json:"id"`
+}
+
+type TrashItemResponseObject interface {
+	VisitTrashItemResponse(w http.ResponseWriter) error
+}
+
+type TrashItem204Response struct {
+}
+
+func (response TrashItem204Response) VisitTrashItemResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type TrashItem401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response TrashItem401ApplicationProblemPlusJSONResponse) VisitTrashItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrashItem404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response TrashItem404ApplicationProblemPlusJSONResponse) VisitTrashItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrashItem409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response TrashItem409ApplicationProblemPlusJSONResponse) VisitTrashItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ListJobsRequestObject struct {
@@ -2638,6 +3977,43 @@ func (response PlanJobCommit503ApplicationProblemPlusJSONResponse) VisitPlanJobC
 	return err
 }
 
+type CheckLibraryRequestObject struct {
+}
+
+type CheckLibraryResponseObject interface {
+	VisitCheckLibraryResponse(w http.ResponseWriter) error
+}
+
+type CheckLibrary200JSONResponse IntegrityReport
+
+func (response CheckLibrary200JSONResponse) VisitCheckLibraryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckLibrary401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CheckLibrary401ApplicationProblemPlusJSONResponse) VisitCheckLibraryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SearchGamesRequestObject struct {
 	Params SearchGamesParams
 }
@@ -2810,6 +4186,209 @@ func (response SearchPlatforms503ApplicationProblemPlusJSONResponse) VisitSearch
 	return err
 }
 
+type EmptyTrashRequestObject struct {
+}
+
+type EmptyTrashResponseObject interface {
+	VisitEmptyTrashResponse(w http.ResponseWriter) error
+}
+
+type EmptyTrash204Response struct {
+}
+
+func (response EmptyTrash204Response) VisitEmptyTrashResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type EmptyTrash401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response EmptyTrash401ApplicationProblemPlusJSONResponse) VisitEmptyTrashResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTrashRequestObject struct {
+}
+
+type ListTrashResponseObject interface {
+	VisitListTrashResponse(w http.ResponseWriter) error
+}
+
+type ListTrash200JSONResponse []TrashEntry
+
+func (response ListTrash200JSONResponse) VisitListTrashResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTrash401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTrash401ApplicationProblemPlusJSONResponse) VisitListTrashResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteTrashEntryRequestObject struct {
+	Id TrashEntryId `json:"id"`
+}
+
+type DeleteTrashEntryResponseObject interface {
+	VisitDeleteTrashEntryResponse(w http.ResponseWriter) error
+}
+
+type DeleteTrashEntry204Response struct {
+}
+
+func (response DeleteTrashEntry204Response) VisitDeleteTrashEntryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteTrashEntry401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteTrashEntry401ApplicationProblemPlusJSONResponse) VisitDeleteTrashEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteTrashEntry404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteTrashEntry404ApplicationProblemPlusJSONResponse) VisitDeleteTrashEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreTrashEntryRequestObject struct {
+	Id   TrashEntryId `json:"id"`
+	Body *RestoreTrashEntryJSONRequestBody
+}
+
+type RestoreTrashEntryResponseObject interface {
+	VisitRestoreTrashEntryResponse(w http.ResponseWriter) error
+}
+
+type RestoreTrashEntry200JSONResponse RestoreResult
+
+func (response RestoreTrashEntry200JSONResponse) VisitRestoreTrashEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreTrashEntry401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RestoreTrashEntry401ApplicationProblemPlusJSONResponse) VisitRestoreTrashEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreTrashEntry404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RestoreTrashEntry404ApplicationProblemPlusJSONResponse) VisitRestoreTrashEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreTrashEntry409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RestoreTrashEntry409ApplicationProblemPlusJSONResponse) VisitRestoreTrashEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreTrashEntry500ApplicationProblemPlusJSONResponse struct {
+	InternalErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RestoreTrashEntry500ApplicationProblemPlusJSONResponse) VisitRestoreTrashEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Login Start a session with the shared password
@@ -2824,6 +4403,18 @@ type StrictServerInterface interface {
 	// ListConsoles Consoles in carousel order
 	// (GET /consoles)
 	ListConsoles(ctx context.Context, request ListConsolesRequestObject) (ListConsolesResponseObject, error)
+	// CreateConsole Add a console for an IGDB platform; it goes last (RF-41)
+	// (POST /consoles)
+	CreateConsole(ctx context.Context, request CreateConsoleRequestObject) (CreateConsoleResponseObject, error)
+	// ReorderConsoles Set the carousel order
+	// (PUT /consoles/order)
+	ReorderConsoles(ctx context.Context, request ReorderConsolesRequestObject) (ReorderConsolesResponseObject, error)
+	// DeleteConsole Delete a console added by the user that has no games
+	// (DELETE /consoles/{id})
+	DeleteConsole(ctx context.Context, request DeleteConsoleRequestObject) (DeleteConsoleResponseObject, error)
+	// UpdateConsole Change a console's name, extensions or (without games) its folder
+	// (PATCH /consoles/{id})
+	UpdateConsole(ctx context.Context, request UpdateConsoleRequestObject) (UpdateConsoleResponseObject, error)
 	// ListConsoleGames Games of one console, by title
 	// (GET /consoles/{slug}/games)
 	ListConsoleGames(ctx context.Context, request ListConsoleGamesRequestObject) (ListConsoleGamesResponseObject, error)
@@ -2836,6 +4427,15 @@ type StrictServerInterface interface {
 	// DownloadGame The whole game as an uncompressed zip, streamed (RF-23)
 	// (GET /games/{id}/download)
 	DownloadGame(ctx context.Context, request DownloadGameRequestObject) (DownloadGameResponseObject, error)
+	// RematchGame Match a game to another IGDB entry, renaming its folder and files (RF-24)
+	// (POST /games/{id}/rematch)
+	RematchGame(ctx context.Context, request RematchGameRequestObject) (RematchGameResponseObject, error)
+	// PlanRematch Preview matching a game to another IGDB entry (RF-24)
+	// (POST /games/{id}/rematch/plan)
+	PlanRematch(ctx context.Context, request PlanRematchRequestObject) (PlanRematchResponseObject, error)
+	// TrashGame Send every item of a game to the trash, as one entry (RF-25)
+	// (POST /games/{id}/trash)
+	TrashGame(ctx context.Context, request TrashGameRequestObject) (TrashGameResponseObject, error)
 	// GetHealth Liveness probe and startup diagnostics
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -2845,6 +4445,12 @@ type StrictServerInterface interface {
 	// DownloadItem Download one item (RF-23)
 	// (GET /items/{id}/download)
 	DownloadItem(ctx context.Context, request DownloadItemRequestObject) (DownloadItemResponseObject, error)
+	// ForgetItem Remove a missing item (deleted over SMB) from the library (RF-26)
+	// (POST /items/{id}/forget)
+	ForgetItem(ctx context.Context, request ForgetItemRequestObject) (ForgetItemResponseObject, error)
+	// TrashItem Send one item to the trash (RF-25)
+	// (POST /items/{id}/trash)
+	TrashItem(ctx context.Context, request TrashItemRequestObject) (TrashItemResponseObject, error)
 	// ListJobs Recent upload jobs, newest first
 	// (GET /jobs)
 	ListJobs(ctx context.Context, request ListJobsRequestObject) (ListJobsResponseObject, error)
@@ -2869,12 +4475,27 @@ type StrictServerInterface interface {
 	// PlanJobCommit Preview where a reviewed upload would be stored
 	// (POST /jobs/{id}/plan)
 	PlanJobCommit(ctx context.Context, request PlanJobCommitRequestObject) (PlanJobCommitResponseObject, error)
+	// CheckLibrary Run the integrity check now (it also runs every hour)
+	// (POST /library/check)
+	CheckLibrary(ctx context.Context, request CheckLibraryRequestObject) (CheckLibraryResponseObject, error)
 	// SearchGames Search games on IGDB, optionally limited to one platform
 	// (GET /metadata/games)
 	SearchGames(ctx context.Context, request SearchGamesRequestObject) (SearchGamesResponseObject, error)
 	// SearchPlatforms Search platforms on IGDB (used to add consoles)
 	// (GET /metadata/platforms)
 	SearchPlatforms(ctx context.Context, request SearchPlatformsRequestObject) (SearchPlatformsResponseObject, error)
+	// EmptyTrash Delete everything in the trash for good
+	// (DELETE /trash)
+	EmptyTrash(ctx context.Context, request EmptyTrashRequestObject) (EmptyTrashResponseObject, error)
+	// ListTrash The trash, newest first (RF-30)
+	// (GET /trash)
+	ListTrash(ctx context.Context, request ListTrashRequestObject) (ListTrashResponseObject, error)
+	// DeleteTrashEntry Delete one entry for good
+	// (DELETE /trash/{id})
+	DeleteTrashEntry(ctx context.Context, request DeleteTrashEntryRequestObject) (DeleteTrashEntryResponseObject, error)
+	// RestoreTrashEntry Put an entry back in its game
+	// (POST /trash/{id}/restore)
+	RestoreTrashEntry(ctx context.Context, request RestoreTrashEntryRequestObject) (RestoreTrashEntryResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -3019,6 +4640,127 @@ func (sh *strictHandler) ListConsoles(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// CreateConsole operation middleware
+func (sh *strictHandler) CreateConsole(w http.ResponseWriter, r *http.Request) {
+	var request CreateConsoleRequestObject
+
+	var body CreateConsoleJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateConsole(ctx, request.(CreateConsoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateConsole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateConsoleResponseObject); ok {
+		if err := validResponse.VisitCreateConsoleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReorderConsoles operation middleware
+func (sh *strictHandler) ReorderConsoles(w http.ResponseWriter, r *http.Request) {
+	var request ReorderConsolesRequestObject
+
+	var body ReorderConsolesJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReorderConsoles(ctx, request.(ReorderConsolesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReorderConsoles")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReorderConsolesResponseObject); ok {
+		if err := validResponse.VisitReorderConsolesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteConsole operation middleware
+func (sh *strictHandler) DeleteConsole(w http.ResponseWriter, r *http.Request, id ConsoleId) {
+	var request DeleteConsoleRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteConsole(ctx, request.(DeleteConsoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteConsole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteConsoleResponseObject); ok {
+		if err := validResponse.VisitDeleteConsoleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateConsole operation middleware
+func (sh *strictHandler) UpdateConsole(w http.ResponseWriter, r *http.Request, id ConsoleId) {
+	var request UpdateConsoleRequestObject
+
+	request.Id = id
+
+	var body UpdateConsoleJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateConsole(ctx, request.(UpdateConsoleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateConsole")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateConsoleResponseObject); ok {
+		if err := validResponse.VisitUpdateConsoleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListConsoleGames operation middleware
 func (sh *strictHandler) ListConsoleGames(w http.ResponseWriter, r *http.Request, slug string) {
 	var request ListConsoleGamesRequestObject
@@ -3123,6 +4865,98 @@ func (sh *strictHandler) DownloadGame(w http.ResponseWriter, r *http.Request, id
 	}
 }
 
+// RematchGame operation middleware
+func (sh *strictHandler) RematchGame(w http.ResponseWriter, r *http.Request, id GameId) {
+	var request RematchGameRequestObject
+
+	request.Id = id
+
+	var body RematchGameJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RematchGame(ctx, request.(RematchGameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RematchGame")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RematchGameResponseObject); ok {
+		if err := validResponse.VisitRematchGameResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PlanRematch operation middleware
+func (sh *strictHandler) PlanRematch(w http.ResponseWriter, r *http.Request, id GameId) {
+	var request PlanRematchRequestObject
+
+	request.Id = id
+
+	var body PlanRematchJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PlanRematch(ctx, request.(PlanRematchRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PlanRematch")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PlanRematchResponseObject); ok {
+		if err := validResponse.VisitPlanRematchResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TrashGame operation middleware
+func (sh *strictHandler) TrashGame(w http.ResponseWriter, r *http.Request, id GameId) {
+	var request TrashGameRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TrashGame(ctx, request.(TrashGameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TrashGame")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TrashGameResponseObject); ok {
+		if err := validResponse.VisitTrashGameResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHealth operation middleware
 func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthRequestObject
@@ -3175,7 +5009,7 @@ func (sh *strictHandler) GetImage(w http.ResponseWriter, r *http.Request, size I
 }
 
 // DownloadItem operation middleware
-func (sh *strictHandler) DownloadItem(w http.ResponseWriter, r *http.Request, id int64) {
+func (sh *strictHandler) DownloadItem(w http.ResponseWriter, r *http.Request, id ItemId) {
 	var request DownloadItemRequestObject
 
 	request.Id = id
@@ -3193,6 +5027,58 @@ func (sh *strictHandler) DownloadItem(w http.ResponseWriter, r *http.Request, id
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DownloadItemResponseObject); ok {
 		if err := validResponse.VisitDownloadItemResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ForgetItem operation middleware
+func (sh *strictHandler) ForgetItem(w http.ResponseWriter, r *http.Request, id ItemId) {
+	var request ForgetItemRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ForgetItem(ctx, request.(ForgetItemRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ForgetItem")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ForgetItemResponseObject); ok {
+		if err := validResponse.VisitForgetItemResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TrashItem operation middleware
+func (sh *strictHandler) TrashItem(w http.ResponseWriter, r *http.Request, id ItemId) {
+	var request TrashItemRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TrashItem(ctx, request.(TrashItemRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TrashItem")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TrashItemResponseObject); ok {
+		if err := validResponse.VisitTrashItemResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3425,6 +5311,30 @@ func (sh *strictHandler) PlanJobCommit(w http.ResponseWriter, r *http.Request, i
 	}
 }
 
+// CheckLibrary operation middleware
+func (sh *strictHandler) CheckLibrary(w http.ResponseWriter, r *http.Request) {
+	var request CheckLibraryRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CheckLibrary(ctx, request.(CheckLibraryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CheckLibrary")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CheckLibraryResponseObject); ok {
+		if err := validResponse.VisitCheckLibraryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // SearchGames operation middleware
 func (sh *strictHandler) SearchGames(w http.ResponseWriter, r *http.Request, params SearchGamesParams) {
 	var request SearchGamesRequestObject
@@ -3470,6 +5380,116 @@ func (sh *strictHandler) SearchPlatforms(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SearchPlatformsResponseObject); ok {
 		if err := validResponse.VisitSearchPlatformsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EmptyTrash operation middleware
+func (sh *strictHandler) EmptyTrash(w http.ResponseWriter, r *http.Request) {
+	var request EmptyTrashRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EmptyTrash(ctx, request.(EmptyTrashRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EmptyTrash")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EmptyTrashResponseObject); ok {
+		if err := validResponse.VisitEmptyTrashResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListTrash operation middleware
+func (sh *strictHandler) ListTrash(w http.ResponseWriter, r *http.Request) {
+	var request ListTrashRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTrash(ctx, request.(ListTrashRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTrash")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTrashResponseObject); ok {
+		if err := validResponse.VisitListTrashResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteTrashEntry operation middleware
+func (sh *strictHandler) DeleteTrashEntry(w http.ResponseWriter, r *http.Request, id TrashEntryId) {
+	var request DeleteTrashEntryRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteTrashEntry(ctx, request.(DeleteTrashEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteTrashEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteTrashEntryResponseObject); ok {
+		if err := validResponse.VisitDeleteTrashEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RestoreTrashEntry operation middleware
+func (sh *strictHandler) RestoreTrashEntry(w http.ResponseWriter, r *http.Request, id TrashEntryId) {
+	var request RestoreTrashEntryRequestObject
+
+	request.Id = id
+
+	var body RestoreTrashEntryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RestoreTrashEntry(ctx, request.(RestoreTrashEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RestoreTrashEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RestoreTrashEntryResponseObject); ok {
+		if err := validResponse.VisitRestoreTrashEntryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

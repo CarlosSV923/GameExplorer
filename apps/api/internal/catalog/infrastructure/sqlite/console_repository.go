@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/infrastructure/sqlite/sqlcgen"
@@ -13,14 +14,15 @@ import (
 
 // ConsoleRepository implements domain.ConsoleRepository.
 type ConsoleRepository struct {
-	q *sqlcgen.Queries
+	db *sql.DB
+	q  *sqlcgen.Queries
 }
 
 var _ domain.ConsoleRepository = (*ConsoleRepository)(nil)
 
 // NewConsoleRepository builds the repository.
 func NewConsoleRepository(db *sql.DB) *ConsoleRepository {
-	return &ConsoleRepository{q: sqlcgen.New(db)}
+	return &ConsoleRepository{db: db, q: sqlcgen.New(db)}
 }
 
 // List implements domain.ConsoleRepository.
@@ -81,4 +83,70 @@ func (r *ConsoleRepository) UpdatePlatformMetadata(ctx context.Context, id domai
 		params.ReleaseYear = sql.NullInt64{Int64: int64(*releaseYear), Valid: true}
 	}
 	return r.q.UpdateConsolePlatformMetadata(ctx, params)
+}
+
+// Create implements domain.ConsoleRepository.
+func (r *ConsoleRepository) Create(ctx context.Context, c domain.Console) (domain.ConsoleID, error) {
+	exts, err := json.Marshal(c.Extensions)
+	if err != nil {
+		return 0, err
+	}
+	params := sqlcgen.InsertConsoleParams{
+		Slug: string(c.Slug), DisplayName: c.DisplayName, Extensions: string(exts),
+		ReleaseYear: nullInt(c.ReleaseYear), LogoImageID: nullString(c.LogoImageID),
+	}
+	if c.IGDBPlatformID != nil {
+		params.IgdbPlatformID = sql.NullInt64{Int64: *c.IGDBPlatformID, Valid: true}
+	}
+	id, err := r.q.InsertConsole(ctx, params)
+	if isUniqueViolation(err) {
+		return 0, domain.ErrSlugTaken
+	}
+	return domain.ConsoleID(id), err
+}
+
+// Update implements domain.ConsoleRepository.
+func (r *ConsoleRepository) Update(ctx context.Context, c domain.Console) error {
+	exts, err := json.Marshal(c.Extensions)
+	if err != nil {
+		return err
+	}
+	err = r.q.UpdateConsole(ctx, sqlcgen.UpdateConsoleParams{
+		Slug: string(c.Slug), DisplayName: c.DisplayName, Extensions: string(exts), ID: int64(c.ID),
+	})
+	if isUniqueViolation(err) {
+		return domain.ErrSlugTaken
+	}
+	return err
+}
+
+// Delete implements domain.ConsoleRepository.
+func (r *ConsoleRepository) Delete(ctx context.Context, id domain.ConsoleID) error {
+	return r.q.DeleteConsole(ctx, int64(id))
+}
+
+// SetOrder implements domain.ConsoleRepository.
+func (r *ConsoleRepository) SetOrder(ctx context.Context, ids []domain.ConsoleID) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	q := r.q.WithTx(tx)
+	for i, id := range ids {
+		if err := q.SetConsoleOrder(ctx, sqlcgen.SetConsoleOrderParams{SortOrder: int64(i + 1), ID: int64(id)}); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// HasGames implements domain.ConsoleRepository.
+func (r *ConsoleRepository) HasGames(ctx context.Context, id domain.ConsoleID) (bool, error) {
+	return r.q.ConsoleHasGames(ctx, int64(id))
+}
+
+// isUniqueViolation recognizes SQLite's UNIQUE constraint error.
+func isUniqueViolation(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }

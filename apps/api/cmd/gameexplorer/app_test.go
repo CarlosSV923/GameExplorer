@@ -28,6 +28,7 @@ func newTestServer(t *testing.T, mutate func(*config.Config)) *httptest.Server {
 		SessionSecret:      strings.Repeat("s", config.MinSessionSecretBytes),
 		SessionTTL:         config.Config{}.SessionTTL + 3600e9,
 		ExtractConcurrency: 1,
+		TrashRetentionDays: 30,
 	}
 	if mutate != nil {
 		mutate(&cfg)

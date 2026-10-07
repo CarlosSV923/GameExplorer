@@ -10,12 +10,50 @@ import (
 	"database/sql"
 )
 
+const countGameItems = `-- name: CountGameItems :one
+SELECT COUNT(*) FROM game_items WHERE game_id = ?
+`
+
+func (q *Queries) CountGameItems(ctx context.Context, gameID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countGameItems, gameID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const deleteGame = `-- name: DeleteGame :exec
+DELETE FROM games WHERE id = ?
+`
+
+func (q *Queries) DeleteGame(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteGame, id)
+	return err
+}
+
+const deleteGameItem = `-- name: DeleteGameItem :exec
+DELETE FROM game_items WHERE id = ?
+`
+
+func (q *Queries) DeleteGameItem(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteGameItem, id)
+	return err
+}
+
 const deleteOperation = `-- name: DeleteOperation :exec
 DELETE FROM library_operations WHERE id = ?
 `
 
 func (q *Queries) DeleteOperation(ctx context.Context, id string) error {
 	_, err := q.db.ExecContext(ctx, deleteOperation, id)
+	return err
+}
+
+const deleteTrashEntry = `-- name: DeleteTrashEntry :exec
+DELETE FROM trash_entries WHERE id = ?
+`
+
+func (q *Queries) DeleteTrashEntry(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteTrashEntry, id)
 	return err
 }
 
@@ -50,16 +88,17 @@ func (q *Queries) FindGameByIGDB(ctx context.Context, arg FindGameByIGDBParams) 
 }
 
 const folderTaken = `-- name: FolderTaken :one
-SELECT EXISTS (SELECT 1 FROM games WHERE console_id = ? AND folder = ? COLLATE NOCASE)
+SELECT EXISTS (SELECT 1 FROM games WHERE console_id = ? AND folder = ? COLLATE NOCASE AND id != ?3)
 `
 
 type FolderTakenParams struct {
 	ConsoleID int64
 	Folder    string
+	ExceptID  int64
 }
 
 func (q *Queries) FolderTaken(ctx context.Context, arg FolderTakenParams) (bool, error) {
-	row := q.db.QueryRowContext(ctx, folderTaken, arg.ConsoleID, arg.Folder)
+	row := q.db.QueryRowContext(ctx, folderTaken, arg.ConsoleID, arg.Folder, arg.ExceptID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -91,7 +130,7 @@ func (q *Queries) GetGame(ctx context.Context, id int64) (Game, error) {
 }
 
 const getGameItem = `-- name: GetGameItem :one
-SELECT id, game_id, kind, label, disc_number, shape, files, size, title_id, source_job, created_at, trashed_at, trash_dir
+SELECT id, game_id, kind, label, disc_number, shape, files, size, title_id, source_job, created_at, trash_entry_id, missing_since
 FROM game_items
 WHERE id = ?
 `
@@ -111,8 +150,26 @@ func (q *Queries) GetGameItem(ctx context.Context, id int64) (GameItem, error) {
 		&i.TitleID,
 		&i.SourceJob,
 		&i.CreatedAt,
+		&i.TrashEntryID,
+		&i.MissingSince,
+	)
+	return i, err
+}
+
+const getTrashEntry = `-- name: GetTrashEntry :one
+SELECT id, game_id, whole_game, reason, dir, trashed_at FROM trash_entries WHERE id = ?
+`
+
+func (q *Queries) GetTrashEntry(ctx context.Context, id int64) (TrashEntry, error) {
+	row := q.db.QueryRowContext(ctx, getTrashEntry, id)
+	var i TrashEntry
+	err := row.Scan(
+		&i.ID,
+		&i.GameID,
+		&i.WholeGame,
+		&i.Reason,
+		&i.Dir,
 		&i.TrashedAt,
-		&i.TrashDir,
 	)
 	return i, err
 }
@@ -165,9 +222,10 @@ func (q *Queries) InsertGame(ctx context.Context, arg InsertGameParams) (int64, 
 	return id, err
 }
 
-const insertGameItem = `-- name: InsertGameItem :exec
+const insertGameItem = `-- name: InsertGameItem :one
 INSERT INTO game_items (game_id, kind, label, disc_number, shape, files, size, title_id, source_job, created_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id
 `
 
 type InsertGameItemParams struct {
@@ -183,8 +241,8 @@ type InsertGameItemParams struct {
 	CreatedAt  string
 }
 
-func (q *Queries) InsertGameItem(ctx context.Context, arg InsertGameItemParams) error {
-	_, err := q.db.ExecContext(ctx, insertGameItem,
+func (q *Queries) InsertGameItem(ctx context.Context, arg InsertGameItemParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertGameItem,
 		arg.GameID,
 		arg.Kind,
 		arg.Label,
@@ -196,7 +254,9 @@ func (q *Queries) InsertGameItem(ctx context.Context, arg InsertGameItemParams) 
 		arg.SourceJob,
 		arg.CreatedAt,
 	)
-	return err
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const insertOperation = `-- name: InsertOperation :exec
@@ -223,8 +283,35 @@ func (q *Queries) InsertOperation(ctx context.Context, arg InsertOperationParams
 	return err
 }
 
+const insertTrashEntry = `-- name: InsertTrashEntry :one
+INSERT INTO trash_entries (game_id, whole_game, reason, dir, trashed_at)
+VALUES (?, ?, ?, ?, ?)
+RETURNING id
+`
+
+type InsertTrashEntryParams struct {
+	GameID    int64
+	WholeGame int64
+	Reason    string
+	Dir       string
+	TrashedAt string
+}
+
+func (q *Queries) InsertTrashEntry(ctx context.Context, arg InsertTrashEntryParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertTrashEntry,
+		arg.GameID,
+		arg.WholeGame,
+		arg.Reason,
+		arg.Dir,
+		arg.TrashedAt,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const listGameItems = `-- name: ListGameItems :many
-SELECT id, game_id, kind, label, disc_number, shape, files, size, title_id, source_job, created_at, trashed_at, trash_dir
+SELECT id, game_id, kind, label, disc_number, shape, files, size, title_id, source_job, created_at, trash_entry_id, missing_since
 FROM game_items
 WHERE game_id = ?
 ORDER BY id
@@ -251,8 +338,8 @@ func (q *Queries) ListGameItems(ctx context.Context, gameID int64) ([]GameItem, 
 			&i.TitleID,
 			&i.SourceJob,
 			&i.CreatedAt,
-			&i.TrashedAt,
-			&i.TrashDir,
+			&i.TrashEntryID,
+			&i.MissingSince,
 		); err != nil {
 			return nil, err
 		}
@@ -269,9 +356,10 @@ func (q *Queries) ListGameItems(ctx context.Context, gameID int64) ([]GameItem, 
 
 const listGameSummaries = `-- name: ListGameSummaries :many
 SELECT g.id, g.console_id, g.title, g.folder, g.release_year, g.cover_image_id,
-       COUNT(i.id) AS item_count, CAST(TOTAL(i.size) AS INTEGER) AS size
+       COUNT(i.id) AS item_count, CAST(TOTAL(i.size) AS INTEGER) AS size,
+       COUNT(i.missing_since) AS missing_count
 FROM games g
-JOIN game_items i ON i.game_id = g.id AND i.trashed_at IS NULL
+JOIN game_items i ON i.game_id = g.id AND i.trash_entry_id IS NULL
 GROUP BY g.id
 ORDER BY g.title COLLATE NOCASE, g.id
 `
@@ -285,6 +373,7 @@ type ListGameSummariesRow struct {
 	CoverImageID sql.NullString
 	ItemCount    int64
 	Size         int64
+	MissingCount int64
 }
 
 // Games with at least one item outside the trash, by title.
@@ -306,6 +395,7 @@ func (q *Queries) ListGameSummaries(ctx context.Context) ([]ListGameSummariesRow
 			&i.CoverImageID,
 			&i.ItemCount,
 			&i.Size,
+			&i.MissingCount,
 		); err != nil {
 			return nil, err
 		}
@@ -355,31 +445,150 @@ func (q *Queries) ListOperations(ctx context.Context) ([]LibraryOperation, error
 	return items, nil
 }
 
-const trashGameItem = `-- name: TrashGameItem :exec
-UPDATE game_items
-SET trashed_at = ?, trash_dir = ?
-WHERE id = ? AND trashed_at IS NULL
+const listTrashEntries = `-- name: ListTrashEntries :many
+SELECT id, game_id, whole_game, reason, dir, trashed_at FROM trash_entries ORDER BY trashed_at DESC, id DESC
 `
 
-type TrashGameItemParams struct {
-	TrashedAt sql.NullString
-	TrashDir  string
-	ID        int64
+func (q *Queries) ListTrashEntries(ctx context.Context) ([]TrashEntry, error) {
+	rows, err := q.db.QueryContext(ctx, listTrashEntries)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TrashEntry
+	for rows.Next() {
+		var i TrashEntry
+		if err := rows.Scan(
+			&i.ID,
+			&i.GameID,
+			&i.WholeGame,
+			&i.Reason,
+			&i.Dir,
+			&i.TrashedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-func (q *Queries) TrashGameItem(ctx context.Context, arg TrashGameItemParams) error {
-	_, err := q.db.ExecContext(ctx, trashGameItem, arg.TrashedAt, arg.TrashDir, arg.ID)
+const listTrashItems = `-- name: ListTrashItems :many
+SELECT id, game_id, kind, label, disc_number, shape, files, size, title_id, source_job, created_at, trash_entry_id, missing_since
+FROM game_items
+WHERE trash_entry_id IS NOT NULL
+ORDER BY id
+`
+
+func (q *Queries) ListTrashItems(ctx context.Context) ([]GameItem, error) {
+	rows, err := q.db.QueryContext(ctx, listTrashItems)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GameItem
+	for rows.Next() {
+		var i GameItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.GameID,
+			&i.Kind,
+			&i.Label,
+			&i.DiscNumber,
+			&i.Shape,
+			&i.Files,
+			&i.Size,
+			&i.TitleID,
+			&i.SourceJob,
+			&i.CreatedAt,
+			&i.TrashEntryID,
+			&i.MissingSince,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const moveGameItems = `-- name: MoveGameItems :exec
+UPDATE game_items SET game_id = ?1 WHERE game_id = ?2
+`
+
+type MoveGameItemsParams struct {
+	ToGame   int64
+	FromGame int64
+}
+
+func (q *Queries) MoveGameItems(ctx context.Context, arg MoveGameItemsParams) error {
+	_, err := q.db.ExecContext(ctx, moveGameItems, arg.ToGame, arg.FromGame)
 	return err
 }
 
-const updateGameMetadata = `-- name: UpdateGameMetadata :exec
+const moveTrashEntries = `-- name: MoveTrashEntries :exec
+UPDATE trash_entries SET game_id = ?1 WHERE game_id = ?2
+`
+
+type MoveTrashEntriesParams struct {
+	ToGame   int64
+	FromGame int64
+}
+
+func (q *Queries) MoveTrashEntries(ctx context.Context, arg MoveTrashEntriesParams) error {
+	_, err := q.db.ExecContext(ctx, moveTrashEntries, arg.ToGame, arg.FromGame)
+	return err
+}
+
+const setItemMissing = `-- name: SetItemMissing :exec
+UPDATE game_items SET missing_since = ? WHERE id = ?
+`
+
+type SetItemMissingParams struct {
+	MissingSince sql.NullString
+	ID           int64
+}
+
+func (q *Queries) SetItemMissing(ctx context.Context, arg SetItemMissingParams) error {
+	_, err := q.db.ExecContext(ctx, setItemMissing, arg.MissingSince, arg.ID)
+	return err
+}
+
+const setItemTrash = `-- name: SetItemTrash :exec
+UPDATE game_items SET trash_entry_id = ? WHERE id = ?
+`
+
+type SetItemTrashParams struct {
+	TrashEntryID sql.NullInt64
+	ID           int64
+}
+
+func (q *Queries) SetItemTrash(ctx context.Context, arg SetItemTrashParams) error {
+	_, err := q.db.ExecContext(ctx, setItemTrash, arg.TrashEntryID, arg.ID)
+	return err
+}
+
+const updateGame = `-- name: UpdateGame :exec
 UPDATE games
-SET title = ?, release_year = ?, cover_image_id = ?, summary = ?, genres = ?, updated_at = ?
+SET igdb_id = ?, title = ?, folder = ?, release_year = ?, cover_image_id = ?, summary = ?, genres = ?, updated_at = ?
 WHERE id = ?
 `
 
-type UpdateGameMetadataParams struct {
+type UpdateGameParams struct {
+	IgdbID       int64
 	Title        string
+	Folder       string
 	ReleaseYear  sql.NullInt64
 	CoverImageID sql.NullString
 	Summary      sql.NullString
@@ -388,9 +597,11 @@ type UpdateGameMetadataParams struct {
 	ID           int64
 }
 
-func (q *Queries) UpdateGameMetadata(ctx context.Context, arg UpdateGameMetadataParams) error {
-	_, err := q.db.ExecContext(ctx, updateGameMetadata,
+func (q *Queries) UpdateGame(ctx context.Context, arg UpdateGameParams) error {
+	_, err := q.db.ExecContext(ctx, updateGame,
+		arg.IgdbID,
 		arg.Title,
+		arg.Folder,
 		arg.ReleaseYear,
 		arg.CoverImageID,
 		arg.Summary,
@@ -398,5 +609,20 @@ func (q *Queries) UpdateGameMetadata(ctx context.Context, arg UpdateGameMetadata
 		arg.UpdatedAt,
 		arg.ID,
 	)
+	return err
+}
+
+const updateItemPlace = `-- name: UpdateItemPlace :exec
+UPDATE game_items SET game_id = ?, files = ? WHERE id = ?
+`
+
+type UpdateItemPlaceParams struct {
+	GameID int64
+	Files  string
+	ID     int64
+}
+
+func (q *Queries) UpdateItemPlace(ctx context.Context, arg UpdateItemPlaceParams) error {
+	_, err := q.db.ExecContext(ctx, updateItemPlace, arg.GameID, arg.Files, arg.ID)
 	return err
 }

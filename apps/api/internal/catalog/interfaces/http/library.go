@@ -68,7 +68,7 @@ func (h *Handler) GetGame(ctx context.Context, req httpapi.GetGameRequestObject)
 	g := v.Game
 	out := httpapi.GameDetail{
 		Id: int64(g.ID), Console: string(v.Console), Title: g.Title, Folder: g.Folder, ReleaseYear: g.ReleaseYear,
-		CoverImageId: g.CoverImageID, ItemCount: len(v.Items), Size: v.Size, IgdbId: g.IGDBID,
+		CoverImageId: g.CoverImageID, ItemCount: len(v.Items), MissingCount: v.Missing, Size: v.Size, IgdbId: g.IGDBID,
 		Path: string(v.Console) + "/" + g.Folder, Summary: g.Summary, Genres: g.Genres,
 		Items: make([]httpapi.LibraryItem, 0, len(v.Items)),
 	}
@@ -85,7 +85,7 @@ func (h *Handler) GetGame(ctx context.Context, req httpapi.GetGameRequestObject)
 func ItemToAPI(it domain.GameItem) httpapi.LibraryItem {
 	out := httpapi.LibraryItem{
 		Id: int64(it.ID), Kind: httpapi.ItemKind(it.Kind), Shape: httpapi.LibraryItemShape(it.Shape),
-		Files: it.Files, Size: it.Size, CreatedAt: it.CreatedAt,
+		Files: it.Files, Size: it.Size, CreatedAt: it.CreatedAt, MissingSince: it.MissingSince,
 	}
 	if it.Label != "" {
 		l := it.Label
@@ -141,7 +141,7 @@ func summaries(games []application.GameListing) []httpapi.GameSummary {
 	for _, g := range games {
 		out = append(out, httpapi.GameSummary{
 			Id: int64(g.ID), Console: string(g.Console), Title: g.Title, Folder: g.Folder,
-			ReleaseYear: g.ReleaseYear, CoverImageId: g.CoverImageID, ItemCount: g.ItemCount, Size: g.Size,
+			ReleaseYear: g.ReleaseYear, CoverImageId: g.CoverImageID, ItemCount: g.ItemCount, MissingCount: g.MissingCount, Size: g.Size,
 		})
 	}
 	return out

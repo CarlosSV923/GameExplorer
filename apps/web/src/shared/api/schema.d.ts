@@ -87,11 +87,50 @@ export interface paths {
         /** Consoles in carousel order */
         get: operations["listConsoles"];
         put?: never;
+        /**
+         * Add a console for an IGDB platform; it goes last (RF-41)
+         * @description Consoles added by the user are detected by extension only.
+         */
+        post: operations["createConsole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/consoles/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the carousel order */
+        put: operations["reorderConsoles"];
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/consoles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a console added by the user that has no games */
+        delete: operations["deleteConsole"];
+        options?: never;
+        head?: never;
+        /** Change a console's name, extensions or (without games) its folder */
+        patch: operations["updateConsole"];
         trace?: never;
     };
     "/metadata/games": {
@@ -392,6 +431,172 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/games/{id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send every item of a game to the trash, as one entry (RF-25) */
+        post: operations["trashGame"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send one item to the trash (RF-25) */
+        post: operations["trashItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{id}/forget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove a missing item (deleted over SMB) from the library (RF-26) */
+        post: operations["forgetItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run the integrity check now (it also runs every hour) */
+        post: operations["checkLibrary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games/{id}/rematch/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview matching a game to another IGDB entry (RF-24)
+         * @description When the new IGDB game is already in the library (same console) the
+         *     games merge; items that are duplicates there come back `undecided`.
+         */
+        post: operations["planRematch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games/{id}/rematch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Match a game to another IGDB entry, renaming its folder and files (RF-24)
+         * @description Reversible like a commit. Every duplicate of a merge needs a decision.
+         */
+        post: operations["rematchGame"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The trash, newest first (RF-30) */
+        get: operations["listTrash"];
+        put?: never;
+        post?: never;
+        /** Delete everything in the trash for good */
+        delete: operations["emptyTrash"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete one entry for good */
+        delete: operations["deleteTrashEntry"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put an entry back in its game
+         * @description Files take the names of the game's current title. If an item's place
+         *     is taken (a duplicate was stored since), the answer is 409 unless
+         *     `onConflict` is `replace`: the current item then goes to the trash.
+         */
+        post: operations["restoreTrashEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/images/{size}/{imageId}": {
         parameters: {
             query?: never;
@@ -607,6 +812,11 @@ export interface components {
             size: number;
             /** Format: date-time */
             createdAt: string;
+            /**
+             * Format: date-time
+             * @description Set while a file of the item is missing from disk (deleted over SMB).
+             */
+            missingSince?: string | null;
         };
         GameSummary: {
             /** Format: int64 */
@@ -620,6 +830,8 @@ export interface components {
             /** @description Render with /api/images/cover_big/{coverImageId}. */
             coverImageId?: string | null;
             itemCount: number;
+            /** @description Items with files missing from disk. */
+            missingCount: number;
             /**
              * Format: int64
              * @description Bytes of every item in the library.
@@ -638,6 +850,107 @@ export interface components {
             genres: string[];
             /** @description Items in the library (not in the trash), base first. */
             items: components["schemas"]["LibraryItem"][];
+        };
+        ConsoleInput: {
+            /**
+             * @description Folder name; can only change while the console has no games.
+             * @example n64
+             */
+            slug: string;
+            /** @example Nintendo 64 */
+            displayName: string;
+            extensions: string[];
+        };
+        ConsoleCreate: components["schemas"]["ConsoleInput"] & {
+            /** Format: int64 */
+            igdbPlatformId: number;
+        };
+        ConsoleOrder: {
+            /** @description Every console id, first to last. */
+            ids: number[];
+        };
+        IntegrityReport: {
+            checked: number;
+            /** @description Items found missing in this check. */
+            missing: number;
+            /** @description Missing items whose files are back. */
+            found: number;
+        };
+        RematchRequest: {
+            /** Format: int64 */
+            igdbGameId: number;
+            /** @description For duplicates when merging into a game that already has the new IGDB id. */
+            decisions?: components["schemas"]["ItemDecision"][];
+        };
+        ItemDecision: {
+            /** Format: int64 */
+            itemId: number;
+            /**
+             * @description replace sends the other game's item to the trash; skip sends this one.
+             * @enum {string}
+             */
+            onDuplicate: "replace" | "skip";
+        };
+        RematchPlan: {
+            console: string;
+            title: string;
+            /** @description Folder after the re-match. */
+            folder: string;
+            /**
+             * Format: int64
+             * @description Game that already has the new IGDB id; the games merge.
+             */
+            mergeInto?: number | null;
+            items: components["schemas"]["RematchItem"][];
+        };
+        RematchItem: {
+            item: components["schemas"]["LibraryItem"];
+            /** @description New names. */
+            files: string[];
+            /** @enum {string} */
+            action: "store" | "replace" | "skip" | "undecided";
+            duplicate?: components["schemas"]["LibraryItem"] | null;
+        };
+        RematchResult: {
+            /** Format: int64 */
+            gameId: number;
+            /** @example switch/Inside */
+            path: string;
+            merged: boolean;
+        };
+        TrashEntry: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            gameId: number;
+            console: string;
+            title: string;
+            folder: string;
+            wholeGame: boolean;
+            /**
+             * @description deleted by the user, or replaced by a duplicate.
+             * @enum {string}
+             */
+            reason: "deleted" | "replaced";
+            /** Format: date-time */
+            trashedAt: string;
+            /**
+             * Format: date-time
+             * @description When it is deleted for good (TRASH_RETENTION_DAYS).
+             */
+            expiresAt: string;
+            /** Format: int64 */
+            size: number;
+            items: components["schemas"]["LibraryItem"][];
+        };
+        RestoreRequest: {
+            /** @enum {string} */
+            onConflict?: "replace";
+        };
+        RestoreResult: {
+            /** Format: int64 */
+            gameId: number;
+            path: string;
         };
         PlannedItem: {
             path: string;
@@ -762,6 +1075,9 @@ export interface components {
         };
     };
     parameters: {
+        ConsoleId: number;
+        ItemId: number;
+        TrashEntryId: number;
         GameId: number;
         JobId: string;
     };
@@ -875,6 +1191,114 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    createConsole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsoleCreate"];
+            };
+        };
+        responses: {
+            /** @description The new console. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Console"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    reorderConsoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsoleOrder"];
+            };
+        };
+        responses: {
+            /** @description Consoles in the new order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Console"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    deleteConsole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ConsoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    updateConsole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ConsoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsoleInput"];
+            };
+        };
+        responses: {
+            /** @description The console. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Console"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     searchGames: {
@@ -1243,7 +1667,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: components["parameters"]["ItemId"];
             };
             cookie?: never;
         };
@@ -1277,6 +1701,252 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    trashGame: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GameId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In the trash. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    trashItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In the trash. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    forgetItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Forgotten. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    checkLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrityReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    planRematch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GameId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RematchRequest"];
+            };
+        };
+        responses: {
+            /** @description The plan. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RematchPlan"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    rematchGame: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GameId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RematchRequest"];
+            };
+        };
+        responses: {
+            /** @description Where the game is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RematchResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listTrash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashEntry"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    emptyTrash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Emptied. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    deleteTrashEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TrashEntryId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    restoreTrashEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TrashEntryId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RestoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Restored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
         };
     };
     getImage: {

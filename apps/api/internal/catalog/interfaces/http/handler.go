@@ -4,6 +4,7 @@ package http
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/application"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
@@ -15,6 +16,10 @@ type Handler struct {
 	consoles *application.ConsoleService
 	browse   *application.BrowseService
 	log      *slog.Logger
+
+	library   *application.LibraryService
+	platforms application.PlatformDirectory
+	retention time.Duration
 }
 
 // NewHandler builds the handler.

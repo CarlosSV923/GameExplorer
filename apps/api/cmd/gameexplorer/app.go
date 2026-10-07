@@ -28,6 +28,7 @@ import (
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/tus"
 	ingestionhttp "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/interfaces/http"
 	metadataapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/application"
+	metadatadomain "github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/domain"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/infrastructure/igdb"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/infrastructure/imagecache"
 	metadatahttp "github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/interfaces/http"
@@ -77,6 +78,7 @@ type app struct {
 	ingestion *ingestionapp.Service
 	processor *ingestionapp.Processor
 	committer *ingestionapp.Committer
+	library   *catalogapp.LibraryService
 	uploads   *tus.Adapter // nil when the library is not writable
 	cfg       config.Config
 
@@ -104,8 +106,13 @@ func (a *app) start(ctx context.Context) {
 		go a.uploads.Run(ctx, a.ingestion)
 		go a.ingestion.RunPurge(ctx, time.Hour)
 		go a.processor.Run(ctx, a.cfg.ExtractConcurrency)
+		go a.library.RunMaintenance(ctx, time.Hour, a.trashRetention())
 	}
 	go a.syncConsoles(ctx, a.log)
+}
+
+func (a *app) trashRetention() time.Duration {
+	return time.Duration(a.cfg.TrashRetentionDays) * 24 * time.Hour
 }
 
 // stagingDir holds each job's extracted files until they are committed.
@@ -116,6 +123,11 @@ func stagingDir(libraryPath string) string {
 // trashDir keeps replaced and deleted items until they are purged (RF-30).
 func trashDir(libraryPath string) string {
 	return filepath.Join(libraryPath, ".gameexplorer", "trash")
+}
+
+// scratchDir holds the scratch files of library operations in progress.
+func scratchDir(libraryPath string) string {
+	return filepath.Join(libraryPath, ".gameexplorer", "ops")
 }
 
 // volumesDir gathers the parts of multi-volume archives until all arrive.
@@ -178,7 +190,7 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 	stagingArea := staging.New(stagingDir(cfg.LibraryPath), volumesDir(cfg.LibraryPath))
 	ingestion := ingestionapp.NewService(jobs, store, events, log, nil).WithItems(items)
 	libraryRepo := catalogsqlite.NewLibraryRepository(db)
-	libraryFiles := libraryfs.New(cfg.LibraryPath, trashDir(cfg.LibraryPath))
+	libraryFiles := libraryfs.New(cfg.LibraryPath, trashDir(cfg.LibraryPath), scratchDir(cfg.LibraryPath))
 	library := catalogapp.NewLibraryService(
 		catalogsqlite.NewConsoleRepository(db), libraryRepo, gameDirectory{metadata}, libraryFiles, log, nil)
 	browse := catalogapp.NewBrowseService(catalogsqlite.NewConsoleRepository(db), libraryRepo, libraryFiles)
@@ -206,7 +218,8 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 			}},
 		),
 		identityAPI: identityHandler,
-		catalogAPI:  cataloghttp.NewHandler(consoles).WithLibrary(browse, log),
+		catalogAPI: cataloghttp.NewHandler(consoles).WithLibrary(browse, log).
+			WithManagement(library, platformDirectory{metadata}, time.Duration(cfg.TrashRetentionDays)*24*time.Hour),
 		metadataAPI: metadatahttp.NewHandler(metadata, log),
 		jobsAPI:     ingestionhttp.NewHandler(ingestion, passwordSubmitter{processor}, events, shutdown).WithCommits(committer),
 	}
@@ -254,7 +267,7 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 	)
 	a := &app{
 		handler: handler, db: db, log: log, consoles: consoles, metadata: metadata,
-		ingestion: ingestion, processor: processor, committer: committer, shutdown: shutdown, cfg: cfg,
+		ingestion: ingestion, processor: processor, committer: committer, library: library, shutdown: shutdown, cfg: cfg,
 	}
 	if uploadsErr == nil {
 		a.uploads = uploads
@@ -318,7 +331,12 @@ type platformDirectory struct{ svc *metadataapp.Service }
 
 func (d platformDirectory) PlatformsByID(ctx context.Context, ids []int64) ([]catalogapp.PlatformInfo, error) {
 	platforms, err := d.svc.PlatformsByID(ctx, ids)
-	if err != nil {
+	switch {
+	case errors.Is(err, metadatadomain.ErrNotConfigured):
+		return nil, catalogapp.ErrMetadataNotConfigured
+	case errors.Is(err, metadatadomain.ErrUpstream):
+		return nil, fmt.Errorf("%w: %w", catalogapp.ErrMetadataUnavailable, err)
+	case err != nil:
 		return nil, err
 	}
 	out := make([]catalogapp.PlatformInfo, 0, len(platforms))

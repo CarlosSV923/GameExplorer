@@ -36,19 +36,19 @@ type Game struct {
 }
 
 type GameItem struct {
-	ID         int64
-	GameID     int64
-	Kind       string
-	Label      string
-	DiscNumber int64
-	Shape      string
-	Files      string
-	Size       int64
-	TitleID    string
-	SourceJob  string
-	CreatedAt  string
-	TrashedAt  sql.NullString
-	TrashDir   string
+	ID           int64
+	GameID       int64
+	Kind         string
+	Label        string
+	DiscNumber   int64
+	Shape        string
+	Files        string
+	Size         int64
+	TitleID      string
+	SourceJob    string
+	CreatedAt    string
+	TrashEntryID sql.NullInt64
+	MissingSince sql.NullString
 }
 
 type LibraryOperation struct {
@@ -73,6 +73,15 @@ type StagedItem struct {
 	VersionCode    string
 	DisplayVersion string
 	DiscNumber     int64
+}
+
+type TrashEntry struct {
+	ID        int64
+	GameID    int64
+	WholeGame int64
+	Reason    string
+	Dir       string
+	TrashedAt string
 }
 
 type UploadJob struct {

@@ -19,6 +19,12 @@ var fakeGames = map[string]string{
 	"119388": `{"id":119388,"name":"The Legend of Zelda: Tears of the Kingdom","first_release_date":1683849600,"platforms":[130]}`,
 }
 
+// fakePlatforms are the platforms the fake IGDB returns by id.
+var fakePlatforms = map[string]string{
+	"130": `{"id":130,"name":"Nintendo Switch","platform_logo":{"image_id":"plgu"},"versions":[{"platform_version_release_dates":[{"y":2017}]}]}`,
+	"4":   `{"id":4,"name":"Nintendo 64","platform_logo":{"image_id":"pl6n"},"versions":[{"platform_version_release_dates":[{"y":1996}]}]}`,
+}
+
 // fakeIGDBServer answers the token endpoint, the API and the image CDN.
 func fakeIGDBServer(t *testing.T) *httptest.Server {
 	t.Helper()
@@ -37,9 +43,17 @@ func fakeIGDBServer(t *testing.T) *httptest.Server {
 			{"id":191419,"name":"Mario Kart 8 Deluxe: Booster Course Pass","platforms":[130]},
 			{"id":26764,"name":"Mario Kart 8 Deluxe","first_release_date":1493337600,"cover":{"image_id":"co213p"},"genres":[{"name":"Racing"}],"platforms":[130]}]`)
 	})
-	mux.HandleFunc("POST /v4/platforms", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = io.WriteString(w, `[{"id":130,"name":"Nintendo Switch","platform_logo":{"image_id":"plgu"},
-			"versions":[{"platform_version_release_dates":[{"y":2017}]}]}]`)
+	mux.HandleFunc("POST /v4/platforms", func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_, ids, _ := strings.Cut(string(body), "where id = (")
+		ids, _, _ = strings.Cut(ids, ")")
+		var out []string
+		for _, id := range strings.Split(ids, ",") {
+			if p, ok := fakePlatforms[id]; ok {
+				out = append(out, p)
+			}
+		}
+		_, _ = io.WriteString(w, "["+strings.Join(out, ",")+"]")
 	})
 	mux.HandleFunc("GET /img/t_logo_med/plgu.png", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("\x89PNG fake"))

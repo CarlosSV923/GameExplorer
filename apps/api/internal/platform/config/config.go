@@ -47,6 +47,10 @@ type Config struct {
 	// right for spinning disks: parallel extractions only make them seek.
 	ExtractConcurrency int `env:"EXTRACT_CONCURRENCY" envDefault:"1"`
 
+	// TrashRetentionDays is how long trashed items are kept before they are
+	// deleted for good (RF-30).
+	TrashRetentionDays int `env:"TRASH_RETENTION_DAYS" envDefault:"30"`
+
 	LogLevel slog.Level `env:"LOG_LEVEL" envDefault:"info"`
 }
 
@@ -89,6 +93,9 @@ func (c Config) validate() error {
 	}
 	if c.ExtractConcurrency < 1 || c.ExtractConcurrency > 8 {
 		errs = append(errs, fmt.Errorf("EXTRACT_CONCURRENCY must be between 1 and 8, got %d", c.ExtractConcurrency))
+	}
+	if c.TrashRetentionDays < 1 || c.TrashRetentionDays > 3650 {
+		errs = append(errs, fmt.Errorf("TRASH_RETENTION_DAYS must be between 1 and 3650, got %d", c.TrashRetentionDays))
 	}
 	if c.Port <= 0 || c.Port > 65535 {
 		errs = append(errs, fmt.Errorf("PORT %d is out of range", c.Port))

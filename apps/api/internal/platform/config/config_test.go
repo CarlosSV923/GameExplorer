@@ -57,6 +57,7 @@ func TestLoadRejectsInvalidConfig(t *testing.T) {
 		{"bad port", func(e map[string]string) { e["PORT"] = "70000" }, "out of range"},
 		{"half igdb credentials", func(e map[string]string) { e["IGDB_CLIENT_ID"] = "abc" }, "IGDB_CLIENT_SECRET"},
 		{"zero extract concurrency", func(e map[string]string) { e["EXTRACT_CONCURRENCY"] = "0" }, "EXTRACT_CONCURRENCY"},
+		{"zero trash retention", func(e map[string]string) { e["TRASH_RETENTION_DAYS"] = "0" }, "TRASH_RETENTION_DAYS"},
 		{"bad log level", func(e map[string]string) { e["LOG_LEVEL"] = "loud" }, `"loud"`},
 	}
 	for _, tt := range tests {

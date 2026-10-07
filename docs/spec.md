@@ -48,16 +48,16 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 - **RF-21** Pantalla de consola: lista de juegos por título y panel de detalle (portada, año, géneros, resumen, carpeta, elementos con tipo y tamaño). Los elementos se ordenan: base, discos por número, updates por fecha y DLC por nombre. Un juego cuyos elementos están todos en la papelera no aparece.
 - **RF-22** Búsqueda global en la biblioteca: cada palabra debe aparecer en el título, sin importar mayúsculas ni acentos ("pokemon" encuentra "Pokémon").
 - **RF-23** Descargar un elemento (reanudable con HTTP Range) o el juego completo como zip sin compresión. Los juegos en carpeta y los discos (`.cue` + pistas) se descargan siempre como zip. Dentro del zip los archivos van en `<carpeta del juego>/`. El zip se arma mientras se envía, pero anuncia su tamaño exacto (el navegador muestra el progreso). No se puede reanudar. Si falta un archivo en disco (borrado por SMB), la descarga falla antes de empezar con un mensaje claro.
-- **RF-24** Re-emparejar un juego con otro resultado de IGDB, lo que renombra la carpeta y todos los archivos (reversible si falla).
-- **RF-25** Enviar un elemento o un juego a la papelera.
-- **RF-26** Chequeo periódico de integridad: marca como *faltante* lo borrado por fuera de la app (por SMB).
+- **RF-24** Re-emparejar un juego con otro resultado de IGDB, lo que renombra la carpeta y todos los archivos (reversible si falla). Los archivos que se agregaron a la carpeta por SMB viajan con ella. Se puede pedir una vista previa. Si el nuevo juego de IGDB ya está en la biblioteca (misma consola), los juegos se **fusionan**: los elementos pasan al existente con sus nombres; para cada duplicado se elige **Reemplazar** (el del juego existente va a la papelera) u **Omitir** (va a la papelera el del juego re-emparejado). La papelera del juego fusionado pasa al existente.
+- **RF-25** Enviar un elemento o un juego a la papelera. Un juego completo es **una sola entrada** (se restaura o borra junta). La carpeta del juego se borra cuando queda vacía.
+- **RF-26** Chequeo de integridad al arrancar y cada hora (y a pedido): marca como *faltante* el elemento con algún archivo borrado por fuera de la app (por SMB) y lo desmarca solo si el archivo vuelve. Un elemento faltante se puede **Olvidar** (se quita de la biblioteca; no hay archivos que borrar).
 
 ### Papelera
-- **RF-30** Los elementos eliminados se mueven a `.gameexplorer/trash` con su metadata, se pueden restaurar y se purgan tras `TRASH_RETENTION_DAYS` (30 por defecto).
+- **RF-30** Los elementos eliminados se mueven a `.gameexplorer/trash` con su metadata, se pueden restaurar y se purgan tras `TRASH_RETENTION_DAYS` (30 por defecto). También se puede borrar para siempre una entrada o **vaciar la papelera** (con confirmación en la interfaz). Al restaurar, los archivos toman los nombres del título actual del juego. Si su lugar está ocupado (se guardó un duplicado después), se pregunta: **Reemplazar** (lo actual va a la papelera, es un intercambio) o **Cancelar**.
 
 ### Consolas
 - **RF-40** Vienen precargadas las 6 consolas: Nintendo Switch (`switch`), Wii (`wii`), Nintendo GameCube (`gc`), PlayStation (`psx`), PlayStation 2 (`ps2`) y PlayStation 3 (`ps3`).
-- **RF-41** Se pueden agregar consolas buscando la plataforma en IGDB y definiendo slug, nombre visible y extensiones; también se pueden reordenar. Las consolas agregadas se detectan solo por extensión.
+- **RF-41** Se pueden agregar consolas buscando la plataforma en IGDB y definiendo slug, nombre visible y extensiones; también se pueden reordenar. Las consolas agregadas se detectan solo por extensión. El nombre y las extensiones de cualquier consola se pueden editar. El slug (la carpeta) solo cambia si la consola no tiene juegos. Solo se pueden borrar consolas agregadas por el usuario y sin juegos (tampoco en la papelera); las 6 de fábrica no se borran.
 
 ### Acceso y preferencias
 - **RF-50** Contraseña única, configurada en el entorno como `APP_PASSWORD_HASH` (argon2id, recomendado) o `APP_PASSWORD` (texto plano, se hashea en memoria al arrancar). Todas las operaciones requieren sesión salvo las marcadas como públicas (salud, login, logout). La sesión se recuerda por dispositivo con una cookie httpOnly, firmada y `SameSite=Strict`. El login tiene rate-limit.

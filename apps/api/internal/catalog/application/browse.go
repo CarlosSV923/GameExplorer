@@ -38,6 +38,7 @@ type GameView struct {
 	Console domain.Slug
 	Items   []domain.GameItem
 	Size    int64
+	Missing int
 }
 
 // Download describes what to send for a download request: a single file
@@ -170,6 +171,9 @@ func (s *BrowseService) Game(ctx context.Context, id domain.GameID) (*GameView, 
 	v := &GameView{Game: g, Console: slugs[g.ConsoleID], Items: items}
 	for _, it := range items {
 		v.Size += it.Size
+		if it.MissingSince != nil {
+			v.Missing++
+		}
 	}
 	return v, nil
 }

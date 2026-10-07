@@ -23,15 +23,17 @@ const partialSuffix = ".gameexplorer-partial"
 
 // FS implements application.Files.
 type FS struct {
-	root  string
-	trash string
+	root    string
+	trash   string
+	scratch string
 }
 
 var _ application.Files = (*FS)(nil)
 
-// New builds the file system for a library root; trash must be inside it.
-func New(root, trash string) *FS {
-	return &FS{root: filepath.Clean(root), trash: filepath.Clean(trash)}
+// New builds the file system for a library root; trash and scratch must be
+// inside it.
+func New(root, trash, scratch string) *FS {
+	return &FS{root: filepath.Clean(root), trash: filepath.Clean(trash), scratch: filepath.Clean(scratch)}
 }
 
 // LibraryPath implements application.Files.
@@ -42,6 +44,38 @@ func (f *FS) LibraryPath(elem ...string) string {
 // TrashPath implements application.Files.
 func (f *FS) TrashPath(elem ...string) string {
 	return filepath.Join(append([]string{f.trash}, elem...)...)
+}
+
+// ScratchPath implements application.Files.
+func (f *FS) ScratchPath(elem ...string) string {
+	return filepath.Join(append([]string{f.scratch}, elem...)...)
+}
+
+// List implements application.Files.
+func (f *FS) List(dir string) ([]string, error) {
+	if err := f.inside(dir); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(entries))
+	for i, e := range entries {
+		names[i] = e.Name()
+	}
+	return names, nil
+}
+
+// RemoveAll implements application.Files.
+func (f *FS) RemoveAll(p string) error {
+	if err := f.inside(p); err != nil {
+		return err
+	}
+	return os.RemoveAll(p)
 }
 
 // inside rejects paths outside the library: every path is built by the
@@ -248,15 +282,4 @@ func (f *FS) Open(p string) (io.ReadSeekCloser, error) {
 		return nil, err
 	}
 	return os.Open(p) //nolint:gosec // checked by inside()
-}
-
-// Remove implements application.Files.
-func (f *FS) Remove(p string) error {
-	if err := f.inside(p); err != nil {
-		return err
-	}
-	if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	return nil
 }

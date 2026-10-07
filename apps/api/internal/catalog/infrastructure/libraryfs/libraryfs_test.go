@@ -14,7 +14,7 @@ import (
 func TestMoveNeverOverwrites(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	f := libraryfs.New(root, filepath.Join(root, ".trash"))
+	f := libraryfs.New(root, filepath.Join(root, ".trash"), filepath.Join(root, ".ops"))
 	a, b := f.LibraryPath("a"), f.LibraryPath("b")
 	_ = os.WriteFile(a, []byte("a"), 0o600)
 	_ = os.WriteFile(b, []byte("b"), 0o600)
@@ -33,15 +33,18 @@ func TestMoveNeverOverwrites(t *testing.T) {
 func TestPathsOutsideTheLibraryAreRefused(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	f := libraryfs.New(root, filepath.Join(root, ".trash"))
+	f := libraryfs.New(root, filepath.Join(root, ".trash"), filepath.Join(root, ".ops"))
 	outside := filepath.Join(t.TempDir(), "x")
 	_ = os.WriteFile(outside, []byte("x"), 0o600)
 
 	if err := f.Move(outside, f.LibraryPath("x")); err == nil {
 		t.Error("move from outside accepted")
 	}
-	if err := f.Remove(outside); err == nil {
+	if err := f.RemoveAll(outside); err == nil {
 		t.Error("remove outside accepted")
+	}
+	if err := f.RemoveAll(root); err == nil {
+		t.Error("removing the whole library accepted")
 	}
 	if _, err := f.Exists(f.LibraryPath("..", "escape")); err == nil {
 		t.Error("parent path accepted")
@@ -54,7 +57,7 @@ func TestPathsOutsideTheLibraryAreRefused(t *testing.T) {
 func TestMkdirAllReportsWhatItCreated(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	f := libraryfs.New(root, filepath.Join(root, ".trash"))
+	f := libraryfs.New(root, filepath.Join(root, ".trash"), filepath.Join(root, ".ops"))
 	_ = os.Mkdir(f.LibraryPath("psx"), 0o750)
 
 	created, err := f.MkdirAll(f.LibraryPath("psx", "Game", "Sub"))
