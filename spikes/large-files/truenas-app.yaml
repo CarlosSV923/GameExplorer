@@ -3,6 +3,8 @@
 services:
   spike:
     image: ghcr.io/carlossv923/gameexplorer-spike:latest
+    # Always fetch the newest spike build when the app (re)starts.
+    pull_policy: always
     # CHANGE: UID:GID of the test dataset owner (Credentials → Users shows the UID).
     user: "3000:3000"
     environment:

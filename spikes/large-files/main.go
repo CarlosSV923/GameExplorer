@@ -80,6 +80,8 @@ var (
 	st         = &state{uploads: map[string]*upload{}, jobs: map[string]*job{}}
 	percentRe  = regexp.MustCompile(`(\d{1,3})%`)
 	started    = time.Now()
+
+	startupError string
 )
 
 func main() {
@@ -92,24 +94,31 @@ func main() {
 	if mask, err := strconv.ParseUint(envOr("UMASK", "002"), 8, 32); err == nil {
 		syscall.Umask(int(mask))
 	}
+	// Startup problems are reported on the web page instead of exiting: on
+	// TrueNAS a crash loop makes the container logs very hard to read.
 	for _, d := range []string{filepath.Join(stagingDir, "uploads"), outputDir} {
 		if err := os.MkdirAll(d, 0o775); err != nil {
-			log.Error("cannot create directory (check dataset permissions / user)", "dir", d, "error", err)
-			os.Exit(1)
+			startupError = fmt.Sprintf("No se pudo crear %s como uid=%d gid=%d: %v. "+
+				"Revisa que el volumen apunte al dataset correcto y que ese usuario tenga permiso de escritura.",
+				d, os.Getuid(), os.Getgid(), err)
+			log.Error("startup", "error", startupError)
+			break
 		}
 	}
 
 	tusHandler, err := newTusHandler(log)
-	if err != nil {
-		log.Error("tus init", "error", err)
-		os.Exit(1)
+	if err != nil && startupError == "" {
+		startupError = "tus: " + err.Error()
+		log.Error("startup", "error", startupError)
 	}
 
 	go samplePeakRSS()
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /{$}", http.FileServerFS(static))
-	mux.Handle("/files/", http.StripPrefix("/files/", tusHandler))
+	if tusHandler != nil {
+		mux.Handle("/files/", http.StripPrefix("/files/", tusHandler))
+	}
 	mux.HandleFunc("GET /api/stats", handleStats)
 	mux.HandleFunc("GET /api/state", handleState)
 	mux.HandleFunc("POST /api/extract", handleExtract)
@@ -228,6 +237,8 @@ func handleStats(w http.ResponseWriter, _ *http.Request) {
 		"gid":          os.Getgid(),
 		"uptimeSec":    int(time.Since(started).Seconds()),
 		"has7zz":       has7zz(),
+		"library":      library,
+		"startupError": startupError,
 	})
 }
 

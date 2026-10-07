@@ -35,6 +35,11 @@
   <h1>Spike de archivos grandes</h1>
   <p class="muted">Prototipo desechable de la fase 0.5. Sube un archivo grande, extráelo, muévelo a la biblioteca y descárgalo. Al final copia el resumen.</p>
 
+  <section id="startupError" hidden style="border-color: #ff8a78; background: #3a2422">
+    <h2 class="bad">El servidor arrancó con un error</h2>
+    <p id="startupErrorText"></p>
+  </section>
+
   <section>
     <h2>Servidor (en vivo)</h2>
     <div class="grid" id="stats"></div>
@@ -85,6 +90,8 @@ async function refresh() {
   try {
     lastStats = await (await fetch('/api/stats')).json()
     const s = lastStats
+    $('startupError').hidden = !s.startupError
+    $('startupErrorText').textContent = s.startupError || ''
     $('stats').innerHTML = ''
     for (const [k, v] of [
       ['RAM actual', mb(s.rssBytes)], ['RAM pico', mb(s.peakRssBytes)], ['Goroutines', s.goroutines],
