@@ -26,3 +26,5 @@ See `truenas-app.yaml` (Apps → Discover Apps → ⋮ → Install via YAML).
 | Peak RSS overall | 12 MB |
 
 Finding: extracted files keep the mode stored in the archive (`rw-r--r--`); umask alone is not enough. The real app must chmod/chown after extraction.
+
+Finding (TrueNAS, 2026-10-06): an SMB dataset grants write access to a group (e.g. `builtin_users`), but a container only gets its primary UID/GID, not supplementary groups, so `mkdir` failed with `permission denied`. Fix: add an ACL entry for the app's user (Modify, Inherit, recursive). The production install guide (phase 11) must include this step.

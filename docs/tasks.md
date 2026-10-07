@@ -17,7 +17,7 @@ Depende de: —
 Depende de: Fase 0 · Cubre: RNF-01, RNF-03, RNF-04
 - [x] Prototipo desechable: tusd + 7zz + `http.ServeContent` + zip *store* (`spikes/large-files`, validado en local)
 - [ ] Medir en el NAS: subida de ~50 GB (throughput y RAM), extracción de un `.rar` de ~30 GB, descarga con Range y como zip
-- [ ] Verificar permisos SMB (PUID/PGID/UMASK) y `rename` dentro del dataset
+- [~] Verificar permisos SMB (PUID/PGID/UMASK) y `rename` dentro del dataset — hallazgo: el contenedor no hereda grupos suplementarios; requiere entrada ACL para su usuario
 - [ ] Registrar los resultados en `docs/spike-results.md`
 
 ## Fase 1 — API base
