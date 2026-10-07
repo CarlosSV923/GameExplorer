@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -64,6 +65,9 @@ type job struct {
 	MoveMs    int64     `json:"moveMs,omitempty"`
 	MoveEXDEV bool      `json:"moveExdev,omitempty"`
 	Sample    string    `json:"sample,omitempty"`
+	Warning   string    `json:"warning,omitempty"`
+	Verified  string    `json:"verified,omitempty"`
+	VerifySecs float64  `json:"verifySeconds,omitempty"`
 }
 
 type state struct {
@@ -360,12 +364,123 @@ func runExtraction(j *job, u *upload, password string) {
 	err = cmd.Wait()
 	if err != nil {
 		msg := strings.TrimSpace(stderr.String())
-		if strings.Contains(msg, "Wrong password") || strings.Contains(msg, "encrypted") {
-			msg = "encrypted archive: wrong or missing password (" + msg + ")"
+		switch {
+		case onlyAttributeErrors(msg):
+			// SMB datasets with NFSv4 ACLs (aclmode=restricted) forbid chmod, so
+			// 7zz cannot apply Unix modes stored in the archive. The data itself
+			// is written; verifyExtraction below proves it with sizes and CRC32.
+			st.mu.Lock()
+			j.Warning = "atributos del archivo no aplicados (el dataset no permite chmod)"
+			st.mu.Unlock()
+			err = nil
+		case strings.Contains(msg, "Wrong password") || strings.Contains(msg, "encrypted"):
+			err = fmt.Errorf("7zz: %w: encrypted archive: wrong or missing password (%s)", err, msg)
+		default:
+			err = fmt.Errorf("7zz: %w: %s", err, msg)
 		}
-		err = fmt.Errorf("7zz: %w: %s", err, msg)
+	}
+	if err == nil {
+		err = verifyExtraction(j, u.Path, password)
 	}
 	finishJob(j, u, err)
+}
+
+func onlyAttributeErrors(stderr string) bool {
+	found := false
+	for line := range strings.SplitSeq(stderr, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if !strings.Contains(line, "Cannot set file attribute") {
+			return false
+		}
+		found = true
+	}
+	return found
+}
+
+// verifyExtraction compares every extracted file with the archive index
+// (size and CRC32), streaming each file once.
+func verifyExtraction(j *job, archive, password string) error {
+	start := time.Now()
+	args := []string{"l", "-slt", "-ba"}
+	if password != "" {
+		args = append(args, "-p"+password)
+	} else {
+		args = append(args, "-p-no-password-given-")
+	}
+	out, err := exec.Command("7zz", append(args, archive)...).Output()
+	if err != nil {
+		return fmt.Errorf("verify: list archive: %w", err)
+	}
+
+	type item struct {
+		path, crc string
+		size      int64
+		dir       bool
+	}
+	var items []item
+	var cur item
+	flush := func() {
+		if cur.path != "" && !cur.dir {
+			items = append(items, cur)
+		}
+		cur = item{}
+	}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		k, v, ok := strings.Cut(strings.TrimSpace(line), " = ")
+		switch {
+		case !ok:
+			if strings.TrimSpace(line) == "" {
+				flush()
+			}
+		case k == "Path":
+			flush()
+			cur.path = v
+		case k == "Size":
+			cur.size, _ = strconv.ParseInt(v, 10, 64)
+		case k == "CRC":
+			cur.crc = strings.ToUpper(v)
+		case k == "Folder":
+			cur.dir = v == "+"
+		}
+	}
+	flush()
+
+	okCount := 0
+	for _, it := range items {
+		p := filepath.Join(j.OutDir, filepath.FromSlash(it.path))
+		info, err := os.Stat(p)
+		if err != nil {
+			return fmt.Errorf("verify: %s missing: %w", it.path, err)
+		}
+		if info.Size() != it.size {
+			return fmt.Errorf("verify: %s size %d, want %d", it.path, info.Size(), it.size)
+		}
+		if it.crc != "" {
+			f, err := os.Open(p)
+			if err != nil {
+				return err
+			}
+			h := crc32.NewIEEE()
+			_, err = io.Copy(h, f)
+			f.Close()
+			if err != nil {
+				return err
+			}
+			if got := fmt.Sprintf("%08X", h.Sum32()); got != it.crc {
+				return fmt.Errorf("verify: %s crc %s, want %s", it.path, got, it.crc)
+			}
+		}
+		okCount++
+	}
+
+	st.mu.Lock()
+	j.Verified = fmt.Sprintf("%d/%d archivos OK (tamaño + CRC32)", okCount, len(items))
+	j.VerifySecs = time.Since(start).Seconds()
+	st.mu.Unlock()
+	return nil
 }
 
 // splitProgress splits 7zz progress output, which redraws using \b and \r.
@@ -392,6 +507,7 @@ func finishJob(j *job, u *upload, err error) {
 	}
 	j.Status = "done"
 	j.Percent = 100
+	j.Seconds -= j.VerifySecs // report extraction speed and verification time separately
 	j.MBps = mbps(dirSize(j.OutDir), j.Seconds)
 	// The real app deletes the archive after a successful extraction.
 	_ = os.Remove(u.Path)
