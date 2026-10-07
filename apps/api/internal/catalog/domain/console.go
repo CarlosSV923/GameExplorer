@@ -53,6 +53,7 @@ type Console struct {
 	DisplayName    string
 	IGDBPlatformID *int64
 	ReleaseYear    *int
+	LogoImageID    *string
 	Extensions     []string
 	SortOrder      int
 }
@@ -61,4 +62,6 @@ type Console struct {
 type ConsoleRepository interface {
 	// List returns every console in carousel order.
 	List(ctx context.Context) ([]Console, error)
+	// UpdatePlatformMetadata stores the logo and, when known, the release year.
+	UpdatePlatformMetadata(ctx context.Context, id ConsoleID, logoImageID *string, releaseYear *int) error
 }

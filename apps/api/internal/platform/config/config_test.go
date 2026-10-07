@@ -55,6 +55,7 @@ func TestLoadRejectsInvalidConfig(t *testing.T) {
 		{"short secret", func(e map[string]string) { e["SESSION_SECRET"] = "short" }, "SESSION_SECRET must be at least"},
 		{"zero ttl", func(e map[string]string) { e["SESSION_TTL"] = "0s" }, "SESSION_TTL must be positive"},
 		{"bad port", func(e map[string]string) { e["PORT"] = "70000" }, "out of range"},
+		{"half igdb credentials", func(e map[string]string) { e["IGDB_CLIENT_ID"] = "abc" }, "IGDB_CLIENT_SECRET"},
 		{"bad log level", func(e map[string]string) { e["LOG_LEVEL"] = "loud" }, `"loud"`},
 	}
 	for _, tt := range tests {

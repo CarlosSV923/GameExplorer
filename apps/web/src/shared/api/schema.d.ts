@@ -94,6 +94,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/metadata/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search games on IGDB, optionally limited to one platform */
+        get: operations["searchGames"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metadata/platforms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search platforms on IGDB (used to add consoles) */
+        get: operations["searchPlatforms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/images/{size}/{imageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * IGDB image (cover or logo) served from the local cache
+         * @description Downloaded from the IGDB image CDN on first request and cached under
+         *     DATA_PATH, so the NAS keeps working offline and the browser never
+         *     contacts third parties.
+         */
+        get: operations["getImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -132,9 +188,43 @@ export interface components {
             igdbPlatformId?: number | null;
             /** @example 2000 */
             releaseYear?: number | null;
+            /** @description IGDB image id; render with /api/images/logo_med/{logoImageId}. */
+            logoImageId?: string | null;
             extensions: string[];
             sortOrder: number;
         };
+        MetadataGame: {
+            /**
+             * Format: int64
+             * @description IGDB game id.
+             */
+            id: number;
+            /** @example Mario Kart 8 Deluxe */
+            name: string;
+            releaseYear?: number | null;
+            /** @description Render with /api/images/cover_big/{coverImageId}. */
+            coverImageId?: string | null;
+            summary?: string | null;
+            genres: string[];
+            platformIds: number[];
+        };
+        MetadataPlatform: {
+            /**
+             * Format: int64
+             * @description IGDB platform id.
+             */
+            id: number;
+            /** @example Wii U */
+            name: string;
+            abbreviation?: string | null;
+            logoImageId?: string | null;
+            releaseYear?: number | null;
+        };
+        /**
+         * @description IGDB image size preset.
+         * @enum {string}
+         */
+        ImageSize: "cover_small" | "cover_big" | "logo_med" | "screenshot_med";
         /**
          * @description What a stored item is within a game folder.
          * @enum {string}
@@ -160,6 +250,42 @@ export interface components {
         };
         /** @description Too many login attempts from this client; retry later. */
         TooManyRequests: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Invalid parameters. */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The resource does not exist. */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description IGDB failed or could not be reached. */
+        BadGateway: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description IGDB credentials are not configured. */
+        ServiceUnavailable: {
             headers: {
                 [name: string]: unknown;
             };
@@ -279,6 +405,90 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    searchGames: {
+        parameters: {
+            query: {
+                q: string;
+                /** @description IGDB platform id (Console.igdbPlatformId). */
+                platformId?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching games, best match first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetadataGame"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    searchPlatforms: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching platforms. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetadataPlatform"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                size: components["schemas"]["ImageSize"];
+                imageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
         };
     };
 }

@@ -34,8 +34,14 @@ type Config struct {
 	// CookieSecure must be true only when the app is served over HTTPS.
 	CookieSecure bool `env:"COOKIE_SECURE" envDefault:"false"`
 
+	// IGDB credentials (Twitch developer app). Without them the app works, but
+	// game and platform search answer 503.
 	IGDBClientID     string `env:"IGDB_CLIENT_ID"`
 	IGDBClientSecret string `env:"IGDB_CLIENT_SECRET"`
+	// Endpoint overrides, only for tests; empty means the real IGDB services.
+	IGDBAPIURL   string `env:"IGDB_API_URL"`
+	IGDBTokenURL string `env:"IGDB_TOKEN_URL"`
+	IGDBImageURL string `env:"IGDB_IMAGE_URL"`
 
 	LogLevel slog.Level `env:"LOG_LEVEL" envDefault:"info"`
 }
@@ -57,6 +63,9 @@ func Load(environ map[string]string) (Config, error) {
 	return cfg, nil
 }
 
+// IGDBConfigured reports whether IGDB credentials are present.
+func (c Config) IGDBConfigured() bool { return c.IGDBClientID != "" && c.IGDBClientSecret != "" }
+
 func (c Config) validate() error {
 	var errs []error
 	switch {
@@ -67,6 +76,9 @@ func (c Config) validate() error {
 	}
 	if len(c.SessionSecret) < MinSessionSecretBytes {
 		errs = append(errs, fmt.Errorf("SESSION_SECRET must be at least %d bytes", MinSessionSecretBytes))
+	}
+	if (c.IGDBClientID == "") != (c.IGDBClientSecret == "") {
+		errs = append(errs, errors.New("set both IGDB_CLIENT_ID and IGDB_CLIENT_SECRET, or neither"))
 	}
 	if c.SessionTTL <= 0 {
 		errs = append(errs, errors.New("SESSION_TTL must be positive"))

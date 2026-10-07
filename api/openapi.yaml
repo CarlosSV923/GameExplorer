@@ -19,6 +19,7 @@ tags:
   - name: system
   - name: auth
   - name: consoles
+  - name: metadata
 security:
   - sessionCookie: []
 paths:
@@ -110,6 +111,127 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /metadata/games:
+    get:
+      tags: [metadata]
+      operationId: searchGames
+      summary: Search games on IGDB, optionally limited to one platform
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+        - name: platformId
+          in: query
+          description: IGDB platform id (Console.igdbPlatformId).
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 25
+            default: 10
+      responses:
+        '200':
+          description: Matching games, best match first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MetadataGame'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /metadata/platforms:
+    get:
+      tags: [metadata]
+      operationId: searchPlatforms
+      summary: Search platforms on IGDB (used to add consoles)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+      responses:
+        '200':
+          description: Matching platforms.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MetadataPlatform'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /images/{size}/{imageId}:
+    get:
+      tags: [metadata]
+      operationId: getImage
+      summary: IGDB image (cover or logo) served from the local cache
+      description: |
+        Downloaded from the IGDB image CDN on first request and cached under
+        DATA_PATH, so the NAS keeps working offline and the browser never
+        contacts third parties.
+      parameters:
+        - name: size
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ImageSize'
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9]{1,40}$'
+      responses:
+        '200':
+          description: The image.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
 components:
   securitySchemes:
     sessionCookie:
@@ -126,6 +248,30 @@ components:
             $ref: '#/components/schemas/Problem'
     TooManyRequests:
       description: Too many login attempts from this client; retry later.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    BadRequest:
+      description: Invalid parameters.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: The resource does not exist.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    BadGateway:
+      description: IGDB failed or could not be reached.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: IGDB credentials are not configured.
       content:
         application/problem+json:
           schema:
@@ -196,6 +342,10 @@ components:
           type: integer
           nullable: true
           example: 2000
+        logoImageId:
+          type: string
+          nullable: true
+          description: IGDB image id; render with /api/images/logo_med/{logoImageId}.
         extensions:
           type: array
           items:
@@ -203,6 +353,63 @@ components:
             example: .iso
         sortOrder:
           type: integer
+
+    MetadataGame:
+      type: object
+      required: [id, name, genres, platformIds]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: IGDB game id.
+        name:
+          type: string
+          example: Mario Kart 8 Deluxe
+        releaseYear:
+          type: integer
+          nullable: true
+        coverImageId:
+          type: string
+          nullable: true
+          description: Render with /api/images/cover_big/{coverImageId}.
+        summary:
+          type: string
+          nullable: true
+        genres:
+          type: array
+          items:
+            type: string
+        platformIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    MetadataPlatform:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: IGDB platform id.
+        name:
+          type: string
+          example: Wii U
+        abbreviation:
+          type: string
+          nullable: true
+        logoImageId:
+          type: string
+          nullable: true
+        releaseYear:
+          type: integer
+          nullable: true
+
+    ImageSize:
+      type: string
+      description: IGDB image size preset.
+      enum: [cover_small, cover_big, logo_med, screenshot_med]
 
     ItemKind:
       type: string

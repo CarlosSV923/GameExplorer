@@ -50,6 +50,11 @@ tasks:
     cmds:
       - docker run --rm -i -v "{{.ROOT_DIR}}:/src" -v ge-gomod:/go/pkg/mod -v ge-gocache:/root/.cache/go-build -w /src/{{.API_DIR}} {{.GO_IMAGE}} go run ./cmd/gameexplorer hash-password
 
+  tidy:
+    desc: go mod tidy (in Docker)
+    cmds:
+      - '{{.DOCKER_GO}} {{.GO_IMAGE}} go mod tidy'
+
   # ---------- code generation ----------
   gen:
     desc: Regenerate code from api/openapi.yaml and the SQL queries
@@ -68,12 +73,23 @@ tasks:
     cmds:
       - docker run --rm -v "{{.ROOT_DIR}}/{{.API_DIR}}:/src" -w /src {{.SQLC_IMAGE}} generate
 
+  demo-catalog:
+    desc: Regenerate the demo's fixed IGDB catalog (needs IGDB_* in .env.local)
+    cmds:
+      - '{{.DOCKER_GO}} -e IGDB_CLIENT_ID -e IGDB_CLIENT_SECRET {{.GO_IMAGE}} go run ./cmd/demo-catalog'
+
   # ---------- quality ----------
   lint:
     desc: Lint Go and TypeScript code
     cmds:
       - task: lint:api
       - task: lint:web
+
+  fmt:
+    desc: Format Go (gofumpt + goimports) and TS/JSON/YAML (Prettier)
+    cmds:
+      - docker run --rm -v "{{.ROOT_DIR}}:/src" -v ge-gomod:/go/pkg/mod -v ge-lintcache:/root/.cache -w /src/{{.API_DIR}} {{.LINT_IMAGE}} golangci-lint fmt ./...
+      - pnpm format
 
   lint:api:
     cmds:

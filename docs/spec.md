@@ -42,7 +42,8 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 - **RF-13** El progreso (subida, extracción, commit) se ve en vivo en un panel persistente.
 
 ### Biblioteca
-- **RF-20** Inicio: carrusel de consolas con logo de IGDB (o el nombre en texto si no hay logo), año de lanzamiento y número de juegos.
+- **RF-20** Inicio: carrusel de consolas con logo de IGDB (o el nombre en texto si no hay logo), año de lanzamiento y número de juegos. El logo es el del **modelo original** de la consola (la versión lanzada primero), porque el logo general de IGDB suele ser el de la última revisión (p. ej. "Switch OLED Model"). Logo y año se actualizan desde IGDB al arrancar.
+- **RF-20a** Búsqueda de juegos en IGDB: solo tipos jugables (juego principal, expansión independiente, remake, remaster, expandido y port; sin bundles, DLC ni packs) y resultados reordenados por coincidencia del nombre (exacto > prefijo > palabra completa). Las imágenes se sirven desde una caché local, de modo que el navegador nunca contacta a terceros.
 - **RF-21** Pantalla de consola: lista de juegos y panel de detalle (portada, año, géneros, resumen, carpeta, elementos con tipo y tamaño).
 - **RF-22** Búsqueda global en la biblioteca.
 - **RF-23** Descargar un elemento (reanudable con HTTP Range) o el juego completo como zip sin compresión. Los juegos en carpeta se descargan siempre como zip.

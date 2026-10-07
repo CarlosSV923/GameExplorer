@@ -32,9 +32,11 @@ Depende de: 0.5 · Cubre: RF-40, RF-50, RNF-02
 
 ## Fase 2 — Contexto `metadata` (IGDB)
 Depende de: 1 · Cubre: RF-09, RF-20, RF-41, RF-61
-- [ ] Cliente IGDB (token client-credentials cacheado, búsqueda de juegos por plataforma y de plataformas)
-- [ ] Caché de portadas y logos en `/data/cache`
-- [ ] Comando `cmd/demo-catalog` que genera el catálogo fijo de la demo
+- [x] Cliente IGDB (token client-credentials cacheado y renovado ante 401, límite de 4 req/s, búsqueda de juegos por plataforma y de plataformas)
+- [x] Filtro de tipos jugables (excluye bundles/DLC) y reordenamiento por nombre (exacto > prefijo > palabra)
+- [x] Caché de portadas y logos en `/data/cache/images` (descarga única por imagen, escritura atómica); `GET /api/images/{size}/{id}`
+- [x] Sincronización de logo y año de las consolas al arrancar; logo del modelo original (IGDB entrega el de la última revisión)
+- [x] Comando `cmd/demo-catalog` (`task demo-catalog`): 81 juegos con portada, incluidos los títulos de los archivos de ejemplo
 
 ## Fase 3 — Contexto `ingestion` I: subidas
 Depende de: 1 · Cubre: RF-01, RF-02, RF-12, RF-13
@@ -69,6 +71,7 @@ Depende de: 0 · Cubre: RNF-05 a RNF-07
 - [ ] `design:design-critique` y `design:accessibility-review` sobre los mockups
 - [ ] `design:design-handoff` → `docs/design-handoff.md`
 - [ ] Tokens en Tailwind, `shared/ui`, i18n (ES/EN), capa de entrada táctil/teclado/gamepad
+- [ ] Contraste de logos de IGDB sobre el fondo carbón: PS2 (azul) y PS3 (gris oscuro) apenas se ven. Definir tratamiento visual o permitir reemplazar el logo de una consola
 
 ## Fase 9 — Frontend con adaptadores HTTP
 Depende de: 7, 8 · Cubre: RF-01 a RF-51 (UI)

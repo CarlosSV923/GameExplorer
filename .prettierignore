@@ -5,3 +5,4 @@ coverage
 apps/api
 *.md
 apps/web/src/shared/api/schema.d.ts
+apps/web/src/modules/metadata/infrastructure/demo/catalog.json

@@ -60,5 +60,21 @@ func toDomain(row sqlcgen.ListConsolesRow) (domain.Console, error) {
 		y := int(row.ReleaseYear.Int64)
 		c.ReleaseYear = &y
 	}
+	if row.LogoImageID.Valid {
+		logo := row.LogoImageID.String
+		c.LogoImageID = &logo
+	}
 	return c, nil
+}
+
+// UpdatePlatformMetadata implements domain.ConsoleRepository.
+func (r *ConsoleRepository) UpdatePlatformMetadata(ctx context.Context, id domain.ConsoleID, logoImageID *string, releaseYear *int) error {
+	params := sqlcgen.UpdateConsolePlatformMetadataParams{ID: int64(id)}
+	if logoImageID != nil {
+		params.LogoImageID = sql.NullString{String: *logoImageID, Valid: true}
+	}
+	if releaseYear != nil {
+		params.ReleaseYear = sql.NullInt64{Int64: int64(*releaseYear), Valid: true}
+	}
+	return r.q.UpdateConsolePlatformMetadata(ctx, params)
 }

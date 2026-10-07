@@ -9,9 +9,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
+
+	"github.com/oapi-codegen/runtime"
 )
 
 // Defines values for HealthStatus.
@@ -26,6 +30,30 @@ func (e HealthStatus) Valid() bool {
 	case Degraded:
 		return true
 	case Ok:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImageSize.
+const (
+	CoverBig      ImageSize = "cover_big"
+	CoverSmall    ImageSize = "cover_small"
+	LogoMed       ImageSize = "logo_med"
+	ScreenshotMed ImageSize = "screenshot_med"
+)
+
+// Valid indicates whether the value is a known member of the ImageSize enum.
+func (e ImageSize) Valid() bool {
+	switch e {
+	case CoverBig:
+		return true
+	case CoverSmall:
+		return true
+	case LogoMed:
+		return true
+	case ScreenshotMed:
 		return true
 	default:
 		return false
@@ -64,6 +92,9 @@ type Console struct {
 	Id             int64    `json:"id"`
 	IgdbPlatformId *int64   `json:"igdbPlatformId,omitempty"`
 
+	// LogoImageId IGDB image id; render with /api/images/logo_med/{logoImageId}.
+	LogoImageId *string `json:"logoImageId,omitempty"`
+
 	// ReleaseYear Example: 2000
 	ReleaseYear *int `json:"releaseYear,omitempty"`
 
@@ -93,12 +124,44 @@ type HealthCheck struct {
 	Ok   bool   `json:"ok"`
 }
 
+// ImageSize IGDB image size preset.
+type ImageSize string
+
 // ItemKind What a stored item is within a game folder.
 type ItemKind string
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Password string `json:"password"`
+}
+
+// MetadataGame defines model for MetadataGame.
+type MetadataGame struct {
+	// CoverImageId Render with /api/images/cover_big/{coverImageId}.
+	CoverImageId *string  `json:"coverImageId,omitempty"`
+	Genres       []string `json:"genres"`
+
+	// Id IGDB game id.
+	Id int64 `json:"id"`
+
+	// Name Example: Mario Kart 8 Deluxe
+	Name        string  `json:"name"`
+	PlatformIds []int64 `json:"platformIds"`
+	ReleaseYear *int    `json:"releaseYear,omitempty"`
+	Summary     *string `json:"summary,omitempty"`
+}
+
+// MetadataPlatform defines model for MetadataPlatform.
+type MetadataPlatform struct {
+	Abbreviation *string `json:"abbreviation,omitempty"`
+
+	// Id IGDB platform id.
+	Id          int64   `json:"id"`
+	LogoImageId *string `json:"logoImageId,omitempty"`
+
+	// Name Example: Wii U
+	Name        string `json:"name"`
+	ReleaseYear *int   `json:"releaseYear,omitempty"`
 }
 
 // Problem RFC 9457 problem details.
@@ -114,11 +177,37 @@ type Session struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
+// BadGateway RFC 9457 problem details.
+type BadGateway = Problem
+
+// BadRequest RFC 9457 problem details.
+type BadRequest = Problem
+
+// NotFound RFC 9457 problem details.
+type NotFound = Problem
+
+// ServiceUnavailable RFC 9457 problem details.
+type ServiceUnavailable = Problem
+
 // TooManyRequests RFC 9457 problem details.
 type TooManyRequests = Problem
 
 // Unauthorized RFC 9457 problem details.
 type Unauthorized = Problem
+
+// SearchGamesParams defines parameters for SearchGames.
+type SearchGamesParams struct {
+	Q string `form:"q" json:"q"`
+
+	// PlatformId IGDB platform id (Console.igdbPlatformId).
+	PlatformId *int64 `form:"platformId,omitempty" json:"platformId,omitempty"`
+	Limit      *int   `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// SearchPlatformsParams defines parameters for SearchPlatforms.
+type SearchPlatformsParams struct {
+	Q string `form:"q" json:"q"`
+}
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
@@ -140,6 +229,15 @@ type ServerInterface interface {
 	// GetHealth Liveness probe and startup diagnostics
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// GetImage IGDB image (cover or logo) served from the local cache
+	// (GET /images/{size}/{imageId})
+	GetImage(w http.ResponseWriter, r *http.Request, size ImageSize, imageId string)
+	// SearchGames Search games on IGDB, optionally limited to one platform
+	// (GET /metadata/games)
+	SearchGames(w http.ResponseWriter, r *http.Request, params SearchGamesParams)
+	// SearchPlatforms Search platforms on IGDB (used to add consoles)
+	// (GET /metadata/platforms)
+	SearchPlatforms(w http.ResponseWriter, r *http.Request, params SearchPlatformsParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -212,6 +310,133 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetImage operation middleware
+func (siw *ServerInterfaceWrapper) GetImage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "size" -------------
+	var size ImageSize
+
+	err = runtime.BindStyledParameterWithOptions("simple", "size", r.PathValue("size"), &size, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "size", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "imageId" -------------
+	var imageId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "imageId", r.PathValue("imageId"), &imageId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "imageId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetImage(w, r, size, imageId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SearchGames operation middleware
+func (siw *ServerInterfaceWrapper) SearchGames(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchGamesParams
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "platformId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "platformId", r.URL.Query(), &params.PlatformId, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "platformId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "platformId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SearchGames(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SearchPlatforms operation middleware
+func (siw *ServerInterfaceWrapper) SearchPlatforms(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchPlatformsParams
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SearchPlatforms(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -346,9 +571,20 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/session", wrapper.GetSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/consoles", wrapper.ListConsoles)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metadata/games", wrapper.SearchGames)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metadata/platforms", wrapper.SearchPlatforms)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/images/{size}/{imageId}", wrapper.GetImage)
 
 	return m
 }
+
+type BadGatewayApplicationProblemPlusJSONResponse Problem
+
+type BadRequestApplicationProblemPlusJSONResponse Problem
+
+type NotFoundApplicationProblemPlusJSONResponse Problem
+
+type ServiceUnavailableApplicationProblemPlusJSONResponse Problem
 
 type TooManyRequestsApplicationProblemPlusJSONResponse Problem
 
@@ -528,6 +764,303 @@ func (response GetHealth200JSONResponse) VisitGetHealthResponse(w http.ResponseW
 	return err
 }
 
+type GetImageRequestObject struct {
+	Size    ImageSize `json:"size"`
+	ImageId string    `json:"imageId"`
+}
+
+type GetImageResponseObject interface {
+	VisitGetImageResponse(w http.ResponseWriter) error
+}
+
+type GetImage200ResponseHeaders struct {
+	CacheControl *string
+}
+
+type GetImage200ImagejpegResponse struct {
+	Body          io.Reader
+	Headers       GetImage200ResponseHeaders
+	ContentLength int64
+}
+
+func (response GetImage200ImagejpegResponse) VisitGetImageResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "image/jpeg")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type GetImage200ImagepngResponse struct {
+	Body          io.Reader
+	Headers       GetImage200ResponseHeaders
+	ContentLength int64
+}
+
+func (response GetImage200ImagepngResponse) VisitGetImageResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "image/png")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type GetImage400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetImage400ApplicationProblemPlusJSONResponse) VisitGetImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetImage401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetImage401ApplicationProblemPlusJSONResponse) VisitGetImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetImage404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetImage404ApplicationProblemPlusJSONResponse) VisitGetImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetImage502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response GetImage502ApplicationProblemPlusJSONResponse) VisitGetImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchGamesRequestObject struct {
+	Params SearchGamesParams
+}
+
+type SearchGamesResponseObject interface {
+	VisitSearchGamesResponse(w http.ResponseWriter) error
+}
+
+type SearchGames200JSONResponse []MetadataGame
+
+func (response SearchGames200JSONResponse) VisitSearchGamesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchGames400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SearchGames400ApplicationProblemPlusJSONResponse) VisitSearchGamesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchGames401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SearchGames401ApplicationProblemPlusJSONResponse) VisitSearchGamesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchGames502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response SearchGames502ApplicationProblemPlusJSONResponse) VisitSearchGamesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchGames503ApplicationProblemPlusJSONResponse struct {
+	ServiceUnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response SearchGames503ApplicationProblemPlusJSONResponse) VisitSearchGamesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchPlatformsRequestObject struct {
+	Params SearchPlatformsParams
+}
+
+type SearchPlatformsResponseObject interface {
+	VisitSearchPlatformsResponse(w http.ResponseWriter) error
+}
+
+type SearchPlatforms200JSONResponse []MetadataPlatform
+
+func (response SearchPlatforms200JSONResponse) VisitSearchPlatformsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchPlatforms400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SearchPlatforms400ApplicationProblemPlusJSONResponse) VisitSearchPlatformsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchPlatforms401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SearchPlatforms401ApplicationProblemPlusJSONResponse) VisitSearchPlatformsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchPlatforms502ApplicationProblemPlusJSONResponse struct {
+	BadGatewayApplicationProblemPlusJSONResponse
+}
+
+func (response SearchPlatforms502ApplicationProblemPlusJSONResponse) VisitSearchPlatformsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(502)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchPlatforms503ApplicationProblemPlusJSONResponse struct {
+	ServiceUnavailableApplicationProblemPlusJSONResponse
+}
+
+func (response SearchPlatforms503ApplicationProblemPlusJSONResponse) VisitSearchPlatformsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Login Start a session with the shared password
@@ -545,6 +1078,15 @@ type StrictServerInterface interface {
 	// GetHealth Liveness probe and startup diagnostics
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
+	// GetImage IGDB image (cover or logo) served from the local cache
+	// (GET /images/{size}/{imageId})
+	GetImage(ctx context.Context, request GetImageRequestObject) (GetImageResponseObject, error)
+	// SearchGames Search games on IGDB, optionally limited to one platform
+	// (GET /metadata/games)
+	SearchGames(ctx context.Context, request SearchGamesRequestObject) (SearchGamesResponseObject, error)
+	// SearchPlatforms Search platforms on IGDB (used to add consoles)
+	// (GET /metadata/platforms)
+	SearchPlatforms(ctx context.Context, request SearchPlatformsRequestObject) (SearchPlatformsResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -706,6 +1248,85 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetHealthResponseObject); ok {
 		if err := validResponse.VisitGetHealthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetImage operation middleware
+func (sh *strictHandler) GetImage(w http.ResponseWriter, r *http.Request, size ImageSize, imageId string) {
+	var request GetImageRequestObject
+
+	request.Size = size
+	request.ImageId = imageId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetImage(ctx, request.(GetImageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetImage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetImageResponseObject); ok {
+		if err := validResponse.VisitGetImageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SearchGames operation middleware
+func (sh *strictHandler) SearchGames(w http.ResponseWriter, r *http.Request, params SearchGamesParams) {
+	var request SearchGamesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SearchGames(ctx, request.(SearchGamesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SearchGames")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SearchGamesResponseObject); ok {
+		if err := validResponse.VisitSearchGamesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SearchPlatforms operation middleware
+func (sh *strictHandler) SearchPlatforms(w http.ResponseWriter, r *http.Request, params SearchPlatformsParams) {
+	var request SearchPlatformsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SearchPlatforms(ctx, request.(SearchPlatformsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SearchPlatforms")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SearchPlatformsResponseObject); ok {
+		if err := validResponse.VisitSearchPlatformsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -39,6 +39,7 @@ func toAPI(c domain.Console) httpapi.Console {
 		DisplayName:    c.DisplayName,
 		IgdbPlatformId: c.IGDBPlatformID,
 		ReleaseYear:    c.ReleaseYear,
+		LogoImageId:    c.LogoImageID,
 		Extensions:     c.Extensions,
 		SortOrder:      c.SortOrder,
 	}

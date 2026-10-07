@@ -11,7 +11,7 @@ import (
 )
 
 const listConsoles = `-- name: ListConsoles :many
-SELECT id, slug, display_name, igdb_platform_id, release_year, extensions, sort_order
+SELECT id, slug, display_name, igdb_platform_id, release_year, logo_image_id, extensions, sort_order
 FROM consoles
 ORDER BY sort_order, id
 `
@@ -22,6 +22,7 @@ type ListConsolesRow struct {
 	DisplayName    string
 	IgdbPlatformID sql.NullInt64
 	ReleaseYear    sql.NullInt64
+	LogoImageID    sql.NullString
 	Extensions     string
 	SortOrder      int64
 }
@@ -41,6 +42,7 @@ func (q *Queries) ListConsoles(ctx context.Context) ([]ListConsolesRow, error) {
 			&i.DisplayName,
 			&i.IgdbPlatformID,
 			&i.ReleaseYear,
+			&i.LogoImageID,
 			&i.Extensions,
 			&i.SortOrder,
 		); err != nil {
@@ -55,4 +57,22 @@ func (q *Queries) ListConsoles(ctx context.Context) ([]ListConsolesRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateConsolePlatformMetadata = `-- name: UpdateConsolePlatformMetadata :exec
+UPDATE consoles
+SET logo_image_id = ?1,
+    release_year  = COALESCE(?2, release_year)
+WHERE id = ?3
+`
+
+type UpdateConsolePlatformMetadataParams struct {
+	LogoImageID sql.NullString
+	ReleaseYear sql.NullInt64
+	ID          int64
+}
+
+func (q *Queries) UpdateConsolePlatformMetadata(ctx context.Context, arg UpdateConsolePlatformMetadataParams) error {
+	_, err := q.db.ExecContext(ctx, updateConsolePlatformMetadata, arg.LogoImageID, arg.ReleaseYear, arg.ID)
+	return err
 }

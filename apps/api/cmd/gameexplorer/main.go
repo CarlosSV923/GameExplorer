@@ -65,6 +65,8 @@ func run(cfg config.Config, log *slog.Logger) error {
 	}
 	defer func() { _ = a.Close() }()
 
+	go a.syncConsoles(ctx, log)
+
 	srv := httpserver.New(net.JoinHostPort("", strconv.Itoa(cfg.Port)), a.handler)
 
 	errCh := make(chan error, 1)
