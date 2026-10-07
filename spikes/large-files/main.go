@@ -52,22 +52,22 @@ type upload struct {
 }
 
 type job struct {
-	ID        string    `json:"id"`
-	UploadID  string    `json:"uploadId"`
-	Status    string    `json:"status"` // running | done | failed | moved
-	Percent   int       `json:"percent"`
-	OutDir    string    `json:"outDir"`
-	Started   time.Time `json:"started"`
-	Seconds   float64   `json:"seconds,omitempty"`
-	MBps      float64   `json:"mbps,omitempty"`
-	Error     string    `json:"error,omitempty"`
-	MovedTo   string    `json:"movedTo,omitempty"`
-	MoveMs    int64     `json:"moveMs,omitempty"`
-	MoveEXDEV bool      `json:"moveExdev,omitempty"`
-	Sample    string    `json:"sample,omitempty"`
-	Warning   string    `json:"warning,omitempty"`
-	Verified  string    `json:"verified,omitempty"`
-	VerifySecs float64  `json:"verifySeconds,omitempty"`
+	ID         string    `json:"id"`
+	UploadID   string    `json:"uploadId"`
+	Status     string    `json:"status"` // running | done | failed | moved
+	Percent    int       `json:"percent"`
+	OutDir     string    `json:"outDir"`
+	Started    time.Time `json:"started"`
+	Seconds    float64   `json:"seconds,omitempty"`
+	MBps       float64   `json:"mbps,omitempty"`
+	Error      string    `json:"error,omitempty"`
+	MovedTo    string    `json:"movedTo,omitempty"`
+	MoveMs     int64     `json:"moveMs,omitempty"`
+	MoveEXDEV  bool      `json:"moveExdev,omitempty"`
+	Sample     string    `json:"sample,omitempty"`
+	Warning    string    `json:"warning,omitempty"`
+	Verified   string    `json:"verified,omitempty"`
+	VerifySecs float64   `json:"verifySeconds,omitempty"`
 }
 
 type state struct {
