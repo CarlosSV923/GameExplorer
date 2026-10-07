@@ -28,7 +28,8 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 - **RF-03** Si el archivo es un comprimido (zip, 7z, rar/rar5, multiparte), se detecta por bytes mágicos y se extrae automáticamente. El comprimido original se borra tras una extracción exitosa.
 - **RF-04** Si el comprimido está cifrado, el formulario pide la contraseña. La contraseña no se guarda.
 - **RF-05** Antes de extraer se comprueba el espacio libre. Ningún archivo extraído puede salir del directorio de staging (zip-slip) y los symlinks se rechazan.
-- **RF-06** Lo extraído se clasifica en elementos: se agrupa `.cue` con sus `.bin`, se reconocen juegos en carpeta y se ignoran archivos basura (`.txt`, `.nfo`, `.url`, `.sfv`, lista configurable). La revisión muestra qué se ignoró.
+- **RF-05a** Tras extraer, **cada archivo se verifica contra el índice del comprimido (tamaño + CRC32)**. Los errores de 7zz que son *solo de atributos* (*Cannot set file attribute*, porque los datasets con ACL prohíben `chmod`) se registran como advertencia si la verificación pasa; cualquier otro error falla la extracción. *(Hallazgo de la Fase 0.5.)*
+- **RF-06** Lo extraído se clasifica en elementos: se agrupa `.cue` con sus `.bin`, se reconocen juegos en carpeta, **se aplanan las carpetas envolventes** (p. ej. `Juego NSP BASE GAME/archivo.nsp`) y se ignoran archivos basura (`.txt`, `.nfo`, `.url`, `.sfv`, lista configurable). La revisión muestra qué se ignoró.
 - **RF-07** Detección de consola por cabecera y extensión (reglas en §6). El resultado es una lista de candidatas con nivel de confianza.
 - **RF-08** **Consola preseleccionada**: si la subida se inicia desde la pantalla de una consola, esa consola viene preseleccionada. Si la detección indica otra consola sin ambigüedad, aparece el aviso "Usar <consola detectada>" y la consola no se cambia sola. Desde Inicio se preselecciona la detectada; si es ambigua, el campo queda vacío y es obligatorio.
 - **RF-09** Formulario de revisión:
@@ -75,7 +76,8 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 
 - **RNF-01 Archivos grandes**: los bytes de los juegos nunca se cargan en memoria. Se usan streams y `rename`, la extracción la hace `7zz` en un proceso hijo, y las descargas usan `http.ServeContent` o un zip *store* en streaming. Objetivo: saturar la red con RAM estable < 300 MB.
 - **RNF-02 Seguridad**: las rutas se construyen siempre en el servidor a partir de IDs y nunca se aceptan rutas del cliente. Protección contra zip-slip, nombres saneados y ningún secreto versionado.
-- **RNF-03 Permisos**: lo escrito en la biblioteca usa `PUID/PGID/UMASK` para poder editarlo por SMB.
+- **RNF-03 Permisos**: la app corre con `PUID/PGID`, y ese usuario necesita una entrada ACL propia en el dataset (*Modify*, *Inherit*), porque un contenedor no hereda grupos suplementarios. Los permisos de lo escrito vienen de la ACL heredada (en datasets con ACL el umask y `chmod` no aplican). Si la app no puede escribir al arrancar, lo muestra en la UI en lugar de reiniciarse en bucle.
+- **RNF-03a Extracción**: se usa el **binario oficial de 7-Zip** (versión fijada y SHA-256 verificado), porque los paquetes de las distribuciones vienen sin el códec RAR.
 - **RNF-04 Atomicidad**: staging y papelera viven en el mismo dataset que la biblioteca, así que mover es `rename`. Si hay `EXDEV`, se copia y luego se borra.
 - **RNF-05 Táctil**:
   - objetivos de 44 px como mínimo;
@@ -99,7 +101,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 
 Saneamiento del título (carpeta y archivos), en este orden:
 1. Unicode NFC.
-2. `:` → ` -`.
+2. `:` y `꞉` (U+A789, sustituto habitual de `:` en Windows) → ` -`. Otros símbolos válidos, como `™`, se conservan.
 3. `/` y `\` → espacio.
 4. Se eliminan `? < > " | *` y los caracteres de control.
 5. Los bloques de espacios en blanco se reducen a uno.
@@ -110,7 +112,7 @@ Saneamiento del título (carpeta y archivos), en este orden:
 
 | Consola | Extensiones | Confirmación por contenido |
 |---|---|---|
-| Switch | `.nsp .xci .nsz .xcz` | Title ID en el nombre: `…000` Base, `…800` Update, otro DLC; `[vX]` es la versión |
+| Switch | `.nsp .xci .nsz .xcz` | Title ID de 16 hex en el nombre: `…000` Base, `…800` Update, otro DLC. `[vN]` es un código numérico; la versión legible (`[1.0.3]`, `Update 1.0.4`) se extrae si aparece y se sugiere como etiqueta del Update. Puede haber región (`[US]`), espacios entre etiquetas o faltar el Title ID (entonces no se sugiere tipo) |
 | GameCube | `.iso .gcm .ciso .rvz` | Magic `0xC2339F3D` en offset `0x1C` |
 | Wii | `.iso .wbfs .rvz` | Magic `0x5D1C9EA3` en offset `0x18` |
 | PS1 | `.cue .bin .chd .pbp` | ISO9660 → `SYSTEM.CNF` con `BOOT=` |

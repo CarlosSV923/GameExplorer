@@ -16,9 +16,9 @@ Depende de: —
 ## Fase 0.5 — Spike de archivos grandes en el NAS
 Depende de: Fase 0 · Cubre: RNF-01, RNF-03, RNF-04
 - [x] Prototipo desechable: tusd + 7zz + `http.ServeContent` + zip *store* (`spikes/large-files`, validado en local)
-- [ ] Medir en el NAS: subida de ~50 GB (throughput y RAM), extracción de un `.rar` de ~30 GB, descarga con Range y como zip
-- [~] Verificar permisos SMB (PUID/PGID/UMASK) y `rename` dentro del dataset — hallazgo: el contenedor no hereda grupos suplementarios; requiere entrada ACL para su usuario
-- [ ] Registrar los resultados en `docs/spike-results.md`
+- [x] Medir en el NAS con 15 GB reales de Switch: subida, reanudación, extracción, verificación CRC32, descarga con Range y como zip (pico de RAM 14,7 MB)
+- [~] Verificar permisos SMB y `rename` dentro del dataset — `rename` OK; falta confirmar edición por Samba
+- [x] Registrar los resultados en `docs/spike-results.md`
 
 ## Fase 1 — API base
 Depende de: 0.5 · Cubre: RF-40, RF-50, RNF-02

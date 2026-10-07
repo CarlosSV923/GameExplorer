@@ -94,6 +94,19 @@
       }
     },
     {
+      "name": "real: modifier-letter colon (U+A789) is treated like a colon, trademark sign is kept",
+      "input": { "title": "Animal Crossing™꞉ New Horizons", "kind": "base", "extension": ".nsp" },
+      "expected": {
+        "sanitizedTitle": "Animal Crossing™ - New Horizons",
+        "fileName": "Animal Crossing™ - New Horizons.nsp"
+      }
+    },
+    {
+      "name": "update label uses the human display version",
+      "input": { "title": "INSIDE", "kind": "update", "label": "v1.0.3", "extension": ".nsp" },
+      "expected": { "sanitizedTitle": "INSIDE", "fileName": "INSIDE [Update v1.0.3].nsp" }
+    },
+    {
       "name": "extension is lowercased",
       "input": { "title": "Metroid Prime", "kind": "base", "extension": ".ISO" },
       "expected": { "sanitizedTitle": "Metroid Prime", "fileName": "Metroid Prime.iso" }

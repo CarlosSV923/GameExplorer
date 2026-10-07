@@ -1,35 +1,81 @@
 {
-  "description": "Console and item-kind suggestions derived from the file name only. consoles lists every candidate slug; an empty list means unknown. Ambiguous extensions (.iso, .bin, .chd) return several candidates and are resolved by header sniffing.",
+  "description": "Console and item-kind suggestions derived from the file name only. consoles lists every candidate slug; an empty list means unknown. Ambiguous extensions (.iso, .bin, .chd) return several candidates and are resolved by header sniffing. Switch: versionCode is the numeric [vN] tag; displayVersion is a human version (x.y.z) found elsewhere in the name. Cases marked 'real' come from actual dumps tested in phase 0.5.",
   "cases": [
     {
-      "name": "switch base from title id ending in 000",
-      "input": { "fileName": "Mario Kart 8 Deluxe [0100152000022000][v0].nsp" },
+      "name": "real: switch base with title id ending in 000",
+      "input": { "fileName": "INSIDE [0100D2D009028000][v0].nsp" },
       "expected": {
         "consoles": ["switch"],
         "kind": "base",
-        "titleId": "0100152000022000",
-        "version": "v0"
+        "titleId": "0100D2D009028000",
+        "versionCode": "0"
       }
     },
     {
-      "name": "switch update from title id ending in 800",
-      "input": { "fileName": "Mario Kart 8 Deluxe [0100152000022800][v3.0.1].nsp" },
+      "name": "real: switch base with region tag between title id and version",
+      "input": { "fileName": "Animal Crossing New Horizons [01006F8002326000][US][v0].nsp" },
+      "expected": {
+        "consoles": ["switch"],
+        "kind": "base",
+        "titleId": "01006F8002326000",
+        "versionCode": "0"
+      }
+    },
+    {
+      "name": "real: switch update with numeric version code and bracketed display version",
+      "input": { "fileName": "INSIDE [0100D2D009028800][v196608][1.0.3].nsp" },
       "expected": {
         "consoles": ["switch"],
         "kind": "update",
-        "titleId": "0100152000022800",
-        "version": "v3.0.1"
+        "titleId": "0100D2D009028800",
+        "versionCode": "196608",
+        "displayVersion": "1.0.3"
       }
     },
     {
-      "name": "switch dlc from any other title id suffix",
-      "input": { "fileName": "MK8D Booster Course Pass [0100152000023001].nsp" },
-      "expected": { "consoles": ["switch"], "kind": "dlc", "titleId": "0100152000023001" }
+      "name": "real: switch update with spaces between tags and trailing text",
+      "input": {
+        "fileName": "The Rogue Prince of Persia [01008D9022462800] [v131072]Update 1.0.4.nsp"
+      },
+      "expected": {
+        "consoles": ["switch"],
+        "kind": "update",
+        "titleId": "01008D9022462800",
+        "versionCode": "131072",
+        "displayVersion": "1.0.4"
+      }
+    },
+    {
+      "name": "real: switch dlc (title id suffix other than 000/800) with unicode in name",
+      "input": {
+        "fileName": "Animal Crossing™꞉ New Horizons - Happy Home Paradise [01006F80023273E8][v0].nsp"
+      },
+      "expected": {
+        "consoles": ["switch"],
+        "kind": "dlc",
+        "titleId": "01006F80023273E8",
+        "versionCode": "0"
+      }
+    },
+    {
+      "name": "real: switch file without title id gives no kind suggestion",
+      "input": { "fileName": "v-animal_crossing_new_horizons_v2228224.nsp" },
+      "expected": { "consoles": ["switch"] }
     },
     {
       "name": "switch xci without title id has no kind suggestion",
       "input": { "fileName": "Metroid Dread.xci" },
       "expected": { "consoles": ["switch"] }
+    },
+    {
+      "name": "title id match is case-insensitive and normalized to upper case",
+      "input": { "fileName": "game [0100d2d009028800][v65536].nsz" },
+      "expected": {
+        "consoles": ["switch"],
+        "kind": "update",
+        "titleId": "0100D2D009028800",
+        "versionCode": "65536"
+      }
     },
     {
       "name": "wbfs is wii",
@@ -52,7 +98,7 @@
       "expected": { "consoles": ["gc", "wii", "ps2", "ps3"] }
     },
     {
-      "name": "cue is ps1 or ps2",
+      "name": "cue is ps1 or ps2 and disc number is suggested",
       "input": { "fileName": "Final Fantasy VII (Disc 1).cue" },
       "expected": { "consoles": ["psx", "ps2"], "kind": "disc", "discNumber": 1 }
     },
