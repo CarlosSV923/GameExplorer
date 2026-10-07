@@ -112,6 +112,7 @@ func main() {
 		log.Error("startup", "error", startupError)
 	}
 
+	recoverUploads(log)
 	go samplePeakRSS()
 
 	mux := http.NewServeMux()
@@ -186,6 +187,36 @@ func newTusHandler(log *slog.Logger) (*tusd.Handler, error) {
 		}
 	}()
 	return h, nil
+}
+
+// recoverUploads re-registers uploads already on disk (tusd writes <id>.info
+// next to each upload), so restarting the container does not lose them.
+func recoverUploads(log *slog.Logger) {
+	dir := filepath.Join(stagingDir, "uploads")
+	infos, _ := filepath.Glob(filepath.Join(dir, "*.info"))
+	for _, p := range infos {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var fi tusd.FileInfo
+		if err := json.Unmarshal(b, &fi); err != nil {
+			continue
+		}
+		info, err := os.Stat(strings.TrimSuffix(p, ".info"))
+		if err != nil {
+			continue
+		}
+		st.uploads[fi.ID] = &upload{
+			ID:        fi.ID,
+			FileName:  fi.MetaData["filename"],
+			Size:      fi.Size,
+			Path:      strings.TrimSuffix(p, ".info"),
+			CreatedAt: info.ModTime(),
+			Done:      info.Size() == fi.Size,
+		}
+	}
+	log.Info("recovered uploads", "count", len(st.uploads))
 }
 
 // ---------- stats ----------
