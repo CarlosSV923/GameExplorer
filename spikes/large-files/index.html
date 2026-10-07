@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GameExplorer · Spike de archivos grandes</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #38383b; color: #fff; font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 28px; }
+  h2 { margin: 0 0 12px; font-size: 18px; }
+  section { background: #2a2a2d; border: 1px solid #4a4a4f; border-radius: 14px; padding: 18px; margin-top: 18px; }
+  .muted { color: #c9c9ce; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .stat { background: #232326; border-radius: 10px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 20px; }
+  button, input[type=password], input[type=file] { font: inherit; }
+  button { min-height: 44px; padding: 0 18px; border-radius: 22px; border: 0; background: #f2b544; color: #1a1a1a; font-weight: 700; cursor: pointer; }
+  button.secondary { background: transparent; color: #fff; border: 1px solid #6c6c72; }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type=password] { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid #6c6c72; background: #232326; color: #fff; }
+  progress { width: 100%; height: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td, th { text-align: left; padding: 6px 8px; border-top: 1px solid #4a4a4f; }
+  a { color: #f2b544; }
+  code, pre { font-family: ui-monospace, monospace; font-size: 13px; }
+  pre { background: #232326; padding: 12px; border-radius: 10px; overflow-x: auto; white-space: pre-wrap; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .ok { color: #9be29b; } .bad { color: #ff8a78; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Spike de archivos grandes</h1>
+  <p class="muted">Prototipo desechable de la fase 0.5. Sube un archivo grande, extráelo, muévelo a la biblioteca y descárgalo. Al final copia el resumen.</p>
+
+  <section>
+    <h2>Servidor (en vivo)</h2>
+    <div class="grid" id="stats"></div>
+  </section>
+
+  <section>
+    <h2>1 · Subir</h2>
+    <div class="row">
+      <input type="file" id="file">
+      <button id="btnUpload">Subir</button>
+      <button id="btnPause" class="secondary" disabled>Pausar</button>
+    </div>
+    <p id="upInfo" class="muted">Puedes pausar y reanudar, o incluso cerrar la pestaña y volver a subir el mismo archivo: continuará donde quedó.</p>
+    <progress id="upBar" value="0" max="100"></progress>
+  </section>
+
+  <section>
+    <h2>2 · Extraer y 3 · Mover a la biblioteca</h2>
+    <div class="row" style="margin-bottom: 10px">
+      <label>Contraseña (si el archivo la tiene) <input type="password" id="pwd"></label>
+    </div>
+    <table><thead><tr><th>Archivo</th><th>Tamaño</th><th>Subida</th><th>Extracción</th><th>Mover</th></tr></thead><tbody id="items"></tbody></table>
+  </section>
+
+  <section>
+    <h2>4 · Descargar</h2>
+    <p class="muted">Archivo suelto: descarga reanudable (Range). Carpeta: zip sin compresión generado al vuelo.</p>
+    <table><tbody id="tree"></tbody></table>
+  </section>
+
+  <section>
+    <h2>Resumen para copiar</h2>
+    <div class="row"><button id="btnCopy">Copiar resumen</button><button id="btnReset" class="secondary">Borrar todo y reiniciar</button></div>
+    <pre id="summary"></pre>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/tus-js-client@4/dist/tus.min.js"></script>
+<script>
+const $ = (id) => document.getElementById(id)
+const gb = (b) => (b / 1e9).toFixed(2) + ' GB'
+const mb = (b) => (b / 1e6).toFixed(0) + ' MB'
+let current = null, lastStats = {}, lastState = { uploads: [], jobs: [] }, clientUpload = {}
+
+function td(text) { const c = document.createElement('td'); c.textContent = text; return c }
+
+async function refresh() {
+  try {
+    lastStats = await (await fetch('/api/stats')).json()
+    const s = lastStats
+    $('stats').innerHTML = ''
+    for (const [k, v] of [
+      ['RAM actual', mb(s.rssBytes)], ['RAM pico', mb(s.peakRssBytes)], ['Goroutines', s.goroutines],
+      ['Disco libre', gb(s.diskFree)], ['Usuario', s.uid + ':' + s.gid], ['7zz', s.has7zz ? 'sí' : 'NO'],
+    ]) {
+      const d = document.createElement('div'); d.className = 'stat'
+      d.innerHTML = '<span class="muted"></span><b></b>'
+      d.firstChild.textContent = k; d.lastChild.textContent = v
+      $('stats').append(d)
+    }
+    lastState = await (await fetch('/api/state')).json()
+    renderItems()
+    renderTree(await (await fetch('/api/tree')).json())
+    renderSummary()
+  } catch (e) { console.error(e) }
+}
+
+function renderItems() {
+  const body = $('items'); body.innerHTML = ''
+  for (const u of lastState.uploads) {
+    const j = lastState.jobs.find((x) => x.uploadId === u.id)
+    const tr = document.createElement('tr')
+    tr.append(td(u.fileName), td(gb(u.size)), td(u.done ? `${u.seconds.toFixed(0)} s · ${u.mbps.toFixed(0)} MB/s` : 'subiendo…'))
+    const ex = document.createElement('td')
+    if (!j && u.done) {
+      const b = document.createElement('button'); b.textContent = 'Extraer'
+      b.onclick = () => post(`/api/extract?id=${u.id}`, { password: $('pwd').value })
+      ex.append(b)
+    } else if (j) {
+      ex.textContent = j.status === 'running' ? `${j.percent} %…` : j.status === 'failed' ? 'Error: ' + j.error : `${j.seconds.toFixed(0)} s · ${j.mbps.toFixed(0)} MB/s`
+      if (j.status === 'failed') ex.className = 'bad'
+    }
+    const mv = document.createElement('td')
+    if (j && j.status === 'done') {
+      const b = document.createElement('button'); b.textContent = 'Mover'
+      b.onclick = () => post(`/api/move?job=${j.id}`)
+      mv.append(b)
+    } else if (j && j.status === 'moved') {
+      mv.innerHTML = `<span class="ok">✓ ${j.moveMs} ms</span><br><code></code>`
+      mv.querySelector('code').textContent = j.sample
+    } else if (j && j.moveExdev) { mv.textContent = 'EXDEV: distinto sistema de archivos'; mv.className = 'bad' }
+    tr.append(ex, mv)
+    body.append(tr)
+  }
+}
+
+function renderTree(entries) {
+  const body = $('tree'); body.innerHTML = ''
+  for (const e of entries || []) {
+    const tr = document.createElement('tr')
+    const a = document.createElement('a')
+    a.textContent = e.isDir ? '📁 ' + e.path + ' (zip)' : e.path
+    a.href = (e.isDir ? '/zip/' : '/download/') + e.path.split('/').map(encodeURIComponent).join('/')
+    const c = document.createElement('td'); c.append(a)
+    tr.append(c, td(e.isDir ? '' : gb(e.size)))
+    body.append(tr)
+  }
+}
+
+function renderSummary() {
+  $('summary').textContent = JSON.stringify({
+    server: { peakRssMB: Math.round(lastStats.peakRssBytes / 1e6), uid: lastStats.uid, gid: lastStats.gid, has7zz: lastStats.has7zz },
+    client: clientUpload,
+    uploads: lastState.uploads.map((u) => ({ file: u.fileName, sizeGB: +(u.size / 1e9).toFixed(2), seconds: Math.round(u.seconds || 0), MBps: Math.round(u.mbps || 0) })),
+    jobs: lastState.jobs.map((j) => ({ status: j.status, seconds: Math.round(j.seconds || 0), MBps: Math.round(j.mbps || 0), moveMs: j.moveMs, exdev: j.moveExdev, sample: j.sample, error: j.error })),
+    userAgent: navigator.userAgent,
+  }, null, 2)
+}
+
+async function post(url, form) {
+  const body = form ? new URLSearchParams(form) : undefined
+  const r = await fetch(url, { method: 'POST', body })
+  if (!r.ok) alert(await r.text())
+  refresh()
+}
+
+$('btnUpload').onclick = () => {
+  const file = $('file').files[0]
+  if (!file) return alert('Elige un archivo')
+  const t0 = performance.now(); let resumedFrom = null
+  current = new tus.Upload(file, {
+    endpoint: '/files/',
+    chunkSize: 64 * 1024 * 1024,
+    retryDelays: [0, 2000, 5000, 10000, 30000],
+    metadata: { filename: file.name },
+    storeFingerprintForResuming: true,
+    removeFingerprintOnSuccess: true,
+    onProgress(sent, total) {
+      if (resumedFrom === null) resumedFrom = sent
+      const pct = (sent / total) * 100
+      const secs = (performance.now() - t0) / 1000
+      const speed = (sent - resumedFrom) / 1e6 / secs
+      $('upBar').value = pct
+      $('upInfo').textContent = `${pct.toFixed(1)} % · ${gb(sent)} de ${gb(total)} · ${speed.toFixed(0)} MB/s`
+    },
+    onSuccess() {
+      const secs = (performance.now() - t0) / 1000
+      clientUpload = { file: file.name, sizeGB: +(file.size / 1e9).toFixed(2), seconds: Math.round(secs), MBps: Math.round((file.size - resumedFrom) / 1e6 / secs) }
+      $('upInfo').textContent = 'Subida completa ✓'; $('btnPause').disabled = true; refresh()
+    },
+    onError(err) { $('upInfo').textContent = 'Error: ' + err },
+  })
+  current.findPreviousUploads().then((prev) => {
+    if (prev.length) current.resumeFromPreviousUpload(prev[0])
+    current.start(); $('btnPause').disabled = false; $('btnPause').textContent = 'Pausar'
+  })
+}
+$('btnPause').onclick = () => {
+  if (!current) return
+  if ($('btnPause').textContent === 'Pausar') { current.abort(); $('btnPause').textContent = 'Reanudar' }
+  else { current.start(); $('btnPause').textContent = 'Pausar' }
+}
+$('btnCopy').onclick = () => navigator.clipboard.writeText($('summary').textContent).then(() => alert('Copiado'))
+$('btnReset').onclick = () => confirm('¿Borrar todo lo subido y generado por el spike?') && post('/api/reset')
+
+refresh(); setInterval(refresh, 1500)
+</script>
+</body>
+</html>

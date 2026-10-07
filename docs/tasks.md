@@ -15,7 +15,7 @@ Depende de: —
 
 ## Fase 0.5 — Spike de archivos grandes en el NAS
 Depende de: Fase 0 · Cubre: RNF-01, RNF-03, RNF-04
-- [ ] Prototipo desechable: tusd + 7zz + `http.ServeContent` + zip *store*
+- [x] Prototipo desechable: tusd + 7zz + `http.ServeContent` + zip *store* (`spikes/large-files`, validado en local)
 - [ ] Medir en el NAS: subida de ~50 GB (throughput y RAM), extracción de un `.rar` de ~30 GB, descarga con Range y como zip
 - [ ] Verificar permisos SMB (PUID/PGID/UMASK) y `rename` dentro del dataset
 - [ ] Registrar los resultados en `docs/spike-results.md`
