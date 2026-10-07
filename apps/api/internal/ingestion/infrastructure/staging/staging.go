@@ -4,12 +4,15 @@
 package staging
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/application"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain"
@@ -18,14 +21,41 @@ import (
 
 // Area implements application.Staging.
 type Area struct {
-	root string
+	root    string
+	volumes string
 }
 
 var _ application.Staging = (*Area)(nil)
 
-// New builds the area rooted at root (created on first use).
-func New(root string) *Area {
-	return &Area{root: root}
+// New builds the area: job directories under root, multi-volume parts under
+// volumes (both created on first use).
+func New(root, volumes string) *Area {
+	return &Area{root: root, volumes: volumes}
+}
+
+// VolumeDir implements application.Staging. The set name comes from a file
+// name, so it is hashed into a safe directory name.
+func (a *Area) VolumeDir(set string) string {
+	sum := sha256.Sum256([]byte(set))
+	return filepath.Join(a.volumes, hex.EncodeToString(sum[:8]))
+}
+
+// RemoveVolumes implements application.Staging.
+func (a *Area) RemoveVolumes(set string) error {
+	return os.RemoveAll(a.VolumeDir(set))
+}
+
+// RemovePart implements application.Staging; it only deletes inside the
+// volumes area.
+func (a *Area) RemovePart(path string) error {
+	rel, err := filepath.Rel(a.volumes, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return fmt.Errorf("staging: refusing to delete %s outside the volumes area", path)
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 // Dir implements application.Staging. Job ids are tus ids (hex), validated by

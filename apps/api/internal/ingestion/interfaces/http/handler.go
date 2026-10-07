@@ -253,6 +253,14 @@ func ToAPI(j domain.UploadJob) httpapi.UploadJob {
 		w := j.Warning
 		out.Warning = &w
 	}
+	if j.VolumeIndex > 0 {
+		n := j.VolumeIndex
+		out.VolumeIndex = &n
+	}
+	if j.MergedInto != "" {
+		m := string(j.MergedInto)
+		out.MergedInto = &m
+	}
 	return out
 }
 

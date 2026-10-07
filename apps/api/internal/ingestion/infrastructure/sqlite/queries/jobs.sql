@@ -1,13 +1,15 @@
 -- name: CreateJob :exec
-INSERT INTO upload_jobs (id, file_name, size, received, status, error, origin_console, storage_path, progress, warning, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO upload_jobs (id, file_name, size, received, status, error, origin_console, storage_path,
+                         progress, warning, volume_set, volume_index, merged_into, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetJob :one
 SELECT * FROM upload_jobs WHERE id = ?;
 
 -- name: SaveJob :exec
 UPDATE upload_jobs
-SET received = ?, status = ?, error = ?, storage_path = ?, progress = ?, warning = ?, updated_at = ?
+SET received = ?, status = ?, error = ?, storage_path = ?, progress = ?, warning = ?,
+    volume_set = ?, volume_index = ?, merged_into = ?, updated_at = ?
 WHERE id = ?;
 
 -- name: ListJobs :many
@@ -18,3 +20,6 @@ SELECT * FROM upload_jobs WHERE status = ? AND updated_at < ? ORDER BY updated_a
 
 -- name: JobExists :one
 SELECT EXISTS(SELECT 1 FROM upload_jobs WHERE id = ?);
+
+-- name: ListWaitingParts :many
+SELECT * FROM upload_jobs WHERE volume_set = ? AND status = 'waiting_parts' ORDER BY volume_index;

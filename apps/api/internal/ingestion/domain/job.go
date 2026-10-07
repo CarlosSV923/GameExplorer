@@ -21,8 +21,12 @@ type Status string
 // Pipeline steps. Phase 3 drives Uploading → Uploaded; extraction, review and
 // commit (phases 4-5) move the job further.
 const (
-	StatusUploading     Status = "uploading"
-	StatusUploaded      Status = "uploaded"
+	StatusUploading Status = "uploading"
+	StatusUploaded  Status = "uploaded"
+	// StatusWaitingParts: a part of a multi-volume archive waits for the rest.
+	StatusWaitingParts Status = "waiting_parts"
+	// StatusMerged: a part whose content now belongs to the set's first volume job.
+	StatusMerged        Status = "merged"
 	StatusExtracting    Status = "extracting"
 	StatusNeedsPassword Status = "needs_password"
 	StatusReview        Status = "review"
@@ -35,7 +39,8 @@ const (
 // transitions lists the allowed next states of each state.
 var transitions = map[Status][]Status{
 	StatusUploading:     {StatusUploaded, StatusFailed, StatusCancelled},
-	StatusUploaded:      {StatusExtracting, StatusReview, StatusFailed, StatusCancelled},
+	StatusUploaded:      {StatusExtracting, StatusReview, StatusWaitingParts, StatusFailed, StatusCancelled},
+	StatusWaitingParts:  {StatusUploaded, StatusMerged, StatusFailed, StatusCancelled},
 	StatusExtracting:    {StatusReview, StatusNeedsPassword, StatusFailed, StatusCancelled},
 	StatusNeedsPassword: {StatusExtracting, StatusFailed, StatusCancelled},
 	StatusReview:        {StatusCommitting, StatusFailed, StatusCancelled},
@@ -86,6 +91,12 @@ type UploadJob struct {
 	OriginConsole *string
 	// StoragePath is where the uploaded bytes live (opaque to the domain).
 	StoragePath string
+
+	// VolumeSet and VolumeIndex are set for parts of multi-volume archives.
+	VolumeSet   string
+	VolumeIndex int
+	// MergedInto is the job (first volume) that took over this part.
+	MergedInto JobID
 }
 
 // NewUploadJob starts a job for a file the browser announced.
@@ -169,6 +180,29 @@ func (j *UploadJob) FinishExtraction(warning string, now time.Time) error {
 // ReadyForReview moves an uploaded raw (non-archive) file straight to review.
 func (j *UploadJob) ReadyForReview(now time.Time) error {
 	return j.moveTo(StatusReview, now)
+}
+
+// WaitForParts parks a multi-volume part until the whole set has arrived.
+func (j *UploadJob) WaitForParts(v Volume, storagePath string, now time.Time) error {
+	if err := j.moveTo(StatusWaitingParts, now); err != nil {
+		return err
+	}
+	j.VolumeSet, j.VolumeIndex, j.StoragePath = v.Set, v.Index, storagePath
+	return nil
+}
+
+// PartsComplete makes the first volume's job ready to extract the whole set.
+func (j *UploadJob) PartsComplete(now time.Time) error {
+	return j.moveTo(StatusUploaded, now)
+}
+
+// MergeInto closes a part whose data is now handled by the first volume's job.
+func (j *UploadJob) MergeInto(primary JobID, now time.Time) error {
+	if err := j.moveTo(StatusMerged, now); err != nil {
+		return err
+	}
+	j.MergedInto = primary
+	return nil
 }
 
 // Cancel stops the job at the user's request.

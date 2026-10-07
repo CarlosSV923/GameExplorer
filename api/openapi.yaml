@@ -566,11 +566,15 @@ components:
       type: string
       description: |
         uploading → uploaded → (extracting ⇄ needs_password) → review →
-        committing → done; failed and cancelled are terminal.
+        committing → done; failed, cancelled and merged are terminal.
+        Parts of a multi-volume archive go uploaded → waiting_parts; when the
+        set is complete the first volume continues and the rest become merged.
       enum:
         [
           uploading,
           uploaded,
+          waiting_parts,
+          merged,
           extracting,
           needs_password,
           review,
@@ -615,6 +619,14 @@ components:
           type: string
           nullable: true
           description: Slug of the console screen the upload started from.
+        volumeIndex:
+          type: integer
+          nullable: true
+          description: Part number for multi-volume archives (1 = first).
+        mergedInto:
+          type: string
+          nullable: true
+          description: Job (first volume) that took over this part.
         createdAt:
           type: string
           format: date-time

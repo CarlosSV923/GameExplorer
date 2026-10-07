@@ -107,6 +107,11 @@ func stagingDir(libraryPath string) string {
 	return filepath.Join(libraryPath, ".gameexplorer", "staging", "extracted")
 }
 
+// volumesDir gathers the parts of multi-volume archives until all arrive.
+func volumesDir(libraryPath string) string {
+	return filepath.Join(libraryPath, ".gameexplorer", "staging", "volumes")
+}
+
 // uploadsDir is where tus stores incoming files: inside the library dataset,
 // so moving a finished game into place is a rename, not a copy.
 func uploadsDir(libraryPath string) string {
@@ -164,7 +169,7 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 	if uploadsErr == nil {
 		processor = ingestionapp.NewProcessor(ingestionapp.ProcessorDeps{
 			Jobs: jobs, Items: items, Uploads: uploads, Extractor: extractor,
-			Staging: staging.New(stagingDir(cfg.LibraryPath)), Profiles: consoleProfiles{consoles},
+			Staging: staging.New(stagingDir(cfg.LibraryPath), volumesDir(cfg.LibraryPath)), Profiles: consoleProfiles{consoles},
 			Publisher: events, Log: log,
 		})
 		ingestion.WithQueue(processor)

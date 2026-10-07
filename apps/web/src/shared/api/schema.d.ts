@@ -347,10 +347,12 @@ export interface components {
         ImageSize: "cover_small" | "cover_big" | "logo_med" | "screenshot_med";
         /**
          * @description uploading → uploaded → (extracting ⇄ needs_password) → review →
-         *     committing → done; failed and cancelled are terminal.
+         *     committing → done; failed, cancelled and merged are terminal.
+         *     Parts of a multi-volume archive go uploaded → waiting_parts; when the
+         *     set is complete the first volume continues and the rest become merged.
          * @enum {string}
          */
-        JobStatus: "uploading" | "uploaded" | "extracting" | "needs_password" | "review" | "committing" | "done" | "failed" | "cancelled";
+        JobStatus: "uploading" | "uploaded" | "waiting_parts" | "merged" | "extracting" | "needs_password" | "review" | "committing" | "done" | "failed" | "cancelled";
         UploadJob: {
             /** @description Equals the tus upload id. */
             id: string;
@@ -369,6 +371,10 @@ export interface components {
             warning?: string | null;
             /** @description Slug of the console screen the upload started from. */
             originConsole?: string | null;
+            /** @description Part number for multi-volume archives (1 = first). */
+            volumeIndex?: number | null;
+            /** @description Job (first volume) that took over this part. */
+            mergedInto?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */

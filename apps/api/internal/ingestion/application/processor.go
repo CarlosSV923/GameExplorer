@@ -54,6 +54,10 @@ type Processor struct {
 
 	mu      sync.Mutex
 	running map[domain.JobID]context.CancelFunc
+
+	// setMu serializes volume-set completion: parts arriving together must
+	// not both promote the set.
+	setMu sync.Mutex
 }
 
 // NewProcessor builds a processor.
@@ -102,7 +106,8 @@ func (p *Processor) SubmitPassword(ctx context.Context, id domain.JobID, passwor
 	return job, nil
 }
 
-// Discard stops any running work for the job and deletes its staged files.
+// Discard stops any running work for the job and deletes its staged files
+// (and, for multi-volume archives, its parts).
 func (p *Processor) Discard(id domain.JobID) {
 	p.mu.Lock()
 	if cancel, ok := p.running[id]; ok {
@@ -111,6 +116,18 @@ func (p *Processor) Discard(id domain.JobID) {
 	p.mu.Unlock()
 	if err := p.d.Staging.Remove(id); err != nil {
 		p.d.Log.Warn("remove staging", "job", id, "error", err)
+	}
+	job, err := p.d.Jobs.Get(context.Background(), id)
+	if err != nil || job.VolumeSet == "" {
+		return
+	}
+	if job.Status == domain.StatusWaitingParts {
+		err = p.d.Staging.RemovePart(job.StoragePath)
+	} else {
+		err = p.d.Staging.RemoveVolumes(job.VolumeSet)
+	}
+	if err != nil {
+		p.d.Log.Warn("remove volume files", "job", id, "error", err)
 	}
 }
 
@@ -170,6 +187,14 @@ func (p *Processor) process(parent context.Context, req request) {
 }
 
 func (p *Processor) handle(ctx context.Context, job *domain.UploadJob, password string) error {
+	if job.VolumeSet == "" { // not yet sorted into a volume set
+		if v, ok := domain.ParseVolume(job.FileName); ok {
+			return p.collectPart(ctx, job, v)
+		}
+		if domain.IsLegacyRarVolume(job.FileName) {
+			return errLegacyVolume
+		}
+	}
 	header, err := p.d.Staging.ReadHeader(job.StoragePath, 8)
 	if err != nil {
 		return fmt.Errorf("read upload: %w", err)
@@ -178,6 +203,80 @@ func (p *Processor) handle(ctx context.Context, job *domain.UploadJob, password 
 		return p.adoptRaw(ctx, job)
 	}
 	return p.extract(ctx, job, password)
+}
+
+// collectPart moves a volume into its set's folder and waits for the rest.
+func (p *Processor) collectPart(ctx context.Context, job *domain.UploadJob, v domain.Volume) error {
+	dest := filepath.Join(p.d.Staging.VolumeDir(v.Set), job.FileName)
+	if err := p.d.Uploads.Take(ctx, job.ID, dest); err != nil {
+		return fmt.Errorf("collect volume: %w", err)
+	}
+	if err := job.WaitForParts(v, dest, p.d.Now()); err != nil {
+		return err
+	}
+	if err := p.save(ctx, job); err != nil {
+		return err
+	}
+	return p.tryCompleteSet(ctx, v.Set)
+}
+
+// tryCompleteSet promotes the set's first volume once every part is there.
+// 7-Zip refuses to open a split archive with missing parts, so a successful
+// listing of the first volume means the set is complete. Header-encrypted
+// sets cannot be listed without the password; they are promoted when the
+// parts are contiguous, and extraction reports anything still missing.
+func (p *Processor) tryCompleteSet(ctx context.Context, set string) error {
+	p.setMu.Lock()
+	defer p.setMu.Unlock()
+
+	parts, err := p.d.Jobs.ListWaitingParts(ctx, set)
+	if err != nil {
+		return err
+	}
+	var first *domain.UploadJob
+	for _, part := range parts {
+		if part.VolumeIndex == 1 {
+			first = part
+		}
+	}
+	if first == nil {
+		return nil // keep waiting for the first volume
+	}
+	_, err = p.d.Extractor.List(ctx, first.StoragePath, "")
+	complete := err == nil ||
+		((errors.Is(err, ErrPasswordRequired) || errors.Is(err, ErrWrongPassword)) && contiguous(parts))
+	if !complete {
+		return nil
+	}
+
+	for _, part := range parts {
+		if part.ID == first.ID {
+			continue
+		}
+		if err := part.MergeInto(first.ID, p.d.Now()); err != nil {
+			return err
+		}
+		if err := p.save(ctx, part); err != nil {
+			return err
+		}
+	}
+	if err := first.PartsComplete(p.d.Now()); err != nil {
+		return err
+	}
+	if err := p.save(ctx, first); err != nil {
+		return err
+	}
+	p.enqueue(request{id: first.ID})
+	return nil
+}
+
+func contiguous(parts []*domain.UploadJob) bool {
+	for i, part := range parts { // sorted by volume index
+		if part.VolumeIndex != i+1 {
+			return false
+		}
+	}
+	return len(parts) > 0
 }
 
 // adoptRaw moves a non-archive upload (an .nsp, an .iso...) into staging.
@@ -248,9 +347,7 @@ func (p *Processor) extract(ctx context.Context, job *domain.UploadJob, password
 		return err
 	}
 	// The archive is no longer needed (RF-03).
-	if err := p.d.Uploads.Delete(ctx, job.ID); err != nil {
-		p.d.Log.Warn("delete extracted archive", "job", job.ID, "error", err)
-	}
+	p.deleteArchive(ctx, job)
 	if err := p.stageItems(ctx, job); err != nil {
 		return err
 	}
@@ -294,6 +391,22 @@ func (p *Processor) fail(ctx context.Context, job *domain.UploadJob, reason stri
 		return
 	}
 	_ = p.save(ctx, job)
+	if job.VolumeSet != "" { // a failed set frees its parts
+		_ = p.d.Staging.RemoveVolumes(job.VolumeSet)
+	}
+}
+
+// deleteArchive removes the uploaded archive (or every part of a volume set).
+func (p *Processor) deleteArchive(ctx context.Context, job *domain.UploadJob) {
+	var err error
+	if job.VolumeSet != "" {
+		err = p.d.Staging.RemoveVolumes(job.VolumeSet)
+	} else {
+		err = p.d.Uploads.Delete(ctx, job.ID)
+	}
+	if err != nil {
+		p.d.Log.Warn("delete extracted archive", "job", job.ID, "error", err)
+	}
 }
 
 func (p *Processor) save(ctx context.Context, job *domain.UploadJob) error {
@@ -305,8 +418,9 @@ func (p *Processor) save(ctx context.Context, job *domain.UploadJob) error {
 }
 
 var (
-	errUnsafePath = errors.New("unsafe path in archive")
-	errNoSpace    = errors.New("not enough free space")
+	errUnsafePath   = errors.New("unsafe path in archive")
+	errNoSpace      = errors.New("not enough free space")
+	errLegacyVolume = errors.New("legacy rar volume")
 )
 
 // failureMessage turns an error into the text shown to the user.
@@ -318,6 +432,8 @@ func failureMessage(err error) string {
 		return "El comprimido contiene rutas peligrosas (fuera de su carpeta) y se descartó."
 	case errors.Is(err, ErrCorrupt):
 		return "El comprimido está dañado o un archivo no pasó la verificación de integridad."
+	case errors.Is(err, errLegacyVolume):
+		return "Volúmenes RAR en formato antiguo (.r00, .r01…) no soportados; usa un comprimido de una parte o volúmenes .part1.rar."
 	case errors.Is(err, ErrUnsafeEntry):
 		return "El comprimido contiene enlaces o archivos especiales y se descartó."
 	default:

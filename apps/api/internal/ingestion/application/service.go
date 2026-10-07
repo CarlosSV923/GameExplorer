@@ -194,6 +194,24 @@ func (s *Service) Purge(ctx context.Context) (PurgeResult, error) {
 		res.Abandoned++
 	}
 
+	waiting, err := s.repo.ListStale(ctx, domain.StatusWaitingParts, s.now().Add(-AbandonedAfter))
+	if err != nil {
+		return res, err
+	}
+	for _, job := range waiting {
+		if s.queue != nil {
+			s.queue.Discard(job.ID) // deletes the gathered part
+		}
+		if err := job.Fail("Faltan partes del comprimido: no llegaron en 24 h.", s.now()); err != nil {
+			return res, err
+		}
+		if err := s.repo.Save(ctx, job); err != nil {
+			return res, err
+		}
+		s.pub.Publish(*job)
+		res.Abandoned++
+	}
+
 	ids, err := s.store.IDs(ctx)
 	if err != nil {
 		return res, err

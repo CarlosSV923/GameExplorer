@@ -39,6 +39,7 @@ func (r *JobRepository) Create(ctx context.Context, j *domain.UploadJob) error {
 		ID: string(j.ID), FileName: j.FileName, Size: j.Size, Received: j.Received,
 		Status: string(j.Status), Error: j.Error, OriginConsole: origin, StoragePath: j.StoragePath,
 		Progress: int64(j.Progress), Warning: j.Warning,
+		VolumeSet: j.VolumeSet, VolumeIndex: int64(j.VolumeIndex), MergedInto: string(j.MergedInto),
 		CreatedAt: formatTime(j.CreatedAt), UpdatedAt: formatTime(j.UpdatedAt),
 	})
 }
@@ -59,7 +60,9 @@ func (r *JobRepository) Get(ctx context.Context, id domain.JobID) (*domain.Uploa
 func (r *JobRepository) Save(ctx context.Context, j *domain.UploadJob) error {
 	return r.q.SaveJob(ctx, sqlcgen.SaveJobParams{
 		ID: string(j.ID), Received: j.Received, Status: string(j.Status), Error: j.Error,
-		StoragePath: j.StoragePath, Progress: int64(j.Progress), Warning: j.Warning, UpdatedAt: formatTime(j.UpdatedAt),
+		StoragePath: j.StoragePath, Progress: int64(j.Progress), Warning: j.Warning,
+		VolumeSet: j.VolumeSet, VolumeIndex: int64(j.VolumeIndex), MergedInto: string(j.MergedInto),
+		UpdatedAt: formatTime(j.UpdatedAt),
 	})
 }
 
@@ -86,6 +89,15 @@ func (r *JobRepository) Exists(ctx context.Context, id domain.JobID) (bool, erro
 	return r.q.JobExists(ctx, string(id))
 }
 
+// ListWaitingParts implements domain.JobRepository.
+func (r *JobRepository) ListWaitingParts(ctx context.Context, set string) ([]*domain.UploadJob, error) {
+	rows, err := r.q.ListWaitingParts(ctx, set)
+	if err != nil {
+		return nil, err
+	}
+	return toDomainAll(rows)
+}
+
 func toDomainAll(rows []sqlcgen.UploadJob) ([]*domain.UploadJob, error) {
 	out := make([]*domain.UploadJob, 0, len(rows))
 	for _, row := range rows {
@@ -108,6 +120,7 @@ func toDomain(row sqlcgen.UploadJob) (*domain.UploadJob, error) {
 		ID: domain.JobID(row.ID), FileName: row.FileName, Size: row.Size, Received: row.Received,
 		Status: domain.Status(row.Status), Error: row.Error, StoragePath: row.StoragePath,
 		Progress: int(row.Progress), Warning: row.Warning, CreatedAt: created, UpdatedAt: updated,
+		VolumeSet: row.VolumeSet, VolumeIndex: int(row.VolumeIndex), MergedInto: domain.JobID(row.MergedInto),
 	}
 	if row.OriginConsole.Valid {
 		o := row.OriginConsole.String

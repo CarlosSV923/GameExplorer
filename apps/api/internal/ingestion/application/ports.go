@@ -82,6 +82,13 @@ type Staging interface {
 	FreeSpace() (uint64, error)
 	// ReadHeader reads the first n bytes of a file.
 	ReadHeader(path string, n int) ([]byte, error)
+
+	// VolumeDir is where the parts of a multi-volume archive gather.
+	VolumeDir(set string) string
+	// RemoveVolumes deletes every part of a set.
+	RemoveVolumes(set string) error
+	// RemovePart deletes one gathered part.
+	RemovePart(path string) error
 }
 
 // UploadAdopter moves a finished raw upload out of the upload store.

@@ -50,4 +50,7 @@ type UploadJob struct {
 	UpdatedAt     string
 	Progress      int64
 	Warning       string
+	VolumeSet     string
+	VolumeIndex   int64
+	MergedInto    string
 }

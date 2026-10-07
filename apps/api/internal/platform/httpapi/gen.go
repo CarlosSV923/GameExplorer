@@ -91,10 +91,12 @@ const (
 	Done          JobStatus = "done"
 	Extracting    JobStatus = "extracting"
 	Failed        JobStatus = "failed"
+	Merged        JobStatus = "merged"
 	NeedsPassword JobStatus = "needs_password"
 	Review        JobStatus = "review"
 	Uploaded      JobStatus = "uploaded"
 	Uploading     JobStatus = "uploading"
+	WaitingParts  JobStatus = "waiting_parts"
 )
 
 // Valid indicates whether the value is a known member of the JobStatus enum.
@@ -110,6 +112,8 @@ func (e JobStatus) Valid() bool {
 		return true
 	case Failed:
 		return true
+	case Merged:
+		return true
 	case NeedsPassword:
 		return true
 	case Review:
@@ -117,6 +121,8 @@ func (e JobStatus) Valid() bool {
 	case Uploaded:
 		return true
 	case Uploading:
+		return true
+	case WaitingParts:
 		return true
 	default:
 		return false
@@ -212,7 +218,9 @@ type ImageSize string
 type ItemKind string
 
 // JobStatus uploading → uploaded → (extracting ⇄ needs_password) → review →
-// committing → done; failed and cancelled are terminal.
+// committing → done; failed, cancelled and merged are terminal.
+// Parts of a multi-volume archive go uploaded → waiting_parts; when the
+// set is complete the first volume continues and the rest become merged.
 type JobStatus string
 
 // LoginRequest defines model for LoginRequest.
@@ -318,6 +326,9 @@ type UploadJob struct {
 	// Id Equals the tus upload id.
 	Id string `json:"id"`
 
+	// MergedInto Job (first volume) that took over this part.
+	MergedInto *string `json:"mergedInto,omitempty"`
+
 	// OriginConsole Slug of the console screen the upload started from.
 	OriginConsole *string `json:"originConsole,omitempty"`
 
@@ -327,9 +338,14 @@ type UploadJob struct {
 	Size     int64 `json:"size"`
 
 	// Status uploading → uploaded → (extracting ⇄ needs_password) → review →
-	// committing → done; failed and cancelled are terminal.
+	// committing → done; failed, cancelled and merged are terminal.
+	// Parts of a multi-volume archive go uploaded → waiting_parts; when the
+	// set is complete the first volume continues and the rest become merged.
 	Status    JobStatus `json:"status"`
 	UpdatedAt time.Time `json:"updatedAt"`
+
+	// VolumeIndex Part number for multi-volume archives (1 = first).
+	VolumeIndex *int `json:"volumeIndex,omitempty"`
 
 	// Warning Non-fatal note, e.g. archive file attributes not applied.
 	Warning *string `json:"warning,omitempty"`

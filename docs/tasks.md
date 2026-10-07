@@ -57,7 +57,8 @@ Depende de: 3 · Cubre: RF-03 a RF-08
 - [x] Detectores por cabecera (Switch, GC, Wii, WBFS, PBP, PKG, ISO9660 cocido y crudo para PS1/PS2/PS3) + vectores `detection-cases.json` (también contra las consolas reales de la BD)
 - [x] API: `progress`/`warning` en el trabajo, `GET /api/jobs/{id}/items`, `POST /api/jobs/{id}/password`; diagnóstico `extractor` en `/api/health`
 - [x] Probado con 4 RAR reales de Switch: tipos y versiones detectados por Title ID, Switch confirmado por cabecera; pico de RAM 66 MB
-- [ ] **Por decidir**: comprimidos multiparte (`.part1.rar`, `.part2.rar`…). Cada subida es un trabajo independiente; hoy las partes no se unen
+- [x] Comprimidos multiparte (decisión: agrupar automáticamente): `.partN.rar` y numerados (`.7z.001`, `.zip.001`…) se reúnen por nombre en `staging/volumes` (estado `waiting_parts`); cuando 7-Zip puede abrir el primer volumen, ese trabajo se extrae y las demás partes quedan `merged`. Purga a las 24 h y cancelación por parte. Formato antiguo `.r00` rechazado con mensaje claro
+- [ ] Probar RAR multiparte con un archivo real (no se pueden crear RAR sin WinRAR; probado con 7z partidos)
 
 ## Fase 5 — Commit al contexto `catalog`
 Depende de: 2, 4 · Cubre: RF-09 a RF-11
