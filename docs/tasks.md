@@ -90,10 +90,15 @@ Depende de: 6 · Cubre: RF-24 a RF-26, RF-30, RF-41
 
 ## Fase 8 — Diseño → código
 Depende de: 0 · Cubre: RNF-05 a RNF-07
-- [ ] `design:design-critique` y `design:accessibility-review` sobre los mockups
-- [ ] `design:design-handoff` → `docs/design-handoff.md`
-- [ ] Tokens en Tailwind, `shared/ui`, i18n (ES/EN), capa de entrada táctil/teclado/gamepad
-- [ ] Contraste de logos de IGDB sobre el fondo carbón: PS2 (azul) y PS3 (gris oscuro) apenas se ven. Definir tratamiento visual o permitir reemplazar el logo de una consola
+- [x] `design:design-critique` y `design:accessibility-review` sobre los mockups → [`design-review.md`](./design-review.md) (14 hallazgos WCAG con su corrección)
+- [x] Lienzo corregido (decisión: dibujar lo que faltaba): foco visible, bordes a 3:1, objetivos de 44 px, radios reales en IGDB, flechas para reordenar consolas, estados de error en el login, subidas fallidas y en espera de partes, faltantes y "Olvidar", papelera completa con conflicto y confirmación, y dos pantallas nuevas (re-emparejar, estados vacíos y de error)
+- [x] `design:design-handoff` → [`design-handoff.md`](./design-handoff.md): tokens, componentes, estados, movimiento, entrada, tamaños de pantalla, casos límite e i18n
+- [x] Tokens como `@theme` de Tailwind v4 (`shared/ui/tokens.css`; la paleta por defecto de Tailwind se borra para que solo existan los tokens). Fuentes servidas por la app (`@fontsource`), sin Google
+- [x] `shared/ui`: Button, LinkButton, IconButton, FileButton, TextField, SearchField, Chip, ChoiceChips, ChoiceList, SegmentedToggle, Banner, ProgressBar, EmptyState, Dialog, ConfirmDialog, PageHeader, TableBox, HelpBar, Glyph e íconos
+- [x] i18n ES/EN (`shared/i18n`): español por defecto, elección recordada, `<html lang>`, tamaños y fechas con `Intl`; pruebas de claves iguales y sin repetir; ESLint prohíbe texto escrito en JSX
+- [x] Capa de entrada (`shared/input`): acciones en lugar de teclas, pila de manejadores (el diálogo atiende primero), gamepad con repetición y zona muerta, navegación espacial propia (decisión: en lugar de `norigin-spatial-navigation`, para funcionar con elementos nativos), glifos solo con control conectado
+- [x] Logos de IGDB (decisión): siempre en blanco en el carrusel, como ES
+- [x] Página de componentes (`app/UiKit.tsx`) como entregable visible hasta la fase 9; revisada en el navegador a 1440 y 375 px, con teclado y en ES/EN
 
 ## Fase 9 — Frontend con adaptadores HTTP
 Depende de: 7, 8 · Cubre: RF-01 a RF-51 (UI)

@@ -1,0 +1,100 @@
+{
+  "app": {
+    "name": "GameExplorer",
+    "tagline": "Your game library on the NAS"
+  },
+  "common": {
+    "back": "Back",
+    "cancel": "Cancel",
+    "close": "Close",
+    "confirm": "Confirm",
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "retry": "Retry",
+    "chooseFiles": "Choose files",
+    "required": "Required"
+  },
+  "language": {
+    "label": "Language",
+    "es": "Español",
+    "en": "English",
+    "esShort": "ES",
+    "enShort": "EN"
+  },
+  "kind": {
+    "base": "Base",
+    "update": "Update",
+    "dlc": "DLC",
+    "disc": "Disc",
+    "discNumber": "Disc {{number}}",
+    "whole": "Whole game",
+    "missing": "Missing from disk"
+  },
+  "glyph": {
+    "A": "A button",
+    "B": "B button",
+    "X": "X button",
+    "Y": "Y button",
+    "RT": "Right trigger",
+    "LB": "Left bumper",
+    "RB": "Right bumper",
+    "MENU": "Menu button",
+    "DPAD": "D-pad"
+  },
+  "help": {
+    "select": "Select",
+    "back": "Back",
+    "choose": "Choose",
+    "menu": "Menu",
+    "search": "Search",
+    "upload": "Upload games",
+    "add": "Add games",
+    "download": "Download",
+    "save": "Save",
+    "restore": "Restore",
+    "delete": "Delete",
+    "dropHint": "You can also drop files anywhere"
+  },
+  "size": {
+    "bytes": "{{value}} B",
+    "kb": "{{value}} KB",
+    "mb": "{{value}} MB",
+    "gb": "{{value}} GB",
+    "tb": "{{value}} TB"
+  },
+  "kit": {
+    "title": "Components",
+    "intro": "The UI foundation: tokens, components, languages and input. Screens arrive in phase 9.",
+    "buttons": "Buttons",
+    "primary": "Upload games",
+    "secondary": "Change IGDB game",
+    "danger": "Move to trash",
+    "disabled": "Change folder",
+    "disabledReason": "The console has games.",
+    "busy": "Saving…",
+    "fields": "Fields",
+    "search": "Search the library",
+    "searchPlaceholder": "Search the library…",
+    "password": "Password",
+    "passwordError": "Wrong password. Try again.",
+    "chips": "Item kinds",
+    "feedback": "Notices and progress",
+    "warning": "You already have Mario Kart 8 Deluxe on Nintendo Switch with: Base.",
+    "dangerBanner": "The library is not writable.",
+    "upload": "Uploading pikmin4.zip",
+    "extract": "Extracting FF7_USA_PSX.7z",
+    "uploading": "Uploading · {{done}} of {{total}}",
+    "extracting": "Extracting…",
+    "dialogs": "Dialogs",
+    "openDialog": "Empty trash",
+    "dialogTitle": "Empty the trash?",
+    "dialogBody": "{{count}} items are deleted for good, freeing {{size}}. This cannot be undone.",
+    "empty": "Empty state",
+    "emptyTitle": "The trash is empty",
+    "emptyBody": "What you send here is kept for 30 days before it is deleted for good.",
+    "type": "Kind",
+    "input": "Input",
+    "gamepadOn": "Gamepad connected: the bar shows glyphs.",
+    "gamepadOff": "No gamepad: the bar shows buttons."
+  }
+}

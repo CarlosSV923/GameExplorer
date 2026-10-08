@@ -1,0 +1,100 @@
+{
+  "app": {
+    "name": "GameExplorer",
+    "tagline": "Tu biblioteca de juegos en el NAS"
+  },
+  "common": {
+    "back": "Volver",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "confirm": "Confirmar",
+    "loading": "Cargando…",
+    "saving": "Guardando…",
+    "retry": "Reintentar",
+    "chooseFiles": "Elegir archivos",
+    "required": "Obligatorio"
+  },
+  "language": {
+    "label": "Idioma",
+    "es": "Español",
+    "en": "English",
+    "esShort": "ES",
+    "enShort": "EN"
+  },
+  "kind": {
+    "base": "Base",
+    "update": "Update",
+    "dlc": "DLC",
+    "disc": "Disco",
+    "discNumber": "Disco {{number}}",
+    "whole": "Juego completo",
+    "missing": "Falta en el disco"
+  },
+  "glyph": {
+    "A": "Botón A",
+    "B": "Botón B",
+    "X": "Botón X",
+    "Y": "Botón Y",
+    "RT": "Gatillo derecho",
+    "LB": "Botón superior izquierdo",
+    "RB": "Botón superior derecho",
+    "MENU": "Botón Menú",
+    "DPAD": "Cruceta"
+  },
+  "help": {
+    "select": "Seleccionar",
+    "back": "Atrás",
+    "choose": "Elegir",
+    "menu": "Menú",
+    "search": "Buscar",
+    "upload": "Subir juegos",
+    "add": "Agregar juegos",
+    "download": "Descargar",
+    "save": "Guardar",
+    "restore": "Restaurar",
+    "delete": "Borrar",
+    "dropHint": "También puedes arrastrar archivos a cualquier parte"
+  },
+  "size": {
+    "bytes": "{{value}} B",
+    "kb": "{{value}} KB",
+    "mb": "{{value}} MB",
+    "gb": "{{value}} GB",
+    "tb": "{{value}} TB"
+  },
+  "kit": {
+    "title": "Componentes",
+    "intro": "Base de la interfaz: tokens, componentes, idiomas y entrada. Las pantallas llegan en la fase 9.",
+    "buttons": "Botones",
+    "primary": "Subir juegos",
+    "secondary": "Cambiar juego IGDB",
+    "danger": "Enviar a la papelera",
+    "disabled": "Cambiar carpeta",
+    "disabledReason": "La consola tiene juegos.",
+    "busy": "Guardando…",
+    "fields": "Campos",
+    "search": "Buscar en la biblioteca",
+    "searchPlaceholder": "Buscar en la biblioteca…",
+    "password": "Contraseña",
+    "passwordError": "Contraseña incorrecta. Inténtalo de nuevo.",
+    "chips": "Tipos de elemento",
+    "feedback": "Avisos y progreso",
+    "warning": "Ya tienes Mario Kart 8 Deluxe en Nintendo Switch con: Base.",
+    "dangerBanner": "No se puede escribir en la biblioteca.",
+    "upload": "Subida de pikmin4.zip",
+    "extract": "Extracción de FF7_USA_PSX.7z",
+    "uploading": "Subiendo · {{done}} de {{total}}",
+    "extracting": "Descomprimiendo…",
+    "dialogs": "Diálogos",
+    "openDialog": "Vaciar papelera",
+    "dialogTitle": "¿Vaciar la papelera?",
+    "dialogBody": "Se borran para siempre {{count}} elementos y se liberan {{size}}. No se puede deshacer.",
+    "empty": "Estado vacío",
+    "emptyTitle": "La papelera está vacía",
+    "emptyBody": "Lo que envíes aquí se guarda 30 días antes de borrarse para siempre.",
+    "type": "Tipo",
+    "input": "Entrada",
+    "gamepadOn": "Control conectado: la barra muestra glifos.",
+    "gamepadOff": "Sin control: la barra muestra botones."
+  }
+}

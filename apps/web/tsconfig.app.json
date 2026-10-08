@@ -17,6 +17,7 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "noEmit": true,
     "skipLibCheck": true,
     "paths": {

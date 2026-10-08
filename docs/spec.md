@@ -43,7 +43,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 - **RF-13** El progreso (subida, extracción, commit) se ve en vivo en un panel persistente.
 
 ### Biblioteca
-- **RF-20** Inicio: carrusel de consolas con logo de IGDB (o el nombre en texto si no hay logo), año de lanzamiento y número de juegos. El logo es el del **modelo original** de la consola (la versión lanzada primero), porque el logo general de IGDB suele ser el de la última revisión (p. ej. "Switch OLED Model"). Logo y año se actualizan desde IGDB al arrancar.
+- **RF-20** Inicio: carrusel de consolas con logo de IGDB (o el nombre en texto si no hay logo), año de lanzamiento y número de juegos. El logo es el del **modelo original** de la consola (la versión lanzada primero), porque el logo general de IGDB suele ser el de la última revisión (p. ej. "Switch OLED Model"). Logo y año se actualizan desde IGDB al arrancar. Los logos se muestran **siempre en blanco**: algunos (PS2 azul, PS3 gris) se pierden sobre el fondo carbón.
 - **RF-20a** Búsqueda de juegos en IGDB: solo tipos jugables (juego principal, expansión independiente, remake, remaster, expandido y port; sin bundles, DLC ni packs) y resultados reordenados por coincidencia del nombre (exacto > prefijo > palabra completa). Las imágenes se sirven desde una caché local, de modo que el navegador nunca contacta a terceros.
 - **RF-21** Pantalla de consola: lista de juegos por título y panel de detalle (portada, año, géneros, resumen, carpeta, elementos con tipo y tamaño). Los elementos se ordenan: base, discos por número, updates por fecha y DLC por nombre. Un juego cuyos elementos están todos en la papelera no aparece.
 - **RF-22** Búsqueda global en la biblioteca: cada palabra debe aparecer en el título, sin importar mayúsculas ni acentos ("pokemon" encuentra "Pokémon").
@@ -87,7 +87,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
   - nada que dependa solo de pasar el mouse;
   - swipe en el carrusel;
   - layouts para tablet vertical y horizontal.
-- **RNF-06 Entrada**: mouse, táctil, teclado y gamepad. Los glifos del gamepad aparecen solo con un control detectado por la Gamepad API; si no, se usan botones normales.
+- **RNF-06 Entrada**: mouse, táctil, teclado y gamepad. Los glifos del gamepad aparecen solo con un control detectado por la Gamepad API; si no, se usan botones normales. Las pantallas reaccionan a acciones (confirmar, atrás, navegar…) y no a teclas; la cruceta y las flechas mueven el foco al elemento más cercano en esa dirección. El mapeo completo está en [`design-handoff.md`](./design-handoff.md) §4.
 - **RNF-07 Accesibilidad**: WCAG 2.1 AA (contraste, foco visible, elementos nativos, `aria-label` en botones de solo icono).
 - **RNF-08 Arquitectura**: DDD en back y front, contrato OpenAPI spec-first y reglas compartidas fijadas con vectores dorados (`contracts/`).
 - **RNF-09 Calidad**: lint, tipos estrictos, tests unitarios, de integración y E2E en CI.

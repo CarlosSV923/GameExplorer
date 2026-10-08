@@ -1,0 +1,128 @@
+/*
+ * Design tokens (docs/design-handoff.md §1). Tailwind's default palette and
+ * fonts are cleared so that only these tokens exist as utilities: a raw value
+ * in a component is a review finding.
+ */
+@import 'tailwindcss';
+
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+
+  /* Surfaces */
+  --color-bg: #38383b;
+  --color-surface: #2a2a2d;
+  --color-surface-field: #2c2c2f;
+  --color-surface-card: #343437;
+  --color-surface-input: #232326;
+  --color-surface-raised: #3a3a3e;
+  --color-bar: #0e0e0f;
+  --color-overlay: rgb(18 18 20 / 0.84);
+  --color-hover: rgb(255 255 255 / 0.08);
+  --color-line: #4a4a4f;
+  --color-control: #8a8a8e;
+  --color-transparent: transparent;
+
+  /* Text */
+  --color-ink-1: #ffffff;
+  --color-ink-2: #c9c9ce;
+  --color-ink-3: #a3a3a8;
+
+  /* Accent and status */
+  --color-accent: #f2b544;
+  --color-accent-hover: #ffd27a;
+  --color-on-accent: #1a1a1a;
+  --color-success: #9be29b;
+  --color-danger: #ff8a78;
+  --color-warning-surface: #3f3626;
+  --color-warning-ink: #ffe2a6;
+  --color-danger-surface: #4a2620;
+  --color-danger-ink: #ffd9d2;
+  --color-progress-upload: #ffffff;
+  --color-progress-extract: #8ab4ff;
+
+  /* Item kinds */
+  --color-kind-base: #ffffff;
+  --color-kind-update: #8ab4ff;
+  --color-on-kind-update: #10203d;
+  --color-kind-dlc: #f2b544;
+  --color-kind-disc: #c9c9ce;
+
+  /* Type */
+  --font-sans: 'Quicksand', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --text-display-xl: clamp(40px, 7vw, 76px);
+  --text-display-xl--line-height: 1.02;
+  --text-display: 44px;
+  --text-display--line-height: 1;
+  --text-count: 30px;
+  --text-title: 26px;
+  --text-heading: 22px;
+  --text-body-lg: 17px;
+  --text-body-lg--line-height: 1.5;
+  --text-body: 16px;
+  --text-body--line-height: 1.5;
+  --text-body-sm: 15px;
+  --text-caption: 13px;
+  --text-chip: 12px;
+  --tracking-display: 0.04em;
+  --tracking-label: 0.08em;
+
+  /* Shape and size */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --spacing-control-lg: 56px;
+  --spacing-control-md: 48px;
+  --spacing-control-sm: 44px;
+
+  /* Motion */
+  --ease-carousel: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-ink-1);
+    font-family: var(--font-sans);
+    font-weight: 600;
+    -webkit-font-smoothing: antialiased;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  a {
+    color: var(--color-accent);
+  }
+  a:hover {
+    color: var(--color-accent-hover);
+  }
+
+  /* Visible focus everywhere (WCAG 2.4.7); hidden inputs inside a label
+     show it on the label. */
+  :focus-visible {
+    outline: 3px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  label:has(> input:focus-visible) {
+    outline: 3px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0ms !important;
+      transition-duration: 0ms !important;
+    }
+  }
+}

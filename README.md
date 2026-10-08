@@ -2,7 +2,7 @@
 
 [Español](README.es.md)
 
-> **Status:** early development (phases 0–7 of [`docs/tasks.md`](docs/tasks.md) done: the API uploads, extracts, detects, stores, lists, serves, re-matches and trashes games; the UI comes in phases 8–9). Nothing usable from a browser yet.
+> **Status:** early development (phases 0–8 of [`docs/tasks.md`](docs/tasks.md) done: the API uploads, extracts, detects, stores, lists, serves, re-matches and trashes games, and the UI foundation is in place — tokens, components, ES/EN and touch/keyboard/gamepad input; the screens come in phase 9). Nothing usable from a browser yet.
 
 Self-hosted web app for a home NAS (TrueNAS SCALE) to **upload, extract, classify, rename, browse and download emulation game files** from any browser: desktop, tablet, touch screen or gamepad. The UI is inspired by EmulationStation.
 

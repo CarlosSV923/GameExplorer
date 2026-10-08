@@ -26,7 +26,8 @@ Bounded contexts: `catalog` (also the trash: trashing and restoring must be atom
 - Paths are built server-side from IDs; never trust client paths.
 - The frontend never knows which adapter set is active; `VITE_DATA_SOURCE` is read only in `src/app`.
 - Touch, keyboard and gamepad must all work; gamepad glyphs only when a gamepad is detected.
-- UI copy: Spanish default, English available (i18n keys, no hardcoded strings once i18n lands in phase 8).
+- UI copy: Spanish default, English available. Text comes from i18n keys in `shared/i18n/{es,en}.json` (ESLint `i18next/no-literal-string` fails on text in JSX).
+- UI: build screens from `shared/ui` and the tokens in `shared/ui/tokens.css` (Tailwind's default palette is cleared: no raw colors). Spec: [`docs/design-handoff.md`](docs/design-handoff.md). Screens react to actions from `shared/input` (`useAction`), never to raw keys or gamepad buttons.
 
 ## Commands
 `task check` runs everything CI runs (Go tasks build the `gameexplorer-dev` image first: Go + official 7-Zip with RAR). Also: `task dev:api` (Go API in Docker, password `gameexplorer`), `task dev:web`, `task dev:demo`, `task gen`, `task fmt`, `task tidy`, `task lint`, `task test`, `task build`, `task hash-password`, `task demo-catalog` (needs IGDB credentials in `.env.local`).
