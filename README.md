@@ -2,7 +2,7 @@
 
 [Español](README.es.md)
 
-> **Status:** early development (phases 0–9 of [`docs/tasks.md`](docs/tasks.md) done: the web app works end to end against the API — sign in, browse the console carousel, upload with resumable transfers, review against IGDB, download, re-match, trash and restore, manage consoles; next come the backend-less demo (phase 10) and the TrueNAS release (phase 11)).
+> **Status:** early development (phases 0–9 of [`docs/tasks.md`](docs/tasks.md) done: the web app works end to end against the API — sign in, browse the console carousel, upload with resumable transfers, review against IGDB, download, re-match, trash and restore, manage consoles; next: a scope simplification — Switch, Wii and PSP only, the user names each upload, IGDB optional (phase 10) — then the backend-less demo (phase 11) and the TrueNAS release (phase 12)).
 
 Self-hosted web app for a home NAS (TrueNAS SCALE) to **upload, extract, classify, rename, browse and download emulation game files** from any browser: desktop, tablet, touch screen or gamepad. The UI is inspired by EmulationStation.
 

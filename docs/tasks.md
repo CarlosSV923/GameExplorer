@@ -109,14 +109,53 @@ Depende de: 7, 8 · Cubre: RF-01 a RF-51 (UI)
 - [x] Contrato ampliado: `Console.builtIn` y `detection`, `GameSummary.igdbId` («Ya en tu biblioteca»), `GET /library/check` (última revisión de integridad)
 - [x] Prueba real contra la API y la biblioteca de `.dev`: subir, revisar con IGDB, guardar, duplicado con Reemplazar, restaurar con conflicto (intercambio), vista previa de fusión, integridad; a 1280 y 375 px sin desbordes. Hallazgos corregidos: la navegación tras guardar se perdía cuando el evento SSE llegaba antes que la respuesta, y una lista vieja podía pisar un evento en vivo (ahora gana la versión más reciente de cada trabajo)
 
-## Fase 10 — Modo demo
-Depende de: 9 · Cubre: RF-60 a RF-65
+## Fase 10 — Ajustes de alcance
+Depende de: 9 · Cubre: el ajuste del 2026-10-08 (aviso al inicio de `spec.md`): RF-01 a RF-13a, RF-20, RF-21, RF-24 a RF-27, RF-30, RF-40 a RF-42, RF-52, RF-54, RNF-08, §5 y §6
+- [ ] **Diseño primero**: mockups nuevos en el lienzo y pasada con `design:design-critique` y `design:accessibility-review`, luego actualizar `design-handoff.md`. Pantallas:
+  - formulario de subida (nombre con sugerencias de IGDB y texto libre, consola, elección para varios archivos);
+  - datos por archivo de Switch;
+  - error de validación con sus cuatro salidas;
+  - sección No asignados en el carrusel y su pantalla, con «Asignar»;
+  - edición de juego y de archivo, y mover de consola o a No asignados;
+  - Ajustes › Consolas (extensiones propias, orden, nombre);
+  - Inicio vacío;
+  - portada genérica para nombres sin IGDB.
+- [ ] **Consolas como módulos**: registro único en Go y en TS con Switch, Wii y PSP (§6). Se quitan GameCube, PS1, PS2 y PS3, la creación y el borrado de consolas (RF-40) y la tabla de consolas pasa a guardar solo orden, nombre visible y extensiones propias. Guía [`adding-a-console.md`](./adding-a-console.md) con los pasos para agregar una consola (escrita para que la siga una IA)
+- [ ] **Extensiones**: variables `SWITCH_EXTENSIONS`, `WII_EXTENSIONS`, `PSP_EXTENSIONS` con valores por defecto; extensiones propias desde la web, que solo se quitan si no las usa ningún archivo; coincidencia más larga (`.nkit.iso`) (RF-41)
+- [ ] **Sin detección**: se borran los detectores por cabecera, el lector ISO9660, `contracts/detection-cases.json`, la clasificación cue/bin y de juegos en carpeta, `guessTitle` y las sugerencias de tipo/versión por nombre. Se mantiene el reconocimiento de comprimidos por bytes mágicos
+- [ ] **Nuevo flujo de subida**: formulario antes de subir, con pre-validación de no comprimidos (RF-03); varios archivos con sus tres modos (RF-03a); descompresión tras el formulario; validación por extensión, descartando el resto (RF-07); error con sus cuatro salidas, incluido cambiar de consola sin volver a descomprimir; datos por archivo de Switch (RF-08); duplicados por nombre final (RF-09)
+- [ ] **Nomenclatura nueva** (§5) en Go, TS y `contracts/naming-cases.json`: `[BASE]`, `[UPDATE vX]`, `[DLC nombre]`; Wii/PSP sin etiqueta; extensión doble conservada
+- [ ] **Identidad por nombre**: juego = consola + nombre saneado sin distinguir mayúsculas; enlace opcional a IGDB (RF-11). Se quitan la carpeta con año o id de IGDB (antiguo RF-11a) y el re-emparejar (antiguo RF-24, pantalla `/reemparejar`)
+- [ ] **Edición** (RF-24): renombrar (IGDB o libre) con fusión; mover a otra consola si todas las extensiones valen allí; mover juego o archivo a No asignados; editar tipo, versión o DLC de un archivo de Switch. Todo con journal
+- [ ] **No asignados y escaneo** (RF-26, RF-27): `_unassigned/`; escaneo al arrancar, cada `LIBRARY_SCAN_INTERVAL` y a pedido; mover lo desconocido conservando ruta, solo si no cambió desde el escaneo anterior; borrados por Samba desaparecen; acciones de asignar, descargar, papelera y borrar. Reemplaza al chequeo de integridad y a «Olvidar»
+- [ ] **Carrusel** (RF-20): solo consolas con juegos; No asignados al final si tiene archivos; estado vacío. Se borran las carpetas de juego y de consola que quedan vacías (RF-25)
+- [ ] **IGDB opcional** (RF-54): la app arranca y funciona sin credenciales
+- [ ] **Datos**: se reemplazan las migraciones por un esquema nuevo y se borra `.dev` (no hay nada en producción); `openapi.yaml`, `task gen`, tests de Go y web, `CLAUDE.md` y README EN/ES al día
+- [ ] Prueba real con `~/Downloads/PruebaJuegos` (Switch, Wii, PSP) y con archivos agregados, renombrados y borrados por Samba en `.dev/library`
+
+## Fase 11 — Modo demo
+Depende de: 10 · Cubre: RF-60 a RF-65
 - [ ] Adaptadores `demo/`, catálogo fijo, archivos de ejemplo, descargas simuladas, banner
 - [ ] E2E en modo demo (escritorio y perfiles táctiles) en CI
 - [ ] Proyecto en Vercel (`apps/web`, `VITE_DATA_SOURCE=demo`)
 
-## Fase 11 — Producción y portfolio
-Depende de: 10
+## Fase 12 — Producción y portfolio
+Depende de: 11
 - [ ] Dockerfile multi-stage (web → go con embed → alpine + 7zip) y release en GHCR
-- [ ] `deploy/truenas/compose.yaml` + guía (datasets, PUID/PGID, veto files)
+- [ ] `deploy/truenas/compose.yaml` + guía (datasets, PUID/PGID, veto files para `.gameexplorer`)
 - [ ] README EN/ES con capturas/GIF y diagramas de arquitectura
+
+## Hallazgos de pruebas reales
+Prueba del 2026-10-08 con 17 archivos reales (~37 GB): 7 `.rar` de Switch (base, updates y DLC de juegos que ya estaban en la biblioteca), 1 `.iso` de PS2, 4 `.iso` de PSP y 5 `.7z`/`.zip` de Wii. Todo subió (~50 MB/s por archivo, 2 a la vez), se descomprimió sin errores y la API se mantuvo en ~100 MB de RAM. La detección acertó en Switch, PS2 y Wii, y los duplicados de Switch (base, update y 3 DLC) se marcaron todos. Se guardaron 9 juegos (PS2, Wii y PSP como consola agregada). La descarga por rango (206) y la descarga completa salieron idénticas al original (MD5) y el zip del juego se generó bien. Después se borró todo.
+
+Estos hallazgos llevaron al ajuste de alcance de la Fase 10:
+
+- [x] **PSP sin soporte** → resuelto por la Fase 10: PSP es una de las tres consolas y no hay detección.
+- [x] **Juegos que no están en IGDB** (el mod «GTA - Sindacco Chronicles») → resuelto por la Fase 10: nombre libre (RF-03, RF-11).
+- [x] **NKit se perdía en el nombre** (`.nkit.iso` → `.iso`) → resuelto por la Fase 10: extensión por coincidencia más larga (§5).
+- [x] **Título sugerido para IGDB (`guessTitle`) con versiones y guiones** → obsoleto: ya no se sugiere el nombre desde el archivo.
+- [x] **Búsqueda IGDB sin consola** («Ookami» no encontraba «Ōkami») → obsoleto: las sugerencias siempre se filtran por la consola elegida.
+- [x] **Update de Switch sin Title ID** y **nombre de DLC no sugerido** → obsoletos: el usuario indica tipo, versión y DLC (RF-08).
+- [ ] **Carpetas vacías** al quedar sin juegos una consola → incluido en la Fase 10 (RF-25).
+- [ ] **Carrusel en pantallas medianas.** A ~800 px de ancho, los nombres laterales casi se tocan, y los logos muy anchos (PSP) se ven pequeños porque se ajustan por alto. *(Fase 10, en el diseño del carrusel)*
+- [ ] **Descarga con nombre no ASCII.** `Ōkami.zip` solo manda `filename*=utf-8''…`; agregar también `filename="Okami.zip"` como respaldo para clientes antiguos. *(Fase 12)*

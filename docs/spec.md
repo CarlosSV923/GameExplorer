@@ -2,89 +2,118 @@
 
 > Fuente de verdad de los requisitos. Si una decisión no está aquí, se consulta y se documenta antes de implementarla.
 > Estado de trabajo: [`tasks.md`](./tasks.md). Mockups: https://claude.ai/artifact/CNf4mdh7jjnMfnjeNFXe56
+>
+> **Ajuste de alcance (2026-10-08, Fase 10).** Tras probar con archivos reales se simplificó el sistema: tres consolas definidas en código (Switch, Wii, PSP), sin detección automática de consola ni de nombre (el usuario lo indica), IGDB opcional (solo sugiere nombres y aporta portadas), sección **No asignados** y escaneo de lo que llega por Samba. Hasta terminar la Fase 10, el código implementa todavía el alcance anterior (fases 1–9).
 
 ## 1. Problema y objetivo
 
-Los juegos de emulación (Switch, Wii, GameCube, PS1, PS2, PS3) se guardan en un TrueNAS SCALE compartido por SMB. Agregar uno exige descargar, descomprimir, comprobar si ya existía, conectarse por SMB, crear carpetas y renombrar; además se olvida qué hay guardado.
+Los juegos de emulación se guardan en un TrueNAS SCALE compartido por SMB. Agregar uno exige descargar, descomprimir, conectarse por SMB, crear carpetas y renombrar; además se olvida qué hay guardado.
 
-GameExplorer es una app web autoalojada, con estética EmulationStation, que desde cualquier navegador (escritorio, tablet, táctil o gamepad) permite subir, descomprimir, clasificar, renombrar, explorar y descargar esos juegos. Es también un proyecto público de portfolio con una demo sin backend.
+GameExplorer es una app web autoalojada, con estética EmulationStation, que desde cualquier navegador (escritorio, tablet, táctil o gamepad) permite **subir, descomprimir, renombrar y organizar** juegos en carpetas por consola y nombre, y luego explorarlos, editarlos y descargarlos. El usuario decide la consola y el nombre; la app no los adivina. Es también un proyecto público de portfolio con una demo sin backend.
 
 ## 2. Glosario
 
 | Término | Significado |
 |---|---|
-| Consola | Plataforma con carpeta propia en la biblioteca (`switch/`, `ps2/`…) |
-| Juego | Un título de IGDB dentro de una consola: `[slug]/[Juego]/` |
-| Elemento (item) | Unidad lógica dentro de un juego: Base, Update, DLC o Disco N |
-| Parte | Archivo físico de un elemento (un disco `.cue` + sus `.bin` = 1 elemento, varias partes) |
-| Juego en carpeta | Formato que es un directorio (PS3 JB `PS3_GAME/`); se trata como una unidad y no se renombra por dentro |
-| Staging | Zona temporal donde se extrae y revisa una subida |
+| Consola | Plataforma con carpeta propia en la biblioteca (`switch/`, `wii/`, `psp/`). Se define en código con sus reglas (§6); no se crea desde la app |
+| Juego | Un nombre dentro de una consola: `[slug]/[Juego]/`. Puede estar enlazado a IGDB (portada, año, géneros) o tener un nombre libre |
+| Archivo | Un archivo de juego dentro de la carpeta del juego. En Switch tiene tipo (Base, Update o DLC); en Wii y PSP es el único archivo del juego |
+| No asignados | Carpeta `_unassigned/` en la raíz del dataset con archivos que no pertenecen a ningún juego (llegados por Samba, o fallos de validación que el usuario decidió guardar) |
+| Staging | Zona temporal donde se sube y descomprime una subida |
 
 ## 3. Requisitos funcionales
 
-### Subida e ingesta
-- **RF-01** Subir uno o varios archivos arrastrándolos a cualquier parte de la ventana o con los botones "Subir juegos" (Inicio) y "Agregar juegos" (pantalla de una consola), que abren el selector de archivos nativo. Con gamepad, ambos botones se activan con RT.
+### Subida
+- **RF-01** Subir uno o varios archivos arrastrándolos a cualquier parte de la ventana o con los botones "Subir juegos" (Inicio) y "Agregar juegos" (pantalla de una consola), que abren el selector de archivos nativo. Con gamepad, ambos botones se activan con RT. Las carpetas no se pueden soltar: hay que comprimirlas.
 - **RF-02** Las subidas son reanudables (protocolo tus) y no tienen límite práctico de tamaño.
-- **RF-03** Si el archivo es un comprimido (zip, 7z, rar/rar5), se detecta por bytes mágicos y se extrae automáticamente. El comprimido original se borra tras una extracción exitosa. Un archivo que no es comprimido pasa directo a revisión. - **RF-03a** Comprimidos multiparte (`.part1.rar`, `.7z.001`…): cada parte es una subida propia; las partes del mismo conjunto se reúnen por nombre (esperando "partes") y, cuando el conjunto está completo, se extrae como un solo trabajo desde el primer volumen; el resto queda unido a él. Las partes que no completan su conjunto en 24 h se purgan. El formato antiguo `.r00/.r01` no se admite (mensaje claro).
-- **RF-04** Si el comprimido está cifrado, el formulario pide la contraseña. La contraseña no se guarda.
-- **RF-05** Antes de extraer se comprueba el espacio libre. Ningún archivo extraído puede salir del directorio de staging (zip-slip) y los symlinks se rechazan.
-- **RF-05a** Tras extraer, **cada archivo se verifica contra el índice del comprimido (tamaño + CRC32)**. Los errores de 7zz que son *solo de atributos* (*Cannot set file attribute*, porque los datasets con ACL prohíben `chmod`) se registran como advertencia si la verificación pasa; cualquier otro error falla la extracción. *(Hallazgo de la Fase 0.5.)*
-- **RF-06** Lo extraído se clasifica en elementos: se agrupa `.cue` con sus `.bin`, se reconocen juegos en carpeta, **se aplanan las carpetas envolventes** (p. ej. `Juego NSP BASE GAME/archivo.nsp`) y se ignoran archivos basura (`.txt`, `.nfo`, `.url`, `.sfv`, lista configurable). La revisión muestra qué se ignoró.
-- **RF-07** Detección de consola por cabecera y extensión (reglas en §6). El resultado es una lista de candidatas con nivel de confianza.
-- **RF-08** **Consola preseleccionada**: si la subida se inicia desde la pantalla de una consola, esa consola viene preseleccionada. Si la detección indica otra consola sin ambigüedad, aparece el aviso "Usar <consola detectada>" y la consola no se cambia sola. Desde Inicio se preselecciona la detectada; si es ambigua, el campo queda vacío y es obligatorio.
-- **RF-09** Formulario de revisión:
-  - búsqueda en IGDB filtrada por la plataforma elegida, con portada y año;
-  - por cada elemento: tipo (Base/Update/DLC/Disco), versión, nombre del DLC o número de disco;
-  - vista previa de la ruta final.
-- **RF-10** Duplicados (IGDB id + consola + tipo): al elegir un juego que ya existe se muestran sus elementos actuales. Una Base, un Disco N o un Update con la misma versión ya existentes cuentan como duplicado, con las opciones **Reemplazar** (el anterior va a la papelera) u **Omitir**. También es duplicado cualquier elemento que tendría el mismo nombre de archivo (p. ej. un DLC con el mismo nombre). La versión se compara sin mayúsculas, espacios ni "v" inicial. Los elementos en la papelera no cuentan.
-- **RF-11** Al confirmar, la app crea o reutiliza el juego, mueve los archivos a `[slug]/[Juego]/[archivo]` con los nombres de §5, reescribe las referencias `FILE` de los `.cue` y limpia el staging. La operación se puede revertir si falla a mitad: los movimientos se anotan antes en un journal y, si algo falla (o la app se reinicia a mitad), se deshacen y la subida vuelve a revisión. Nunca se sobrescribe un archivo que ya esté en la carpeta del juego. Antes de confirmar, la revisión puede pedir una vista previa con los nombres finales y los duplicados.
-- **RF-11a** Carpeta del juego: el título saneado. Si otro juego de la misma consola ya la usa (o existe una carpeta con ese nombre creada por SMB), se agrega el año: `Resident Evil (2002)`; si también está ocupado, el id de IGDB: `Resident Evil (2002) [1234]`. Un juego que ya está en la biblioteca conserva su carpeta y su título.
+- **RF-03** **Formulario antes de subir.** Al elegir archivos se abre un formulario; la subida no empieza hasta enviarlo. Pide:
+  - **Nombre del juego** (obligatorio): mientras se escribe, sugiere juegos de IGDB de la plataforma de la consola elegida. Elegir una sugerencia es opcional: se puede guardar cualquier nombre (mods, traducciones, homebrew). Sin credenciales de IGDB, el campo no sugiere nada.
+  - **Consola** (obligatoria): viene elegida según la pantalla. En el carrusel, la del centro; en la pantalla de una consola, esa consola; en Subidas, Ajustes o No asignados, ninguna. Siempre se puede cambiar. La lista muestra todas las consolas, incluso las que no tienen juegos.
+  - Si un archivo **no es comprimido** y su extensión no vale para la consola elegida, el formulario lo avisa y no deja continuar (evita subir varios GB para nada). Los comprimidos se validan al descomprimir (RF-07).
+- **RF-03a** **Varios archivos a la vez.** El formulario pregunta primero cómo tratarlos:
+  - **Partes de un mismo comprimido** (`.part1.rar`, `.7z.001`…): un nombre y una consola para todos; cuando todas las partes están subidas, se descomprime desde el primer volumen. Si no forman un conjunto o falta alguna parte, la subida falla con un error claro. El formato antiguo `.r00/.r01` no se admite.
+  - **Archivos del mismo juego** (p. ej. una base y un update `.nsp` sueltos): un nombre y una consola para todos; cada archivo se procesa por separado.
+  - **Juegos distintos**: un formulario por archivo.
+  Si el usuario trata como juegos distintos las partes de un comprimido, su descompresión falla y se muestra el error.
+- **RF-04** Si el comprimido está cifrado, se pide la contraseña. La contraseña no se guarda.
+- **RF-05** Antes de descomprimir se comprueba el espacio libre. Ningún archivo extraído puede salir del directorio de staging (zip-slip) y los symlinks se rechazan.
+- **RF-05a** Tras descomprimir, **cada archivo se verifica contra el índice del comprimido (tamaño + CRC32)**. Los errores de 7zz que son *solo de atributos* (*Cannot set file attribute*, porque los datasets con ACL prohíben `chmod`) se registran como advertencia si la verificación pasa; cualquier otro error falla la extracción. *(Hallazgo de la Fase 0.5.)*
+- **RF-06** Un comprimido (zip, 7z, rar/rar5, reconocido por bytes mágicos) se descomprime **después** de enviar el formulario y terminar la subida. El comprimido original se borra tras una extracción exitosa. Un archivo que no es comprimido no se descomprime. La app no intenta adivinar la consola ni el nombre.
+- **RF-07** **Validación por extensión.** Al terminar la descompresión (o la subida, si no era comprimido) se buscan, en cualquier subcarpeta, los archivos cuya extensión vale para la consola elegida. Todo lo demás (`.txt`, `.nfo`, imágenes, carpetas de instrucciones) **se descarta**.
+  - **Wii y PSP**: debe haber **exactamente un** archivo válido; con más de uno, es un error de validación.
+  - **Switch**: puede haber uno o varios (p. ej. un comprimido con base, update y DLC).
+  - **Sin archivos válidos** (o más de uno en Wii/PSP): se muestra un error con estas opciones:
+    - **Cambiar de consola**: si los archivos valen para la nueva consola, se reubican sin volver a descomprimir ni renombrar.
+    - **Mandar a No asignados**: los archivos descomprimidos van a `_unassigned/`.
+    - **Mandar a la papelera**: restaurable a No asignados.
+    - **Borrar definitivamente**.
+- **RF-08** **Datos por archivo (Switch).** Tras la validación, para cada archivo válido se pide su **tipo**: Juego base, Update o DLC. El Update exige la **versión** y el DLC exige el **nombre del DLC**. Wii y PSP no piden nada más.
+- **RF-09** **Duplicados.** Si en la carpeta del juego ya existe un archivo con el mismo nombre final (§5), se avisa y se elige **Reemplazar** (el anterior va a la papelera) u **Omitir**. Los archivos en la papelera no cuentan.
+- **RF-10** Al confirmar, la app crea o reutiliza la carpeta del juego, mueve los archivos a `[slug]/[Juego]/[archivo]` con los nombres de §5 y limpia el staging. La operación se puede revertir si falla a mitad: los movimientos se anotan antes en un journal y, si algo falla (o la app se reinicia a mitad), se deshacen y la subida vuelve al paso anterior. Nunca se sobrescribe un archivo existente sin la decisión de RF-09. Antes de confirmar se ve una vista previa con los nombres finales y los duplicados.
+- **RF-11** **Identidad del juego.** Un juego se identifica por su consola y su nombre saneado, sin distinguir mayúsculas (los shares SMB no las distinguen). Guardar con un nombre que ya existe agrega los archivos a ese juego. Si el nombre se eligió de IGDB, el juego queda enlazado a ese id (portada, año, géneros); con un nombre libre se muestra una portada genérica con el título.
 - **RF-12** Las subidas abandonadas y el staging huérfano se purgan tras 24 h.
-- **RF-13** El progreso (subida, extracción, commit) se ve en vivo en un panel persistente: la pantalla **Subidas** (`/subidas`: zona de soltar + panel) y un indicador «Subidas · N» en la cabecera de todas las pantallas mientras haya subidas en curso o esperando al usuario. Al arrastrar archivos sobre cualquier pantalla aparece la misma zona de soltar con el panel. El panel muestra las subidas activas y las terminadas o fallidas de las últimas 24 h; estas se pueden quitar de la lista (se recuerda en el navegador).
-- **RF-13a** Se suben **2 archivos a la vez**; el resto espera en cola. Si se corta la conexión, la subida se reintenta sola; agotados los reintentos, hay un botón Reintentar. Si se recarga o se cierra la pestaña, la subida queda **Interrumpida** con lo recibido, y se continúa eligiendo de nuevo el mismo archivo (mismo nombre y tamaño). Mientras haya subidas en curso, el navegador pide confirmar antes de cerrar la pestaña. Las carpetas no se pueden soltar: hay que comprimirlas.
+- **RF-13** El progreso (subida, descompresión, guardado) se ve en vivo en un panel persistente: la pantalla **Subidas** (`/subidas`: zona de soltar + panel) y un indicador «Subidas · N» en la cabecera de todas las pantallas mientras haya subidas en curso o esperando al usuario. Al arrastrar archivos sobre cualquier pantalla aparece la misma zona de soltar con el panel. El panel muestra las subidas activas y las terminadas o fallidas de las últimas 24 h; estas se pueden quitar de la lista (se recuerda en el navegador).
+- **RF-13a** Se suben **2 archivos a la vez**; el resto espera en cola. Si se corta la conexión, la subida se reintenta sola; agotados los reintentos, hay un botón Reintentar. Si se recarga o se cierra la pestaña, la subida queda **Interrumpida** con lo recibido, y se continúa eligiendo de nuevo el mismo archivo (mismo nombre y tamaño). Mientras haya subidas en curso, el navegador pide confirmar antes de cerrar la pestaña.
 
 ### Biblioteca
-- **RF-20** Inicio: carrusel de consolas con logo de IGDB (o el nombre en texto si no hay logo), año de lanzamiento y número de juegos. El logo es el del **modelo original** de la consola (la versión lanzada primero), porque el logo general de IGDB suele ser el de la última revisión (p. ej. "Switch OLED Model"). Logo y año se actualizan desde IGDB al arrancar. Los logos se muestran **siempre en blanco**: algunos (PS2 azul, PS3 gris) se pierden sobre el fondo carbón.
-- **RF-20a** Búsqueda de juegos en IGDB: solo tipos jugables (juego principal, expansión independiente, remake, remaster, expandido y port; sin bundles, DLC ni packs) y resultados reordenados por coincidencia del nombre (exacto > prefijo > palabra completa). Las imágenes se sirven desde una caché local, de modo que el navegador nunca contacta a terceros.
-- **RF-21** Pantalla de consola: lista de juegos por título y panel de detalle (portada, año, géneros, resumen, carpeta, elementos con tipo y tamaño). Los elementos se ordenan: base, discos por número, updates por fecha y DLC por nombre. Un juego cuyos elementos están todos en la papelera no aparece.
+- **RF-20** Inicio: carrusel con las consolas **que tienen juegos**, en el orden de Ajustes, con logo de IGDB (o el nombre en texto si no hay logo o no hay IGDB), año de lanzamiento y número de juegos. Al final aparece **No asignados** si tiene archivos. Si no hay nada en ninguna parte, Inicio muestra un estado vacío con "Subir juegos". El logo es el del **modelo original** de la consola y se muestra **siempre en blanco**.
+- **RF-20a** Sugerencias de IGDB: solo tipos jugables (juego principal, expansión independiente, remake, remaster, expandido y port; sin bundles, DLC ni packs), filtradas por la plataforma de la consola y ordenadas por coincidencia del nombre (exacto > prefijo > palabra completa). Las imágenes se sirven desde una caché local, de modo que el navegador nunca contacta a terceros.
+- **RF-21** Pantalla de consola: lista de juegos por título y panel de detalle (portada, año, géneros y resumen si está enlazado a IGDB; carpeta; archivos con tipo y tamaño). En Switch los archivos se ordenan: base, updates por versión y DLC por nombre. Un juego cuyos archivos están todos en la papelera no aparece.
 - **RF-22** Búsqueda global en la biblioteca: cada palabra debe aparecer en el título, sin importar mayúsculas ni acentos ("pokemon" encuentra "Pokémon"). Desde Inicio, Enter lleva a la pantalla de resultados (`/buscar`), agrupados por consola y con el mismo detalle que la pantalla de una consola. En la pantalla de una consola el campo filtra su lista.
-- **RF-23** Descargar un elemento (reanudable con HTTP Range) o el juego completo como zip sin compresión. Los juegos en carpeta y los discos (`.cue` + pistas) se descargan siempre como zip. Dentro del zip los archivos van en `<carpeta del juego>/`. El zip se arma mientras se envía, pero anuncia su tamaño exacto (el navegador muestra el progreso). No se puede reanudar. Si falta un archivo en disco (borrado por SMB), la descarga falla antes de empezar con un mensaje claro.
-- **RF-24** Re-emparejar un juego con otro resultado de IGDB, lo que renombra la carpeta y todos los archivos (reversible si falla). Los archivos que se agregaron a la carpeta por SMB viajan con ella. Se puede pedir una vista previa. Si el nuevo juego de IGDB ya está en la biblioteca (misma consola), los juegos se **fusionan**: los elementos pasan al existente con sus nombres; para cada duplicado se elige **Reemplazar** (el del juego existente va a la papelera) u **Omitir** (va a la papelera el del juego re-emparejado). La papelera del juego fusionado pasa al existente.
-- **RF-25** Enviar un elemento o un juego a la papelera. Un juego completo es **una sola entrada** (se restaura o borra junta). La carpeta del juego se borra cuando queda vacía.
-- **RF-26** Chequeo de integridad al arrancar y cada hora (y a pedido): marca como *faltante* el elemento con algún archivo borrado por fuera de la app (por SMB) y lo desmarca solo si el archivo vuelve. Un elemento faltante se puede **Olvidar** (se quita de la biblioteca; no hay archivos que borrar).
+- **RF-23** Descargar un archivo (reanudable con HTTP Range) o el juego completo como zip sin compresión. Dentro del zip los archivos van en `<carpeta del juego>/`. El zip se arma mientras se envía, pero anuncia su tamaño exacto (el navegador muestra el progreso). No se puede reanudar. Si falta un archivo en disco, la descarga falla antes de empezar con un mensaje claro.
+- **RF-24** **Editar un juego** desde su detalle (todo reversible si falla a mitad):
+  - **Renombrar**: con una sugerencia de IGDB (lo enlaza) o un nombre libre (lo desenlaza). Cambia la carpeta y el nombre de todos sus archivos. Si ya existe otro juego con ese nombre en la consola, se fusionan aplicando RF-09 a cada choque.
+  - **Mover a otra consola**: solo si **todos** sus archivos tienen extensiones válidas en la consola destino (p. ej. `.iso` entre Wii y PSP). Si allí existe un juego con el mismo nombre, se fusionan aplicando RF-09.
+  - **Mover a No asignados**: el juego completo o un archivo suelto.
+  - **Editar un archivo (Switch)**: cambiar su tipo, versión o nombre del DLC; el archivo se renombra (con RF-09 si choca).
+- **RF-25** Enviar un archivo o un juego a la papelera. Un juego completo es **una sola entrada** (se restaura o borra junta). La carpeta del juego se borra cuando queda vacía, y la de la consola también.
+
+### No asignados y Samba
+- **RF-26** **Escaneo de la biblioteca** al arrancar, cada `LIBRARY_SCAN_INTERVAL` (15 min por defecto) y a pedido («Revisar ahora» en Ajustes › General, con la hora de la última revisión). Reemplaza al chequeo de integridad anterior.
+  - Un archivo **borrado** por Samba desaparece de la biblioteca; si era el último de su juego, el juego también. No hay aviso ni estado "faltante".
+  - Todo archivo que la app no conoce y que está **dentro de una carpeta de consola** o **en la raíz del dataset** (incluidas carpetas que no son de ninguna consola, p. ej. `n64/`) se **mueve a `_unassigned/` conservando su ruta**: `wii/Zelda/Zelda.iso` → `_unassigned/wii/Zelda/Zelda.iso`. Si el destino existe, se agrega un sufijo. Se ignoran `.gameexplorer/` y `_unassigned/`.
+  - Un archivo solo se mueve si no cambió (tamaño y fecha) desde el escaneo anterior, para no tocar una copia por Samba a medias.
+  - Renombrar por Samba un archivo de la app equivale a borrarlo y agregar uno desconocido.
+- **RF-27** **Sección No asignados** (`_unassigned/`): lista los archivos (no las carpetas) con su ruta de origen. No se puede subir directamente a ella. Por archivo se puede:
+  - **Asignar** a una consola con el mismo formulario de subida (nombre, consola y, tras la validación, los datos de Switch). Si es comprimido, se descomprime; aplican RF-07 a RF-10.
+  - **Descargar**.
+  - **Mandar a la papelera**.
+  - **Borrar definitivamente**.
 
 ### Papelera
-- **RF-30** Los elementos eliminados se mueven a `.gameexplorer/trash` con su metadata, se pueden restaurar y se purgan tras `TRASH_RETENTION_DAYS` (30 por defecto). También se puede borrar para siempre una entrada o **vaciar la papelera** (con confirmación en la interfaz). Al restaurar, los archivos toman los nombres del título actual del juego. Si su lugar está ocupado (se guardó un duplicado después), se pregunta: **Reemplazar** (lo actual va a la papelera, es un intercambio) o **Cancelar**.
+- **RF-30** Los archivos y juegos eliminados se mueven a `.gameexplorer/trash` con su metadata, se pueden restaurar y se purgan tras `TRASH_RETENTION_DAYS` (30 por defecto). También se puede borrar para siempre una entrada o **vaciar la papelera** (con confirmación en la interfaz). Se restauran a su lugar de origen (juego, o No asignados para lo que vino de allí o de una subida fallida). Si su lugar está ocupado, se pregunta: **Reemplazar** (lo actual va a la papelera, es un intercambio) o **Cancelar**.
 
 ### Consolas
-- **RF-40** Vienen precargadas las 6 consolas: Nintendo Switch (`switch`), Wii (`wii`), Nintendo GameCube (`gc`), PlayStation (`psx`), PlayStation 2 (`ps2`) y PlayStation 3 (`ps3`).
-- **RF-41** Se pueden agregar consolas buscando la plataforma en IGDB y definiendo slug, nombre visible y extensiones; también se pueden reordenar. Las consolas agregadas se detectan solo por extensión. El nombre y las extensiones de cualquier consola se pueden editar. El slug (la carpeta) solo cambia si la consola no tiene juegos. Solo se pueden borrar consolas agregadas por el usuario y sin juegos (tampoco en la papelera); las 6 de fábrica no se borran.
+- **RF-40** Hay tres consolas, definidas en código con sus reglas: Nintendo Switch (`switch`), Wii (`wii`) y PlayStation Portable (`psp`) (§6). No se pueden crear ni borrar desde la app; agregar una consola es un cambio de código, documentado paso a paso en [`adding-a-console.md`](./adding-a-console.md).
+- **RF-41** Extensiones por consola: las de fábrica vienen de una variable de entorno por consola (`SWITCH_EXTENSIONS`, `WII_EXTENSIONS`, `PSP_EXTENSIONS`, separadas por comas); si no se define, se usan los valores de §6. Desde Ajustes › Consolas se pueden **agregar** extensiones propias y **quitar solo esas**, y solo si ningún archivo de la biblioteca las usa (se muestra cuántos). Las de la variable no se pueden quitar desde la app. Una extensión puede tener varios puntos (`.nkit.iso`); vale la coincidencia más larga.
+- **RF-42** En Ajustes › Consolas también se puede **reordenar** el carrusel (por defecto Switch, Wii, PSP) y cambiar el **nombre visible**. La carpeta (slug) nunca cambia.
 
 ### Acceso y preferencias
 - **RF-50** Contraseña única, configurada en el entorno como `APP_PASSWORD_HASH` (argon2id, recomendado) o `APP_PASSWORD` (texto plano, se hashea en memoria al arrancar). Todas las operaciones requieren sesión salvo las marcadas como públicas (salud, login, logout). La sesión se recuerda por dispositivo con una cookie httpOnly, firmada y `SameSite=Strict`. El login tiene rate-limit.
 - **RF-51** Interfaz en español (por defecto) e inglés. La elección se recuerda en el navegador.
-- **RF-52** El botón **Menú** (Start en el control) abre **Ajustes**, con tres secciones: **Consolas** (orden, edición, agregar, borrar), **Papelera** y **General** (idioma, integridad con su última revisión y «Revisar ahora», cerrar sesión y atribución a IGDB).
+- **RF-52** El botón **Menú** (Start en el control) abre **Ajustes**, con tres secciones: **Consolas** (extensiones, orden y nombre visible), **Papelera** y **General** (idioma, escaneo de la biblioteca con su última revisión y «Revisar ahora», cerrar sesión y atribución a IGDB).
 - **RF-53** Si la sesión vence mientras se usa la app, se vuelve al login y, al entrar, a la pantalla donde se estaba.
+- **RF-54** **IGDB es opcional.** Sin `IGDB_CLIENT_ID`/`IGDB_CLIENT_SECRET` todo funciona: el nombre no sugiere nada, no hay portadas y los logos de consola son el nombre en texto. La atribución a IGDB solo aparece si está configurado.
 
 ### Modo demo
 - **RF-60** Con `VITE_DATA_SOURCE=demo` el frontend funciona sin backend: adaptadores en memoria y estado solo de la sesión (se reinicia al recargar).
-- **RF-61** Los datos de IGDB vienen de un catálogo fijo versionado, generado con un comando de Go y credenciales de desarrollo.
-- **RF-62** La subida, la extracción, la contraseña, la revisión y el commit se simulan con la misma máquina de estados que el backend.
-- **RF-63** Acepta archivos propios: solo lee nombre, tamaño y los primeros KB para la detección por cabecera. El archivo nunca sale del navegador.
+- **RF-61** Las sugerencias de IGDB vienen de un catálogo fijo versionado, generado con un comando de Go y credenciales de desarrollo.
+- **RF-62** La subida, la descompresión, la contraseña, la validación, los datos de Switch y el guardado se simulan con la misma máquina de estados que el backend.
+- **RF-63** Acepta archivos propios: solo usa su nombre y tamaño. El archivo nunca sale del navegador. El contenido de un comprimido propio se simula como un único archivo válido para la consola elegida.
 - **RF-64** Botón "Probar con archivos de ejemplo" que carga:
-  - un `.rar` de Switch con base duplicada, update y DLC;
-  - un `.7z` multidisco de PS1;
-  - un `.rar` con contraseña (con la contraseña como pista).
+  - un `.rar` de Switch con base, update y DLC (pide los tipos tras descomprimir; la base sale duplicada);
+  - un `.7z` de Wii con contraseña (con la contraseña como pista);
+  - un `.zip` para PSP sin archivos válidos (muestra el error con cambiar de consola / No asignados).
 - **RF-65** Las descargas generan un `.txt` explicativo. La demo no tiene login y muestra un banner fijo de modo demo.
 
 ## 4. Requisitos no funcionales
 
-- **RNF-01a Memoria medida** (Fase 3): proceso de la API en ~40 MB al arrancar y ~60 MB tras logins y subidas de 1,5–6,9 GB; la subida no añade memoria. argon2id usa los parámetros mínimos de OWASP (19 MiB, t=2, p=1), porque con 64 MiB cada login dejaba ~65 MB de heap residente.
+- **RNF-01a Memoria medida** (Fase 3): proceso de la API en ~40 MB al arrancar y ~60 MB tras logins y subidas de 1,5–6,9 GB; la subida no añade memoria. argon2id usa los parámetros mínimos de OWASP (19 MiB, t=2, p=1), porque con 64 MiB cada login dejaba ~65 MB de heap residente. Prueba real del 2026-10-08: ~100 MB con 17 archivos (~37 GB), 2 subidas y una extracción a la vez.
 - **RNF-01 Archivos grandes**: los bytes de los juegos nunca se cargan en memoria. Se usan streams y `rename`, la extracción la hace `7zz` en un proceso hijo, y las descargas usan `http.ServeContent` o un zip *store* en streaming. Objetivo: saturar la red con RAM estable < 300 MB.
 - **RNF-02 Seguridad**: las rutas se construyen siempre en el servidor a partir de IDs y nunca se aceptan rutas del cliente. Protección contra zip-slip, nombres saneados y ningún secreto versionado.
 - **RNF-03 Permisos**: la app corre con `PUID/PGID`, y ese usuario necesita una entrada ACL propia en el dataset (*Modify*, *Inherit*), porque un contenedor no hereda grupos suplementarios. Los permisos de lo escrito vienen de la ACL heredada (en datasets con ACL el umask y `chmod` no aplican). Si la app no puede escribir al arrancar, lo muestra en la UI en lugar de reiniciarse en bucle.
 - **RNF-03a Extracción**: se usa el **binario oficial de 7-Zip** (versión fijada y SHA-256 verificado), porque los paquetes de las distribuciones vienen sin el códec RAR.
-- **RNF-04 Atomicidad**: staging y papelera viven en el mismo dataset que la biblioteca, así que mover es `rename`. Si hay `EXDEV`, se copia y luego se borra.
+- **RNF-04 Atomicidad**: staging, papelera y `_unassigned/` viven en el mismo dataset que la biblioteca, así que mover es `rename`. Si hay `EXDEV`, se copia y luego se borra.
 - **RNF-05 Táctil**:
   - objetivos de 44 px como mínimo;
   - nada que dependa solo de pasar el mouse;
@@ -92,45 +121,41 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
   - layouts para tablet vertical y horizontal.
 - **RNF-06 Entrada**: mouse, táctil, teclado y gamepad. Los glifos del gamepad aparecen solo con un control detectado por la Gamepad API; si no, se usan botones normales. Las pantallas reaccionan a acciones (confirmar, atrás, navegar…) y no a teclas; la cruceta y las flechas mueven el foco al elemento más cercano en esa dirección. El mapeo completo está en [`design-handoff.md`](./design-handoff.md) §4.
 - **RNF-07 Accesibilidad**: WCAG 2.1 AA (contraste, foco visible, elementos nativos, `aria-label` en botones de solo icono).
-- **RNF-08 Arquitectura**: DDD en back y front, contrato OpenAPI spec-first y reglas compartidas fijadas con vectores dorados (`contracts/`).
+- **RNF-08 Arquitectura**: DDD en back y front, contrato OpenAPI spec-first y reglas compartidas fijadas con vectores dorados (`contracts/`). **Cada consola es un módulo** con sus reglas (extensiones por defecto, datos por archivo, nombres, validación) registrado en un único lugar en Go y en TS; agregar una consola no debe tocar el resto del sistema (guía en [`adding-a-console.md`](./adding-a-console.md)).
 - **RNF-09 Calidad**: lint, tipos estrictos, tests unitarios, de integración y E2E en CI.
-- **RNF-10 Legal**: la app no distribuye ROMs, muestra atribución a IGDB y se publica con licencia MIT.
+- **RNF-10 Legal**: la app no distribuye ROMs, muestra atribución a IGDB cuando lo usa y se publica con licencia MIT.
 
 ## 5. Nomenclatura (vectores: `contracts/naming-cases.json`)
 
-| Tipo | Archivo |
-|---|---|
-| Base | `Juego.ext` |
-| Update | `Juego [Update <versión>].ext` |
-| DLC | `Juego [DLC] <nombre>.ext` |
-| Disco | `Juego (Disc N).ext` |
+| Consola | Tipo | Archivo |
+|---|---|---|
+| Switch | Juego base | `Juego [BASE].ext` |
+| Switch | Update | `Juego [UPDATE v<versión>].ext` |
+| Switch | DLC | `Juego [DLC <nombre>].ext` |
+| Wii, PSP | — | `Juego.ext` |
 
-Pistas de un `.cue` (estilo Redump): con una sola pista, el `.bin` toma el nombre del disco (`Juego (Disc 1).bin`); con varias, `Juego (Disc 1) (Track 1).bin`…, con dos dígitos a partir de 10 pistas. Cada pista conserva su extensión. Los juegos en carpeta (PS3) se nombran como el elemento, sin extensión.
+Ejemplos: `Limbo [BASE].xci`, `Limbo [UPDATE v122345].nsp`, `Limbo [DLC Fuga Maestra].nsp`, `Ōkami.nkit.iso`.
 
-Saneamiento del título (carpeta y archivos), en este orden:
+- **Versión del Update**: el usuario escribe solo dígitos y puntos (`1.2.1`, `122345`) y la app antepone `v`. Si escribe `v1.2.1`, la `v` no se duplica.
+- **Extensión**: es la coincidencia más larga entre las de la consola (`.nkit.iso`, no `.iso`) y va en minúsculas.
+
+Saneamiento del nombre del juego (carpeta y archivos) y del nombre del DLC, en este orden:
 1. Unicode NFC.
 2. `:` y `꞉` (U+A789, sustituto habitual de `:` en Windows) → ` -`. Otros símbolos válidos, como `™`, se conservan.
 3. `/` y `\` → espacio.
 4. Se eliminan `? < > " | *` y los caracteres de control.
 5. Los bloques de espacios en blanco se reducen a uno.
 6. Se recortan los espacios y puntos finales y los espacios iniciales.
-7. La extensión va en minúsculas.
 
-La versión del Update y el nombre del DLC se sanean igual y son obligatorios. Un nombre que supera 255 bytes se rechaza.
+Un nombre que supera 255 bytes se rechaza. La carpeta del juego es su nombre saneado.
 
-## 6. Detección (vectores: `contracts/detection-cases.json`)
+## 6. Consolas
 
-| Consola | Extensiones | Confirmación por contenido |
-|---|---|---|
-| Switch | `.nsp .xci .nsz .xcz` | Title ID de 16 hex en el nombre: `…000` Base, `…800` Update, otro DLC. `[vN]` es un código numérico; la versión legible (`[1.0.3]`, `Update 1.0.4`) se extrae si aparece y se sugiere como etiqueta del Update. Puede haber región (`[US]`), espacios entre etiquetas o faltar el Title ID (entonces no se sugiere tipo) |
-| GameCube | `.iso .gcm .ciso .rvz` | Magic `0xC2339F3D` en offset `0x1C` |
-| Wii | `.iso .wbfs .rvz` | Magic `0x5D1C9EA3` en offset `0x18` |
-| PS1 | `.cue .bin .chd .pbp` | ISO9660 → `SYSTEM.CNF` con `BOOT=` |
-| PS2 | `.iso .chd .bin .cue` | ISO9660 → `SYSTEM.CNF` con `BOOT2=` |
-| PS3 | carpeta JB, `.iso`, `.pkg` | `PS3_GAME/PARAM.SFO` o `PS3_DISC.SFB` |
-| Agregadas por el usuario | las configuradas | Solo extensión |
-
-`(Disc N)` en el nombre sugiere el tipo Disco con su número.
+| Consola | Slug | Extensiones por defecto | Datos por archivo | Archivos válidos por subida | Plataforma IGDB |
+|---|---|---|---|---|---|
+| Nintendo Switch | `switch` | `.nsp .xci` | Tipo (Base / Update / DLC); versión si es Update; nombre si es DLC | Uno o varios | 130 |
+| Wii | `wii` | `.iso .wbfs .rvz .nkit.iso` | — (sin DLC ni updates por ahora) | Exactamente uno | 5 |
+| PlayStation Portable | `psp` | `.iso .cso` | — (sin DLC ni updates por ahora) | Exactamente uno | 38 |
 
 ## 7. Ambientes
 
@@ -139,10 +164,10 @@ La versión del Update y el nombre del DLC se sanean igual y son obligatorios. U
 | Back | Go (`air` o docker compose) | Contenedor GHCR con la SPA incrustada | — |
 | Front | Vite dev con proxy `/api` | Servido por Go | Estático, `VITE_DATA_SOURCE=demo` |
 | Datos | `./.dev/` | Datasets `/library` y `/data` | Memoria de la sesión |
-| IGDB | Credenciales de desarrollo | Credenciales de producción | Catálogo fijo |
+| IGDB | Credenciales de desarrollo (opcional) | Credenciales de producción (opcional) | Catálogo fijo |
 
 Variables: ver [`.env.example`](../.env.example). Cada push a `main` despliega la demo; los tags `v*` publican la imagen en GHCR.
 
 ## 8. Fuera de alcance del MVP
 
-Importar la biblioteca existente · cambiar el tipo o la etiqueta de un elemento · mover elementos entre juegos o consolas · hash para duplicados exactos · IGDB real en la demo · salvapantallas.
+Detección automática de consola o nombre · DLC y updates en Wii y PSP · juegos de varios discos · crear consolas desde la app · hash para duplicados exactos · IGDB real en la demo · salvapantallas.

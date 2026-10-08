@@ -160,7 +160,7 @@ Una capa única en `shared/input` traduce cada dispositivo a **acciones**. Las p
 | 768–1023 (tablet) | Lista y detalle se apilan: la lista es una pantalla y el detalle otra (`/consolas/:slug/:juegoId`). Revisión en una columna. Panel de subidas debajo de la zona de soltar |
 | < 768 (teléfono) | Carrusel con 1 consola a cada lado y el nombre con `clamp`. Tablas dentro de `TableBox` con desplazamiento horizontal. La barra inferior se reparte en dos líneas. Márgenes de 16 px |
 
-Las tablets en vertical y horizontal se prueban con los perfiles táctiles de Playwright (fase 10).
+Las tablets en vertical y horizontal se prueban con los perfiles táctiles de Playwright (fase 11).
 
 ### Rutas (fase 9)
 | Ruta | Pantalla |
