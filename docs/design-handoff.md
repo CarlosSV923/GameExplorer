@@ -1,4 +1,4 @@
-# Traspaso de diseño (Fase 8)
+# Traspaso de diseño (Fases 8 y 10)
 
 Fuente: lienzo [`/design`](https://claude.ai/artifact/CNf4mdh7jjnMfnjeNFXe56) (9 pantallas, versión 14, ya corregidas según [`design-review.md`](./design-review.md)). Destino: React 19 + Vite + Tailwind v4, componentes en `apps/web/src/shared/ui`.
 
@@ -89,7 +89,7 @@ Familias: **Quicksand** 500/600/700 para la interfaz y **JetBrains Mono** 400/50
 | `LinkButton` | Igual que `Button`, pero renderiza `<a>` | Para navegar (Cancelar, Revisar) |
 | `FileButton` | `multiple`, `accept?`, `onFiles` | `label` + `input[type=file]` superpuesto e invisible; el foco se ve en el `label` |
 | `TextField` / `SearchField` | `label` (visible u oculto), `hint?`, `error?` | El error va en `aria-describedby` y pone `aria-invalid`. La búsqueda lleva el ícono de lupa y la tecla `/` como atajo |
-| `Chip` | `kind: base \| update \| dlc \| disc \| whole \| missing \| neutral` | Texto en mayúsculas desde i18n |
+| `Chip` | `kind: base \| update \| dlc \| game \| whole \| unassigned \| neutral` | Texto en mayúsculas desde i18n. `game` = archivo único de Wii/PSP |
 | `ChoiceChips` | Radios con estilo de chip (tipo de elemento) | `fieldset` + `legend` |
 | `ChoiceList` | Radios con estilo de fila (resultados de IGDB) | Reemplaza `role=option`. Seleccionado: fondo `accent` |
 | `SegmentedToggle` | Botones con `aria-pressed` (ES/EN) | Pista `surface-input` |
@@ -103,7 +103,7 @@ Familias: **Quicksand** 500/600/700 para la interfaz y **JetBrains Mono** 400/50
 | `HelpBar` | `actions: [{button, label}]` y versión sin control | Con gamepad: glifos. Sin gamepad: botones reales o nada (ver §4) |
 | `Glyph` | `A \| B \| X \| Y \| RT \| LB \| RB \| MENU \| DPAD` | Dibujos propios en SVG, sin logos de marcas |
 
-El **carrusel**, la lista con detalle, la revisión y las demás pantallas son componentes de módulo (`modules/<contexto>/ui`, fase 9). Usan estas primitivas.
+El **carrusel**, la lista con detalle, el formulario de subida y las demás pantallas son componentes de módulo (`modules/<contexto>/ui`, fase 9). Usan estas primitivas.
 
 ## 3. Estados e interacción
 
@@ -111,7 +111,7 @@ El **carrusel**, la lista con detalle, la revisión y las demás pantallas son c
 |---|---|---|
 | Botón primario | hover / active | Fondo `accent-hover` / `scale(.98)` |
 | Botón secundario | hover | Fondo `rgb(255 255 255 / .08)` |
-| Cualquier botón | disabled | Opacidad .45, sin hover. Si hay motivo (p. ej. "La consola tiene juegos"), va en `aria-describedby` y como texto visible cerca |
+| Cualquier botón | disabled | Opacidad .45, sin hover. Si hay motivo (p. ej. «Ni Wii ni PSP aceptan .nsp»), el botón usa `aria-disabled="true"` en lugar de `disabled` (sigue enfocable), el motivo va como texto visible cerca y en `aria-describedby`, y el manejador ignora la acción |
 | Cualquier botón | loading | Indicador giratorio a la izquierda y etiqueta "Guardando…"; no se puede pulsar dos veces |
 | Enlace | hover | `accent-hover` |
 | Fila de lista | seleccionada | `aria-current="true"`, fondo `surface-card`, barra `accent` a la izquierda de 4 px |
@@ -157,20 +157,20 @@ Una capa única en `shared/input` traduce cada dispositivo a **acciones**. Las p
 |---|---|
 | ≥ 1280 | Diseño de los mockups (1440) |
 | 1024–1279 | Carrusel con 2 consolas a cada lado en lugar de 3 |
-| 768–1023 (tablet) | Lista y detalle se apilan: la lista es una pantalla y el detalle otra (`/consolas/:slug/:juegoId`). Revisión en una columna. Panel de subidas debajo de la zona de soltar |
+| 768–1023 (tablet) | Lista y detalle se apilan: la lista es una pantalla y el detalle otra (`/consolas/:slug/:juegoId`). Datos de los archivos y error de validación en una columna. Panel de subidas debajo de la zona de soltar |
 | < 768 (teléfono) | Carrusel con 1 consola a cada lado y el nombre con `clamp`. Tablas dentro de `TableBox` con desplazamiento horizontal. La barra inferior se reparte en dos líneas. Márgenes de 16 px |
 
 Las tablets en vertical y horizontal se prueban con los perfiles táctiles de Playwright (fase 11).
 
-### Rutas (fase 9)
+### Rutas (fase 9, ajustadas en la fase 10)
 | Ruta | Pantalla |
 |---|---|
 | `/entrar` | Login (`?redirect=` vuelve a donde se estaba) |
 | `/` | Carrusel (`?consola=` recuerda la consola actual) |
 | `/buscar?q=` | Resultados por consola (`&juego=` elige el detalle) |
 | `/consolas/:slug` y `/consolas/:slug/:juegoId` | Lista y detalle (en < 1024 px, dos páginas) |
-| `/consolas/:slug/:juegoId/reemparejar` | Cambiar juego IGDB |
-| `/subidas` y `/subidas/:id` | Subidas y revisión |
+| `/no-asignados` | Archivos de `_unassigned/` |
+| `/subidas` y `/subidas/:id` | Subidas; en `:id`, los datos de los archivos (Switch) o el error de validación. El formulario de subida es un diálogo sobre la pantalla actual, sin ruta |
 | `/ajustes/consolas`, `/ajustes/papelera`, `/ajustes/general` | Ajustes (LB/RB cambian de sección) |
 
 - **Selección por defecto:** en pantallas anchas la consola muestra el detalle del primer juego; en angostas, solo la lista, sin resaltar nada hasta elegir.
@@ -182,14 +182,16 @@ Las tablets en vertical y horizontal se prueban con los perfiles táctiles de Pl
 - **Inglés:** los textos crecen ~30 %. Los botones nunca tienen ancho fijo y las barras hacen `flex-wrap`.
 - **Tamaños y fechas:** con `Intl` según el idioma (`22,7 GB` en ES, `22.7 GB` en EN; fechas cortas como "6 oct 2026").
 - **Vacíos y errores:** se usan las plantillas de `States.dc.html`:
-  - consola sin juegos;
+  - última consola vaciada (al volver ya no está en el carrusel);
   - búsqueda sin resultados;
   - papelera vacía;
-  - primera vez;
-  - IGDB no configurado o sin respuesta (con Reintentar);
+  - Inicio vacío (en el propio carrusel);
+  - IGDB sin respuesta en el formulario (se sigue con nombre propio; Reintentar);
+  - aviso tras «Revisar ahora»;
   - biblioteca no escribible: banner fijo `danger`, que sale de `/api/health`.
 - **Carga:** esqueletos con la forma del contenido (filas de lista y portada) después de 300 ms; antes no se muestra nada, para evitar parpadeos.
-- **Sin logo de IGDB:** el nombre tipográfico. **Con logo:** siempre en blanco (`filter: brightness(0) invert(1)`), con el nombre como `alt`.
+- **Sin logo de IGDB** (o sin IGDB configurado): el nombre tipográfico. **Con logo:** siempre en blanco (`filter: brightness(0) invert(1)`), con el nombre como `alt`, dentro de una caja de ancho y alto máximos (`object-fit: contain`) para que los logos anchos como el de PSP no queden pequeños.
+- **Sin portada** (nombre propio, sin IGDB): portada genérica en `surface-card` con el ícono de mando, el título y la carpeta.
 - **Mensajes del backend:** el `detail` de los errores viene en español. El front muestra su propio texto traducido para los casos conocidos (por estado HTTP y operación) y usa `detail` solo como respaldo.
 
 ## 7. Idiomas (i18n)
@@ -205,3 +207,29 @@ Las tablets en vertical y horizontal se prueban con los perfiles táctiles de Pl
 - Orden de foco: cabecera → contenido → acciones → barra de ayuda.
 - El panel de subidas es una región `aria-live="polite"`; los errores graves usan `role=alert`.
 - Botones de icono siempre con `aria-label` traducido; los íconos decorativos con `aria-hidden`.
+
+## 9. Fase 10: subir con formulario, editar y No asignados
+
+Mockups: `UploadForm`, `FileDetails`, `ValidationError`, `GameList` (diálogos), `Unassigned`, `Settings` y `Main` en el lienzo. Revisión: [`design-review.md`](./design-review.md) (Fase 10).
+
+### Componentes nuevos
+| Componente | Dónde | Notas |
+|---|---|---|
+| `NameCombobox` | Formulario de subida, Renombrar | Campo + lista de sugerencias de IGDB de la plataforma de la consola elegida. Patrón combobox de ARIA (`aria-activedescendant`, flechas, Enter, Esc). Desde 2 caracteres, con 300 ms de espera; hasta 5 sugerencias con portada y año; la última opción siempre es «Usar «texto» tal cual». **Ninguna sugerencia se elige sola**: Enter sin opción resaltada usa el texto escrito. Al elegir una, aparece «Enlazado a IGDB: nombre»; si después se edita el texto, se desenlaza. Sin IGDB o si falla: sin lista y una nota debajo; el formulario sigue |
+| `ConsolePicker` | Formulario, Cambiar consola, error de validación | Radios en tarjetas (nombre + extensiones). Las opciones que no aceptan los archivos van desactivadas con el motivo |
+| `UploadModePicker` | Formulario con varios archivos | Tres radios: partes de un comprimido, archivos del mismo juego, juegos distintos. Con «juegos distintos» el formulario muestra «Juego 1 de N» y pasa al siguiente al confirmar |
+| `FileTypeChips` | Datos de los archivos, Editar archivo | `ChoiceChips` con Juego base / Update / DLC (colores de `Chip`) |
+| `VersionField` | Update | `TextField` con prefijo «v» decorativo (`aria-hidden`); acepta solo dígitos y puntos; si el usuario escribe «v» se quita |
+| `PathPreview` | Formulario, datos, diálogos | Texto mono en `success` sobre `surface-input`: la ruta o el nombre final. Con datos incompletos: `ink-3` y «…» en el hueco |
+| `ExtensionChip` | Ajustes › Consolas | 44 px de alto. Con candado (de la variable de entorno, sin quitar) o con botón quitar (propia). Si está en uso, quitar es `aria-disabled` y debajo se dice cuántos archivos la usan |
+| `MoreMenu` | Detalle de juego y filas de archivo | `aria-haspopup="menu"`, `role=menu`; contiene «Mover a No asignados» |
+
+### Flujos
+- **Subir:** elegir o soltar archivos → formulario (diálogo sobre la pantalla actual; consola preseleccionada según la pantalla) → subida → descompresión → si los archivos encajan, `FileDetails` (en Switch pide tipo, versión o DLC de cada archivo; en Wii y PSP solo muestra el archivo y su nombre final para confirmar con «Guardar»); si no, `ValidationError`. El panel de subidas lleva a cada paso pendiente («Completar», «Resolver», contraseña).
+- **Error de validación:** primero la salida que conserva el trabajo (cambiar de consola, con las consolas que aceptan los archivos activas), después No asignados, papelera y borrar definitivamente (`ConfirmDialog` con lo que se libera).
+- **Editar:** «Renombrar» y «Cambiar consola» abren diálogos con la vista previa del cambio (carpeta y archivos). Si el destino ya tiene un juego con ese nombre, el diálogo avisa que se fusionarán y los choques se resuelven con Reemplazar u Omitir.
+- **No asignados:** tabla con origen, cómo llegó, tamaño y acciones (Asignar, Descargar, Papelera, Borrar). «Asignar» abre el formulario con el archivo ya elegido; se desactiva si no es comprimido y ninguna consola acepta su extensión.
+- **Ajustes › Consolas:** el nombre visible se guarda al salir del campo o con Enter y muestra «Guardado». Extensión nueva: debe empezar con punto, solo minúsculas, dígitos y puntos (`.nkit.iso`), sin repetir una de la misma consola.
+
+### Gamepad en los formularios
+A elige, B cierra o vuelve, X confirma el formulario («Subir», «Guardar»), la cruceta mueve el foco. Los campos de texto usan el teclado en pantalla del sistema.

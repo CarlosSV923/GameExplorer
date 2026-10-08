@@ -47,7 +47,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
     - **Mandar a No asignados**: los archivos descomprimidos van a `_unassigned/`.
     - **Mandar a la papelera**: restaurable a No asignados.
     - **Borrar definitivamente**.
-- **RF-08** **Datos por archivo (Switch).** Tras la validación, para cada archivo válido se pide su **tipo**: Juego base, Update o DLC. El Update exige la **versión** y el DLC exige el **nombre del DLC**. Wii y PSP no piden nada más.
+- **RF-08** **Confirmar y datos por archivo.** Tras la validación siempre hay un paso de confirmación con la vista previa de los nombres finales y el botón Guardar. En **Switch**, ahí se pide para cada archivo válido su **tipo**: Juego base, Update o DLC; el Update exige la **versión** y el DLC exige el **nombre del DLC**. En **Wii y PSP** solo se confirma.
 - **RF-09** **Duplicados.** Si en la carpeta del juego ya existe un archivo con el mismo nombre final (§5), se avisa y se elige **Reemplazar** (el anterior va a la papelera) u **Omitir**. Los archivos en la papelera no cuentan.
 - **RF-10** Al confirmar, la app crea o reutiliza la carpeta del juego, mueve los archivos a `[slug]/[Juego]/[archivo]` con los nombres de §5 y limpia el staging. La operación se puede revertir si falla a mitad: los movimientos se anotan antes en un journal y, si algo falla (o la app se reinicia a mitad), se deshacen y la subida vuelve al paso anterior. Nunca se sobrescribe un archivo existente sin la decisión de RF-09. Antes de confirmar se ve una vista previa con los nombres finales y los duplicados.
 - **RF-11** **Identidad del juego.** Un juego se identifica por su consola y su nombre saneado, sin distinguir mayúsculas (los shares SMB no las distinguen). Guardar con un nombre que ya existe agrega los archivos a ese juego. Si el nombre se eligió de IGDB, el juego queda enlazado a ese id (portada, año, géneros); con un nombre libre se muestra una portada genérica con el título.
@@ -85,7 +85,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 
 ### Consolas
 - **RF-40** Hay tres consolas, definidas en código con sus reglas: Nintendo Switch (`switch`), Wii (`wii`) y PlayStation Portable (`psp`) (§6). No se pueden crear ni borrar desde la app; agregar una consola es un cambio de código, documentado paso a paso en [`adding-a-console.md`](./adding-a-console.md).
-- **RF-41** Extensiones por consola: las de fábrica vienen de una variable de entorno por consola (`SWITCH_EXTENSIONS`, `WII_EXTENSIONS`, `PSP_EXTENSIONS`, separadas por comas); si no se define, se usan los valores de §6. Desde Ajustes › Consolas se pueden **agregar** extensiones propias y **quitar solo esas**, y solo si ningún archivo de la biblioteca las usa (se muestra cuántos). Las de la variable no se pueden quitar desde la app. Una extensión puede tener varios puntos (`.nkit.iso`); vale la coincidencia más larga.
+- **RF-41** Extensiones por consola: las de fábrica vienen de una variable de entorno por consola (`SWITCH_EXTENSIONS`, `WII_EXTENSIONS`, `PSP_EXTENSIONS`, separadas por comas); si no se define, se usan los valores de §6. Desde Ajustes › Consolas se pueden **agregar** extensiones propias y **quitar solo esas**, y solo si ningún archivo de la biblioteca las usa (se muestra cuántos). Las de la variable no se pueden quitar desde la app. Una extensión puede tener varios puntos (`.nkit.iso`). **La extensión de un archivo es la más larga que coincide entre las de todas las consolas**: `Juego.nkit.iso` es `.nkit.iso` (solo Wii), aunque PSP acepte `.iso`.
 - **RF-42** En Ajustes › Consolas también se puede **reordenar** el carrusel (por defecto Switch, Wii, PSP) y cambiar el **nombre visible**. La carpeta (slug) nunca cambia.
 
 ### Acceso y preferencias
@@ -137,7 +137,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 Ejemplos: `Limbo [BASE].xci`, `Limbo [UPDATE v122345].nsp`, `Limbo [DLC Fuga Maestra].nsp`, `Ōkami.nkit.iso`.
 
 - **Versión del Update**: el usuario escribe solo dígitos y puntos (`1.2.1`, `122345`) y la app antepone `v`. Si escribe `v1.2.1`, la `v` no se duplica.
-- **Extensión**: es la coincidencia más larga entre las de la consola (`.nkit.iso`, no `.iso`) y va en minúsculas.
+- **Extensión**: la de RF-41 (la coincidencia más larga entre todas las consolas: `.nkit.iso`, no `.iso`), en minúsculas.
 
 Saneamiento del nombre del juego (carpeta y archivos) y del nombre del DLC, en este orden:
 1. Unicode NFC.

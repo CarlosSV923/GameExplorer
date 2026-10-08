@@ -111,7 +111,7 @@ Depende de: 7, 8 · Cubre: RF-01 a RF-51 (UI)
 
 ## Fase 10 — Ajustes de alcance
 Depende de: 9 · Cubre: el ajuste del 2026-10-08 (aviso al inicio de `spec.md`): RF-01 a RF-13a, RF-20, RF-21, RF-24 a RF-27, RF-30, RF-40 a RF-42, RF-52, RF-54, RNF-08, §5 y §6
-- [ ] **Diseño primero**: mockups nuevos en el lienzo y pasada con `design:design-critique` y `design:accessibility-review`, luego actualizar `design-handoff.md`. Pantallas:
+- [x] **Diseño primero**: mockups nuevos en el lienzo y pasada con `design:design-critique` y `design:accessibility-review`, luego actualizar `design-handoff.md`. Pantallas:
   - formulario de subida (nombre con sugerencias de IGDB y texto libre, consola, elección para varios archivos);
   - datos por archivo de Switch;
   - error de validación con sus cuatro salidas;
@@ -123,7 +123,7 @@ Depende de: 9 · Cubre: el ajuste del 2026-10-08 (aviso al inicio de `spec.md`):
 - [ ] **Consolas como módulos**: registro único en Go y en TS con Switch, Wii y PSP (§6). Se quitan GameCube, PS1, PS2 y PS3, la creación y el borrado de consolas (RF-40) y la tabla de consolas pasa a guardar solo orden, nombre visible y extensiones propias. Guía [`adding-a-console.md`](./adding-a-console.md) con los pasos para agregar una consola (escrita para que la siga una IA)
 - [ ] **Extensiones**: variables `SWITCH_EXTENSIONS`, `WII_EXTENSIONS`, `PSP_EXTENSIONS` con valores por defecto; extensiones propias desde la web, que solo se quitan si no las usa ningún archivo; coincidencia más larga (`.nkit.iso`) (RF-41)
 - [ ] **Sin detección**: se borran los detectores por cabecera, el lector ISO9660, `contracts/detection-cases.json`, la clasificación cue/bin y de juegos en carpeta, `guessTitle` y las sugerencias de tipo/versión por nombre. Se mantiene el reconocimiento de comprimidos por bytes mágicos
-- [ ] **Nuevo flujo de subida**: formulario antes de subir, con pre-validación de no comprimidos (RF-03); varios archivos con sus tres modos (RF-03a); descompresión tras el formulario; validación por extensión, descartando el resto (RF-07); error con sus cuatro salidas, incluido cambiar de consola sin volver a descomprimir; datos por archivo de Switch (RF-08); duplicados por nombre final (RF-09)
+- [ ] **Nuevo flujo de subida**: formulario antes de subir, con pre-validación de no comprimidos (RF-03); varios archivos con sus tres modos (RF-03a); descompresión tras el formulario; validación por extensión, descartando el resto (RF-07); error con sus cuatro salidas, incluido cambiar de consola sin volver a descomprimir; paso de confirmación con datos por archivo de Switch (RF-08); duplicados por nombre final (RF-09)
 - [ ] **Nomenclatura nueva** (§5) en Go, TS y `contracts/naming-cases.json`: `[BASE]`, `[UPDATE vX]`, `[DLC nombre]`; Wii/PSP sin etiqueta; extensión doble conservada
 - [ ] **Identidad por nombre**: juego = consola + nombre saneado sin distinguir mayúsculas; enlace opcional a IGDB (RF-11). Se quitan la carpeta con año o id de IGDB (antiguo RF-11a) y el re-emparejar (antiguo RF-24, pantalla `/reemparejar`)
 - [ ] **Edición** (RF-24): renombrar (IGDB o libre) con fusión; mover a otra consola si todas las extensiones valen allí; mover juego o archivo a No asignados; editar tipo, versión o DLC de un archivo de Switch. Todo con journal

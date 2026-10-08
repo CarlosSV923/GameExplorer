@@ -85,3 +85,46 @@ Gamepad: la cruceta y el stick mueven el foco espacialmente; A = Enter, B = Esca
 - **Inicio:** falta un `<h1>`; el nombre de la consola actual debe serlo, dentro del enlace.
 - **Carrusel:** se anuncia como región con `aria-roledescription="carrusel"`, y cada cambio de consola en una región `aria-live`.
 - **Superposición de soltar:** necesita un `<main>`, o un diálogo con su nombre.
+
+# Revisión de diseño (Fase 10)
+
+Pantallas nuevas o rehechas por el ajuste de alcance: Inicio (solo consolas con juegos, No asignados y estado vacío), formulario de subida, datos de los archivos (Switch), error de validación, lista y detalle con edición, No asignados, Ajustes y estados. Se quitaron Revisión y Re-emparejar.
+
+## Crítica
+
+**Impresión general.** El flujo es más corto y predecible: el usuario dice qué es antes de subir y la app solo pide más datos cuando hacen falta (tipos de Switch) o cuando algo no encaja. El mayor riesgo era la densidad de acciones en el detalle del juego.
+
+| Hallazgo | Severidad | Cambio |
+|---|---|---|
+| El detalle tenía cinco botones del mismo peso (descargar, renombrar, cambiar consola, mover a No asignados, papelera) y cada fila cuatro iconos, uno de ellos ambiguo (carpeta = «mover a No asignados») | 🟡 Moderada | «Mover a No asignados» pasa a un menú **Más**, en el juego y en cada archivo. Quedan visibles las acciones frecuentes |
+| «Cambiar consola» abría un diálogo donde todas las opciones estaban desactivadas (un juego de Switch no cabe en Wii ni PSP) | 🟡 Moderada | El botón se desactiva y debajo se explica por qué |
+| En No asignados, «Asignar» llevaba a un callejón sin salida con archivos que ninguna consola acepta (`.z64`) | 🟡 Moderada | «Asignar» se desactiva en esos archivos; la fila ya dice «Ninguna consola acepta .z64». Coincide con la pre-validación del formulario (RF-03) |
+| Riesgo de enlazar a IGDB un juego equivocado sin darse cuenta | 🟡 Moderada | Regla de traspaso: ninguna sugerencia se elige sola; el enlace se confirma con un aviso «Enlazado a IGDB: …» y se rompe si se edita el texto |
+| Los chips de extensiones medían 36 px de alto | 🟢 Menor | Pasan a 44 px |
+| Guardado del nombre visible de una consola sin indicar | 🟢 Menor | Se guarda al salir del campo o con Enter, con estado «Guardado» |
+
+**Lo que funciona.** La ruta final se ve en todo momento («Se guardará en…»); el error de validación ofrece primero la salida que conserva el trabajo (cambiar de consola sin volver a descomprimir); las extensiones con candado explican de dónde vienen.
+
+## Auditoría de accesibilidad (WCAG 2.1 AA)
+
+| # | Hallazgo | Criterio | Severidad | Solución |
+|---|---|---|---|---|
+| 1 | Botones desactivados con explicación («Cambiar consola», «Asignar», quitar una extensión en uso): con `disabled` no reciben foco y la explicación no se anuncia | 4.1.2, 3.3.2 | 🟡 Mayor | Usar `aria-disabled="true"` (sigue enfocable), `aria-describedby` hacia el texto visible y bloquear la acción en el manejador |
+| 2 | Combobox del nombre: las opciones son `li` con clic | 2.1.1, 4.1.2 | 🟡 Mayor | Patrón combobox de ARIA: el foco queda en el campo, flechas mueven `aria-activedescendant`, Enter elige, Esc cierra la lista; la opción «Usar … tal cual» siempre es la última |
+| 3 | Menú «Más» | 4.1.2 | 🟡 Mayor | `aria-haspopup="menu"`, `role="menu"`/`menuitem`, flechas, Esc devuelve el foco al botón |
+| 4 | Diálogos (renombrar, cambiar consola, editar archivo, borrar definitivamente) | 2.4.3 | 🟡 Mayor | Foco atrapado, foco inicial en el primer campo (o en «Cancelar» en el borrado definitivo), Esc cierra, el foco vuelve al botón que lo abrió. El borrado definitivo es `alertdialog` |
+| 5 | El prefijo «v» del campo versión es decorativo | 1.3.1 | 🟢 Menor | `aria-hidden` en la «v» y la etiqueta dice «Versión»; la vista previa del nombre final la muestra completa |
+| 6 | Escribir con gamepad | 2.1.1 | 🟢 Menor | Los campos de texto usan el teclado en pantalla del sistema; el resto del formulario se completa con la cruceta y A/B/X |
+
+### Contraste (pares nuevos)
+| Texto | Fondo | Ratio | Mínimo | ¿Pasa? |
+|---|---|---|---|---|
+| `#a3a3a8` (notas) | `#2a2a2d` / `#343437` / `#38383b` | 5,70 / 4,94 / 4,65 | 4,5 | ✅ |
+| `#ffb3a6` (errores) | `#2a2a2d` / `#343437` | 8,35 / 7,24 | 4,5 | ✅ |
+| `#9be29b` (ruta final) | `#232326` | 10,26 | 4,5 | ✅ |
+| `#c9c9ce` (modo elegido) | `#3a3327` | 7,56 | 4,5 | ✅ |
+| `#ff8a78` (acciones peligrosas) | `#38383b` | 5,10 | 4,5 | ✅ |
+| `#10203d` sobre chip Update | `#8ab4ff` | 7,76 | 4,5 | ✅ |
+| Bordes de controles `#8a8a8e` | `#2a2a2d` | 4,16 | 3 (1.4.11) | ✅ |
+
+Los controles desactivados (`#4a4a4f`, `#6c6c72`) quedan fuera de 1.4.11; su motivo siempre está escrito al lado.
