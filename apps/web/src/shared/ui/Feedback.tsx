@@ -109,6 +109,16 @@ export function ProgressBar({
   )
 }
 
+/** A placeholder block with the shape of the content being loaded. */
+export function Skeleton({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cx('block animate-pulse rounded-md bg-surface-card', className)}
+    />
+  )
+}
+
 /** Centered empty state (States.dc.html). */
 export function EmptyState({
   icon,

@@ -102,8 +102,12 @@ Depende de: 0 · Cubre: RNF-05 a RNF-07
 
 ## Fase 9 — Frontend con adaptadores HTTP
 Depende de: 7, 8 · Cubre: RF-01 a RF-51 (UI)
-- [ ] Puertos de la aplicación y adaptadores `http/` por módulo
-- [ ] Pantallas: carrusel, lista/detalle, subida + revisión, papelera, ajustes, login
+- [x] Puertos de la aplicación y adaptadores `http/` por módulo (`catalog`, `ingestion`, `metadata`, `identity`, `system`): las pantallas no saben qué adaptador está activo; los errores llegan como `AppError` por tipo (sin sesión, conflicto, IGDB caído…) y la interfaz muestra su propio texto
+- [x] Router (TanStack Router, rutas en español) y datos (TanStack Query). Sesión vencida → login y vuelta a donde estabas
+- [x] Pantallas: login, carrusel, consola (lista + detalle, descargas, papelera, «Olvidar»), búsqueda, re-emparejar, subidas (zona de soltar en toda la ventana + panel), revisión, ajustes (consolas, papelera, general)
+- [x] Subidas con `tus-js-client` (decisión: en lugar de Uppy, porque la interfaz es propia): 2 a la vez, cola, reintento, reanudar tras recargar eligiendo el mismo archivo, aviso al cerrar la pestaña; progreso en vivo por SSE
+- [x] Contrato ampliado: `Console.builtIn` y `detection`, `GameSummary.igdbId` («Ya en tu biblioteca»), `GET /library/check` (última revisión de integridad)
+- [x] Prueba real contra la API y la biblioteca de `.dev`: subir, revisar con IGDB, guardar, duplicado con Reemplazar, restaurar con conflicto (intercambio), vista previa de fusión, integridad; a 1280 y 375 px sin desbordes. Hallazgos corregidos: la navegación tras guardar se perdía cuando el evento SSE llegaba antes que la respuesta, y una lista vieja podía pisar un evento en vivo (ahora gana la versión más reciente de cada trabajo)
 
 ## Fase 10 — Modo demo
 Depende de: 9 · Cubre: RF-60 a RF-65

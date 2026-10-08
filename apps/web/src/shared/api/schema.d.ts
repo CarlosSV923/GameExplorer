@@ -489,7 +489,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The last integrity check (it runs at start and every hour) */
+        get: operations["getLibraryCheck"];
         put?: never;
         /** Run the integrity check now (it also runs every hour) */
         post: operations["checkLibrary"];
@@ -663,6 +664,14 @@ export interface components {
             sortOrder: number;
             /** @description Games with at least one item in the library. */
             gameCount: number;
+            /** @description One of the six consoles the app ships with; they cannot be deleted. */
+            builtIn: boolean;
+            /**
+             * @description How uploads are recognized: Switch title id, disc header, folder
+             *     structure (PS3) or, for consoles added by the user, extension only.
+             * @enum {string}
+             */
+            detection: "titleId" | "header" | "structure" | "extension";
         };
         MetadataGame: {
             /**
@@ -821,6 +830,8 @@ export interface components {
         GameSummary: {
             /** Format: int64 */
             id: number;
+            /** Format: int64 */
+            igdbId: number;
             /** @description Console slug. */
             console: string;
             title: string;
@@ -839,8 +850,6 @@ export interface components {
             size: number;
         };
         GameDetail: components["schemas"]["GameSummary"] & {
-            /** Format: int64 */
-            igdbId: number;
             /**
              * @description Library-relative folder.
              * @example switch/Inside
@@ -870,11 +879,19 @@ export interface components {
             ids: number[];
         };
         IntegrityReport: {
+            /** Format: date-time */
+            checkedAt: string;
             checked: number;
             /** @description Items found missing in this check. */
             missing: number;
             /** @description Missing items whose files are back. */
             found: number;
+            /** @description Items still missing after this check. */
+            missingTotal: number;
+        };
+        IntegrityStatus: {
+            /** @description Unset until the first check has run. */
+            lastCheck?: components["schemas"]["IntegrityReport"] | null;
         };
         RematchRequest: {
             /** Format: int64 */
@@ -1770,6 +1787,27 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    getLibraryCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The last check, if one has run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrityStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
     checkLibrary: {

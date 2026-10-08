@@ -19,6 +19,8 @@ interface DialogProps {
   onClose: () => void
   /** Buttons, the main action last (drawn on the right). */
   actions: ReactNode
+  /** What gets focus on open: the main action (default) or the first field. */
+  initialFocus?: 'action' | 'first'
   children?: ReactNode
 }
 
@@ -27,7 +29,13 @@ interface DialogProps {
  * the main action) and returns where it was on close; Escape and the B
  * button close it (docs/design-handoff.md §2).
  */
-export function Dialog({ title, onClose, actions, children }: DialogProps) {
+export function Dialog({
+  title,
+  onClose,
+  actions,
+  initialFocus = 'action',
+  children,
+}: DialogProps) {
   const titleId = useId()
   const box = useRef<HTMLDivElement>(null)
   const [host] = useState(() => document.createElement('div'))
@@ -55,7 +63,10 @@ export function Dialog({ title, onClose, actions, children }: DialogProps) {
     const items = box.current ? tabbables(box.current) : []
     // The main action is the last button; fall back to the first control.
     const buttons = items.filter((el) => el instanceof HTMLButtonElement)
-    ;(buttons[buttons.length - 1] ?? items[0])?.focus()
+    const target = initialFocus === 'first' ? items[0] : (buttons[buttons.length - 1] ?? items[0])
+    target?.focus()
+    // Only on open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Tab stays inside the dialog.
@@ -82,12 +93,12 @@ export function Dialog({ title, onClose, actions, children }: DialogProps) {
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={onKeyDown}
-        className="box-border flex w-full max-w-[560px] flex-col gap-4.5 rounded-xl border border-control bg-surface p-7"
+        className="box-border flex max-h-full w-full max-w-[560px] animate-dialog-in flex-col gap-4.5 overflow-y-auto rounded-xl border border-control bg-surface p-7"
       >
         <h2 id={titleId} className="m-0 text-title font-bold">
           {title}
         </h2>
-        {children && <div className="text-body-lg text-ink-1">{children}</div>}
+        {children && <div className="flex flex-col gap-4 text-body-lg text-ink-1">{children}</div>}
         <div className="flex flex-wrap justify-end gap-3">{actions}</div>
       </div>
     </div>,

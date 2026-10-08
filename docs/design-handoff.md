@@ -162,6 +162,20 @@ Una capa única en `shared/input` traduce cada dispositivo a **acciones**. Las p
 
 Las tablets en vertical y horizontal se prueban con los perfiles táctiles de Playwright (fase 10).
 
+### Rutas (fase 9)
+| Ruta | Pantalla |
+|---|---|
+| `/entrar` | Login (`?redirect=` vuelve a donde se estaba) |
+| `/` | Carrusel (`?consola=` recuerda la consola actual) |
+| `/buscar?q=` | Resultados por consola (`&juego=` elige el detalle) |
+| `/consolas/:slug` y `/consolas/:slug/:juegoId` | Lista y detalle (en < 1024 px, dos páginas) |
+| `/consolas/:slug/:juegoId/reemparejar` | Cambiar juego IGDB |
+| `/subidas` y `/subidas/:id` | Subidas y revisión |
+| `/ajustes/consolas`, `/ajustes/papelera`, `/ajustes/general` | Ajustes (LB/RB cambian de sección) |
+
+- **Selección por defecto:** en pantallas anchas la consola muestra el detalle del primer juego; en angostas, solo la lista, sin resaltar nada hasta elegir.
+- **RT:** abre el selector de archivos del botón de subida de la pantalla. Los navegadores solo lo abren tras un clic, toque o tecla, así que con el control el botón recibe el foco.
+
 ## 6. Contenido y casos límite
 
 - **Nombres largos** (juegos, archivos): en listas se cortan con `…` (`text-overflow: ellipsis`) y van completos en `title`; en el detalle se ajustan a varias líneas. Las rutas mono pueden partirse en cualquier carácter (`overflow-wrap: anywhere`).

@@ -1,9 +1,15 @@
-import { useId, type InputHTMLAttributes } from 'react'
+import {
+  useId,
+  type ComponentPropsWithRef,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+} from 'react'
 
 import { cx } from './cx'
-import { ErrorIcon, SearchIcon } from './icons'
+import { ChevronDownIcon, ErrorIcon, SearchIcon } from './icons'
 
-interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
+interface TextFieldProps extends Omit<ComponentPropsWithRef<'input'>, 'size'> {
   label: string
   /** Keep the label for screen readers only. */
   hideLabel?: boolean
@@ -53,6 +59,61 @@ export function TextField({
           {hint}
         </span>
       )}
+      {error && (
+        <span id={errorId} className="flex items-start gap-2 text-body-sm text-danger">
+          <ErrorIcon className="mt-px shrink-0" />
+          {error}
+        </span>
+      )}
+    </div>
+  )
+}
+
+interface SelectFieldProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
+  label: string
+  hideLabel?: boolean
+  hint?: ReactNode
+  error?: string
+  children: ReactNode
+}
+
+/** A native select (gamepad and touch friendly), styled like the fields. */
+export function SelectField({
+  label,
+  hideLabel = false,
+  hint,
+  error,
+  className,
+  children,
+  ...rest
+}: SelectFieldProps) {
+  const id = useId()
+  const errorId = `${id}-error`
+  return (
+    <div className="flex flex-col gap-2">
+      <label
+        htmlFor={id}
+        className={cx('text-caption font-bold text-ink-2', hideLabel && 'sr-only')}
+      >
+        {label}
+      </label>
+      <span className="relative flex">
+        <select
+          id={id}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          className={cx(
+            'box-border h-13 w-full cursor-pointer appearance-none rounded-md border bg-surface-field pr-12 pl-4 text-body-lg font-bold text-ink-1',
+            error ? 'border-danger' : 'border-control',
+            className,
+          )}
+          {...rest}
+        >
+          {children}
+        </select>
+        <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-ink-2" />
+      </span>
+      {hint}
       {error && (
         <span id={errorId} className="flex items-start gap-2 text-body-sm text-danger">
           <ErrorIcon className="mt-px shrink-0" />

@@ -107,7 +107,8 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={cx(
-        'inline-flex size-control-sm shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent transition duration-120 ease-out hover:bg-hover disabled:cursor-default disabled:opacity-45',
+        iconButtonClass,
+        'disabled:cursor-default disabled:opacity-45',
         tone === 'danger' ? 'text-danger' : 'text-ink-1',
         className,
       )}
@@ -118,8 +119,38 @@ export function IconButton({
   )
 }
 
+const iconButtonClass =
+  'inline-flex size-control-sm shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent no-underline transition duration-120 ease-out hover:bg-hover'
+
+interface IconLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'aria-label'> {
+  href: string
+  label: string
+  tone?: 'default' | 'danger'
+  children: ReactNode
+}
+
+/** An icon-only link (a download), drawn like IconButton. */
+export function IconLink({ label, tone = 'default', className, children, ...rest }: IconLinkProps) {
+  return (
+    <a
+      aria-label={label}
+      title={label}
+      className={cx(
+        iconButtonClass,
+        tone === 'danger' ? 'text-danger hover:text-danger' : 'text-ink-1 hover:text-ink-1',
+        className,
+      )}
+      {...rest}
+    >
+      {children}
+    </a>
+  )
+}
+
 interface FileButtonProps {
   onFiles: (files: File[]) => void
+  /** Marks the input for the global upload shortcut (RT). */
+  shortcut?: boolean
   multiple?: boolean
   accept?: string
   variant?: ButtonVariant
@@ -135,6 +166,7 @@ interface FileButtonProps {
  */
 export function FileButton({
   onFiles,
+  shortcut = false,
   multiple = true,
   accept,
   variant = 'primary',
@@ -151,6 +183,7 @@ export function FileButton({
       <input
         ref={input}
         type="file"
+        data-shortcut={shortcut ? 'upload' : undefined}
         multiple={multiple}
         accept={accept}
         className="absolute inset-0 cursor-pointer opacity-0"

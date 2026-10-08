@@ -189,7 +189,24 @@ func (h *Handler) CheckLibrary(ctx context.Context, _ httpapi.CheckLibraryReques
 	if err != nil {
 		return nil, err
 	}
-	return httpapi.CheckLibrary200JSONResponse{Checked: rep.Checked, Missing: rep.Missing, Found: rep.Found}, nil
+	return httpapi.CheckLibrary200JSONResponse(integrityToAPI(rep)), nil
+}
+
+// GetLibraryCheck implements httpapi.StrictServerInterface.
+func (h *Handler) GetLibraryCheck(_ context.Context, _ httpapi.GetLibraryCheckRequestObject) (httpapi.GetLibraryCheckResponseObject, error) {
+	out := httpapi.IntegrityStatus{}
+	if rep := h.library.LastIntegrity(); rep != nil {
+		last := integrityToAPI(*rep)
+		out.LastCheck = &last
+	}
+	return httpapi.GetLibraryCheck200JSONResponse(out), nil
+}
+
+func integrityToAPI(rep application.IntegrityReport) httpapi.IntegrityReport {
+	return httpapi.IntegrityReport{
+		CheckedAt: rep.CheckedAt, Checked: rep.Checked, Missing: rep.Missing,
+		Found: rep.Found, MissingTotal: rep.MissingTotal,
+	}
 }
 
 // ---------- rematch ----------

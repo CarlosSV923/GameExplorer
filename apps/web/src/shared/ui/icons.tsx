@@ -53,3 +53,21 @@ export const ClockIcon = icon(['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M12 7v5
 export const FolderIcon = icon([
   'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
 ])
+export const PlusIcon = icon(['M12 5v14', 'M5 12h14'])
+export const ImageIcon = icon([
+  'M6 4h12a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Z',
+  'M9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
+  'm21 16-5-5-9 9',
+])
+export const GamepadIcon = icon([
+  'M8 6h8a6 6 0 0 1 0 12H8A6 6 0 0 1 8 6Z',
+  'M7 10v4',
+  'M5 12h4',
+  'M16 11h.01',
+  'M18 13h.01',
+])
+export const LogoutIcon = icon([
+  'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3',
+  'M10 17l-5-5 5-5',
+  'M5 12h11',
+])

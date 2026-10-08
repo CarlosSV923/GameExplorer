@@ -2,7 +2,7 @@
 
 [Español](README.es.md)
 
-> **Status:** early development (phases 0–8 of [`docs/tasks.md`](docs/tasks.md) done: the API uploads, extracts, detects, stores, lists, serves, re-matches and trashes games, and the UI foundation is in place — tokens, components, ES/EN and touch/keyboard/gamepad input; the screens come in phase 9). Nothing usable from a browser yet.
+> **Status:** early development (phases 0–9 of [`docs/tasks.md`](docs/tasks.md) done: the web app works end to end against the API — sign in, browse the console carousel, upload with resumable transfers, review against IGDB, download, re-match, trash and restore, manage consoles; next come the backend-less demo (phase 10) and the TrueNAS release (phase 11)).
 
 Self-hosted web app for a home NAS (TrueNAS SCALE) to **upload, extract, classify, rename, browse and download emulation game files** from any browser: desktop, tablet, touch screen or gamepad. The UI is inspired by EmulationStation.
 
@@ -19,7 +19,7 @@ Drop a `.rar`, `.zip`, `.7z` or a raw game file. GameExplorer extracts it, detec
 | Layer | Tech |
 |---|---|
 | Backend | Go, `net/http`, tusd, SQLite (modernc + sqlc + goose), 7-Zip |
-| Frontend | React, Vite, TypeScript, Tailwind, TanStack Router/Query, Uppy |
+| Frontend | React, Vite, TypeScript, Tailwind, TanStack Router/Query, tus-js-client |
 | Contract | OpenAPI 3 (spec-first; Go server and TS client are generated) |
 | Design | Domain-Driven Design on both sides, ports and adapters, shared golden test vectors |
 

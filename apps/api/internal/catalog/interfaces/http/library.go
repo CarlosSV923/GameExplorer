@@ -140,7 +140,7 @@ func summaries(games []application.GameListing) []httpapi.GameSummary {
 	out := make([]httpapi.GameSummary, 0, len(games))
 	for _, g := range games {
 		out = append(out, httpapi.GameSummary{
-			Id: int64(g.ID), Console: string(g.Console), Title: g.Title, Folder: g.Folder,
+			Id: int64(g.ID), IgdbId: g.IGDBID, Console: string(g.Console), Title: g.Title, Folder: g.Folder,
 			ReleaseYear: g.ReleaseYear, CoverImageId: g.CoverImageID, ItemCount: g.ItemCount, MissingCount: g.MissingCount, Size: g.Size,
 		})
 	}

@@ -1,7 +1,7 @@
 import { changeLanguage, createI18n, storedLanguage } from '.'
 import en from './en.json'
 import es from './es.json'
-import { formatDate, formatSize } from './format'
+import { daysUntil, formatDate, formatRelative, formatSize } from './format'
 import enRaw from './en.json?raw'
 import esRaw from './es.json?raw'
 
@@ -65,5 +65,26 @@ describe('i18n', () => {
     expect(formatSize(512, 'es', i18n.t)).toBe('512 B')
     expect(formatDate(new Date(2026, 9, 6), 'es')).toBe('6 oct 2026')
     expect(formatDate(new Date(2026, 9, 6), 'en')).toBe('Oct 6, 2026')
+  })
+})
+
+describe('daysUntil', () => {
+  const now = Date.parse('2026-10-08T02:20:00Z')
+  it.each([
+    ['2026-11-07T02:20:36Z', 30],
+    ['2026-11-07T03:20:36Z', 30],
+    ['2026-10-08T12:00:00Z', 1],
+    ['2026-10-01T00:00:00Z', 1],
+  ])('%s → %i', (iso, want) => {
+    expect(daysUntil(new Date(iso), now)).toBe(want)
+  })
+})
+
+describe('formatRelative', () => {
+  const now = Date.parse('2026-10-08T12:00:00Z')
+  it('says how long ago, in the interface language', () => {
+    expect(formatRelative(new Date(now - 12 * 60_000), now, 'es')).toBe('hace 12 min')
+    expect(formatRelative(new Date(now - 12 * 60_000), now, 'en')).toBe('12 min. ago')
+    expect(formatRelative(new Date(now - 5_000), now, 'es')).toBe('este minuto')
   })
 })

@@ -128,6 +128,8 @@ type LibraryService struct {
 
 	// mu serializes changes: two of them must not race for a folder or a name.
 	mu sync.Mutex
+	// lastCheck is the last integrity report (guarded by mu).
+	lastCheck *IntegrityReport
 }
 
 // NewLibraryService builds the service. now may be nil (time.Now).

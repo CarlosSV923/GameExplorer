@@ -21,7 +21,7 @@ WHERE id = ?;
 
 -- name: ListGameSummaries :many
 -- Games with at least one item outside the trash, by title.
-SELECT g.id, g.console_id, g.title, g.folder, g.release_year, g.cover_image_id,
+SELECT g.id, g.console_id, g.igdb_id, g.title, g.folder, g.release_year, g.cover_image_id,
        COUNT(i.id) AS item_count, CAST(TOTAL(i.size) AS INTEGER) AS size,
        COUNT(i.missing_since) AS missing_count
 FROM games g

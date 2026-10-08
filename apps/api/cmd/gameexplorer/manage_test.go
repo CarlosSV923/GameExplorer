@@ -332,8 +332,23 @@ func TestIntegrityCheckMarksMissingItems(t *testing.T) {
 		t.Helper()
 		return decode[struct{ Checked, Missing, Found int }](t, call(t, srv, cookie, http.MethodPost, "/api/library/check", ""))
 	}
+	last := func() *struct {
+		CheckedAt    time.Time
+		MissingTotal int
+	} {
+		t.Helper()
+		return decode[struct {
+			LastCheck *struct {
+				CheckedAt    time.Time
+				MissingTotal int
+			}
+		}](t, get(t, srv, cookie, "/api/library/check")).LastCheck
+	}
 	if rep := check(); rep.Checked != 2 || rep.Missing != 0 {
 		t.Fatalf("clean check = %+v", rep)
+	}
+	if l := last(); l == nil || l.CheckedAt.IsZero() || l.MissingTotal != 0 {
+		t.Fatalf("last check = %+v", l)
 	}
 
 	// Deleted over SMB.
@@ -350,6 +365,9 @@ func TestIntegrityCheckMarksMissingItems(t *testing.T) {
 	_ = os.Rename(filepath.Join(library, "elsewhere.nsp"), filepath.Join(dir, base.Files[0]))
 	if rep := check(); rep.Found != 1 {
 		t.Fatalf("check after restore = %+v", rep)
+	}
+	if l := last(); l == nil || l.MissingTotal != 1 {
+		t.Fatalf("last check = %+v, want the update still missing", l)
 	}
 	if res := call(t, srv, cookie, http.MethodPost, "/api/items/"+id(base.ID)+"/forget", ""); res.StatusCode != http.StatusConflict {
 		t.Fatalf("forget a present item = %d, want 409", res.StatusCode)
@@ -370,6 +388,8 @@ type consoleJSON struct {
 	LogoImageID *string  `json:"logoImageId"`
 	ReleaseYear *int     `json:"releaseYear"`
 	SortOrder   int      `json:"sortOrder"`
+	BuiltIn     bool     `json:"builtIn"`
+	Detection   string   `json:"detection"`
 }
 
 func TestConsoleManagement(t *testing.T) {
@@ -383,7 +403,8 @@ func TestConsoleManagement(t *testing.T) {
 	}
 	n64 := decode[consoleJSON](t, res)
 	if n64.DisplayName != "Nintendo 64" || !slices.Equal(n64.Extensions, []string{".z64", ".n64"}) ||
-		n64.LogoImageID == nil || *n64.LogoImageID != "pl6n" || n64.ReleaseYear == nil || n64.SortOrder <= 60 { // last in the carousel
+		n64.LogoImageID == nil || *n64.LogoImageID != "pl6n" || n64.ReleaseYear == nil || n64.SortOrder <= 60 || // last in the carousel
+		n64.BuiltIn || n64.Detection != "extension" {
 		t.Fatalf("n64 = %+v", n64)
 	}
 	for name, body := range map[string]string{

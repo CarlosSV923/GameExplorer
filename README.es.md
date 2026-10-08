@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-> **Estado:** desarrollo inicial (fases 0–8 de [`docs/tasks.md`](docs/tasks.md) completadas: la API sube, extrae, detecta, guarda, lista, entrega, re-empareja y manda juegos a la papelera, y la base de la interfaz está lista: tokens, componentes, ES/EN y entrada táctil, teclado y gamepad; las pantallas llegan en la fase 9). Todavía no hay nada utilizable desde el navegador.
+> **Estado:** desarrollo inicial (fases 0–9 de [`docs/tasks.md`](docs/tasks.md) completadas: la app web funciona de punta a punta contra la API: entrar, recorrer el carrusel de consolas, subir con transferencias reanudables, revisar con IGDB, descargar, re-emparejar, mandar a la papelera y restaurar, y administrar consolas; faltan la demo sin backend (fase 10) y la publicación para TrueNAS (fase 11)).
 
 App web autoalojada para un NAS doméstico (TrueNAS SCALE) que permite **subir, descomprimir, clasificar, renombrar, explorar y descargar juegos de emulación** desde cualquier navegador: escritorio, tablet, pantalla táctil o gamepad. La interfaz está inspirada en EmulationStation.
 
@@ -19,7 +19,7 @@ Arrastra un `.rar`, `.zip`, `.7z` o el archivo del juego. GameExplorer lo descom
 | Capa | Tecnología |
 |---|---|
 | Backend | Go, `net/http`, tusd, SQLite (modernc + sqlc + goose), 7-Zip |
-| Frontend | React, Vite, TypeScript, Tailwind, TanStack Router/Query, Uppy |
+| Frontend | React, Vite, TypeScript, Tailwind, TanStack Router/Query, tus-js-client |
 | Contrato | OpenAPI 3 (spec-first; el servidor Go y el cliente TS se generan) |
 | Diseño | Domain-Driven Design en ambos lados, puertos y adaptadores, vectores de prueba compartidos |
 

@@ -51,5 +51,21 @@ func toAPI(c domain.Console) httpapi.Console {
 		Extensions:     c.Extensions,
 		SortOrder:      c.SortOrder,
 		GameCount:      c.GameCount,
+		BuiltIn:        c.DetectorKey != "",
+		Detection:      detection(c.DetectorKey),
+	}
+}
+
+// detection tells how uploads for a console are recognized (by its detector).
+func detection(key string) httpapi.ConsoleDetection {
+	switch key {
+	case "":
+		return httpapi.ConsoleDetectionExtension
+	case "switch":
+		return httpapi.ConsoleDetectionTitleId
+	case "ps3":
+		return httpapi.ConsoleDetectionStructure
+	default:
+		return httpapi.ConsoleDetectionHeader
 	}
 }

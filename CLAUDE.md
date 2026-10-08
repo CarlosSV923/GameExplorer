@@ -13,7 +13,7 @@ Self-hosted web app (TrueNAS SCALE) to upload, extract, classify, rename, browse
 | Path | What |
 |---|---|
 | `apps/api` | Go module. `cmd/gameexplorer` is the composition root; `internal/<context>/{domain,application,infrastructure,interfaces}` |
-| `apps/web` | React + Vite + TS. `src/app` (composition root), `src/modules/<context>/{domain,application,infrastructure/{http,demo},ui}`, `src/shared` |
+| `apps/web` | React + Vite + TS. `src/app` (composition root: adapters, router, providers), `src/modules/<context>/{domain,application,infrastructure/{http,demo},ui}` for `catalog`, `ingestion`, `metadata`, `identity`, `system`; `src/shared` (`ui`, `input`, `i18n`, `api`, `kernel`, `routing`) |
 | `api/` | OpenAPI contract |
 | `contracts/` | Golden test vectors |
 | `docs/` | Spec, tasks, design handoff |
@@ -27,6 +27,7 @@ Bounded contexts: `catalog` (also the trash: trashing and restoring must be atom
 - The frontend never knows which adapter set is active; `VITE_DATA_SOURCE` is read only in `src/app`.
 - Touch, keyboard and gamepad must all work; gamepad glyphs only when a gamepad is detected.
 - UI copy: Spanish default, English available. Text comes from i18n keys in `shared/i18n/{es,en}.json` (ESLint `i18next/no-literal-string` fails on text in JSX).
+- Front data: module screens read their ports through the module's context (`use<Module>Ports`) and TanStack Query hooks in `application/`; adapters throw `AppError` (`shared/kernel/errors.ts`), never HTTP details. Routes live in `src/app/router.tsx`.
 - UI: build screens from `shared/ui` and the tokens in `shared/ui/tokens.css` (Tailwind's default palette is cleared: no raw colors). Spec: [`docs/design-handoff.md`](docs/design-handoff.md). Screens react to actions from `shared/input` (`useAction`), never to raw keys or gamepad buttons.
 
 ## Commands

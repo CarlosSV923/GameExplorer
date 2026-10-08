@@ -53,7 +53,9 @@
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --text-display-xl: clamp(40px, 7vw, 76px);
   --text-display-xl--line-height: 1.02;
-  --text-display: 44px;
+  --text-display-lg: clamp(36px, 6vw, 60px);
+  --text-display-lg--line-height: 1.02;
+  --text-display: clamp(30px, 6vw, 44px);
   --text-display--line-height: 1;
   --text-count: 30px;
   --text-title: 26px;
@@ -77,8 +79,36 @@
   --spacing-control-md: 48px;
   --spacing-control-sm: 44px;
 
-  /* Motion */
+  /* Motion (docs/design-handoff.md §3) */
   --ease-carousel: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-carousel-next: carousel-next 220ms var(--ease-carousel);
+  --animate-carousel-prev: carousel-prev 220ms var(--ease-carousel);
+  --animate-dialog-in: dialog-in 160ms ease-out;
+  --animate-fade-in: fade-in 120ms ease-out;
+
+  @keyframes carousel-next {
+    from {
+      opacity: 0;
+      transform: translateX(32px);
+    }
+  }
+  @keyframes carousel-prev {
+    from {
+      opacity: 0;
+      transform: translateX(-32px);
+    }
+  }
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
 }
 
 @layer base {
@@ -98,6 +128,10 @@
   select,
   textarea {
     font: inherit;
+  }
+  /* File names and paths: JetBrains Mono 400 (only 400 and 500 are loaded). */
+  .font-mono {
+    font-weight: 400;
   }
   a {
     color: var(--color-accent);

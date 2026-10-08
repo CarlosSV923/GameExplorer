@@ -685,6 +685,19 @@ paths:
           $ref: '#/components/responses/Conflict'
 
   /library/check:
+    get:
+      tags: [library]
+      operationId: getLibraryCheck
+      summary: The last integrity check (it runs at start and every hour)
+      responses:
+        '200':
+          description: The last check, if one has run.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrityStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
       tags: [library]
       operationId: checkLibrary
@@ -1028,7 +1041,7 @@ components:
 
     Console:
       type: object
-      required: [id, slug, displayName, extensions, sortOrder, gameCount]
+      required: [id, slug, displayName, extensions, sortOrder, gameCount, builtIn, detection]
       properties:
         id:
           type: integer
@@ -1062,6 +1075,15 @@ components:
         gameCount:
           type: integer
           description: Games with at least one item in the library.
+        builtIn:
+          type: boolean
+          description: One of the six consoles the app ships with; they cannot be deleted.
+        detection:
+          type: string
+          enum: [titleId, header, structure, extension]
+          description: |
+            How uploads are recognized: Switch title id, disc header, folder
+            structure (PS3) or, for consoles added by the user, extension only.
 
     MetadataGame:
       type: object
@@ -1335,9 +1357,12 @@ components:
 
     GameSummary:
       type: object
-      required: [id, console, title, folder, itemCount, missingCount, size]
+      required: [id, console, igdbId, title, folder, itemCount, missingCount, size]
       properties:
         id:
+          type: integer
+          format: int64
+        igdbId:
           type: integer
           format: int64
         console:
@@ -1369,11 +1394,8 @@ components:
       allOf:
         - $ref: '#/components/schemas/GameSummary'
         - type: object
-          required: [igdbId, path, genres, items]
+          required: [path, genres, items]
           properties:
-            igdbId:
-              type: integer
-              format: int64
             path:
               type: string
               description: Library-relative folder.
@@ -1431,8 +1453,11 @@ components:
 
     IntegrityReport:
       type: object
-      required: [checked, missing, found]
+      required: [checkedAt, checked, missing, found, missingTotal]
       properties:
+        checkedAt:
+          type: string
+          format: date-time
         checked:
           type: integer
         missing:
@@ -1441,6 +1466,18 @@ components:
         found:
           type: integer
           description: Missing items whose files are back.
+        missingTotal:
+          type: integer
+          description: Items still missing after this check.
+
+    IntegrityStatus:
+      type: object
+      properties:
+        lastCheck:
+          allOf:
+            - $ref: '#/components/schemas/IntegrityReport'
+          nullable: true
+          description: Unset until the first check has run.
 
     RematchRequest:
       type: object

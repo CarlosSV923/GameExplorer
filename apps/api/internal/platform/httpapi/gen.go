@@ -36,6 +36,30 @@ func (e CommitItemOnDuplicate) Valid() bool {
 	}
 }
 
+// Defines values for ConsoleDetection.
+const (
+	ConsoleDetectionExtension ConsoleDetection = "extension"
+	ConsoleDetectionHeader    ConsoleDetection = "header"
+	ConsoleDetectionStructure ConsoleDetection = "structure"
+	ConsoleDetectionTitleId   ConsoleDetection = "titleId"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleDetection enum.
+func (e ConsoleDetection) Valid() bool {
+	switch e {
+	case ConsoleDetectionExtension:
+		return true
+	case ConsoleDetectionHeader:
+		return true
+	case ConsoleDetectionStructure:
+		return true
+	case ConsoleDetectionTitleId:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Degraded HealthStatus = "degraded"
@@ -251,19 +275,19 @@ func (e RestoreRequestOnConflict) Valid() bool {
 
 // Defines values for StagedItemConfidence.
 const (
-	Extension StagedItemConfidence = "extension"
-	Header    StagedItemConfidence = "header"
-	None      StagedItemConfidence = "none"
+	StagedItemConfidenceExtension StagedItemConfidence = "extension"
+	StagedItemConfidenceHeader    StagedItemConfidence = "header"
+	StagedItemConfidenceNone      StagedItemConfidence = "none"
 )
 
 // Valid indicates whether the value is a known member of the StagedItemConfidence enum.
 func (e StagedItemConfidence) Valid() bool {
 	switch e {
-	case Extension:
+	case StagedItemConfidenceExtension:
 		return true
-	case Header:
+	case StagedItemConfidenceHeader:
 		return true
-	case None:
+	case StagedItemConfidenceNone:
 		return true
 	default:
 		return false
@@ -382,6 +406,13 @@ type CommitResult struct {
 
 // Console defines model for Console.
 type Console struct {
+	// BuiltIn One of the six consoles the app ships with; they cannot be deleted.
+	BuiltIn bool `json:"builtIn"`
+
+	// Detection How uploads are recognized: Switch title id, disc header, folder
+	// structure (PS3) or, for consoles added by the user, extension only.
+	Detection ConsoleDetection `json:"detection"`
+
 	// DisplayName Example: PlayStation 2
 	DisplayName string   `json:"displayName"`
 	Extensions  []string `json:"extensions"`
@@ -403,6 +434,10 @@ type Console struct {
 	Slug      string `json:"slug"`
 	SortOrder int    `json:"sortOrder"`
 }
+
+// ConsoleDetection How uploads are recognized: Switch title id, disc header, folder
+// structure (PS3) or, for consoles added by the user, extension only.
+type ConsoleDetection string
 
 // ConsoleCreate defines model for ConsoleCreate.
 type ConsoleCreate struct {
@@ -479,6 +514,7 @@ type GameSummary struct {
 	// Folder Folder inside the console folder.
 	Folder    string `json:"folder"`
 	Id        int64  `json:"id"`
+	IgdbId    int64  `json:"igdbId"`
 	ItemCount int    `json:"itemCount"`
 
 	// MissingCount Items with files missing from disk.
@@ -514,13 +550,23 @@ type ImageSize string
 
 // IntegrityReport defines model for IntegrityReport.
 type IntegrityReport struct {
-	Checked int `json:"checked"`
+	Checked   int       `json:"checked"`
+	CheckedAt time.Time `json:"checkedAt"`
 
 	// Found Missing items whose files are back.
 	Found int `json:"found"`
 
 	// Missing Items found missing in this check.
 	Missing int `json:"missing"`
+
+	// MissingTotal Items still missing after this check.
+	MissingTotal int `json:"missingTotal"`
+}
+
+// IntegrityStatus defines model for IntegrityStatus.
+type IntegrityStatus struct {
+	// LastCheck Unset until the first check has run.
+	LastCheck *IntegrityReport `json:"lastCheck,omitempty"`
 }
 
 // ItemDecision defines model for ItemDecision.
@@ -960,6 +1006,9 @@ type ServerInterface interface {
 	// PlanJobCommit Preview where a reviewed upload would be stored
 	// (POST /jobs/{id}/plan)
 	PlanJobCommit(w http.ResponseWriter, r *http.Request, id JobId)
+	// GetLibraryCheck The last integrity check (it runs at start and every hour)
+	// (GET /library/check)
+	GetLibraryCheck(w http.ResponseWriter, r *http.Request)
 	// CheckLibrary Run the integrity check now (it also runs every hour)
 	// (POST /library/check)
 	CheckLibrary(w http.ResponseWriter, r *http.Request)
@@ -1628,6 +1677,20 @@ func (siw *ServerInterfaceWrapper) PlanJobCommit(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// GetLibraryCheck operation middleware
+func (siw *ServerInterfaceWrapper) GetLibraryCheck(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetLibraryCheck(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CheckLibrary operation middleware
 func (siw *ServerInterfaceWrapper) CheckLibrary(w http.ResponseWriter, r *http.Request) {
 
@@ -1961,6 +2024,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/games/{id}/trash", wrapper.TrashGame)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/items/{id}/trash", wrapper.TrashItem)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/items/{id}/forget", wrapper.ForgetItem)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/library/check", wrapper.GetLibraryCheck)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/library/check", wrapper.CheckLibrary)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/games/{id}/rematch/plan", wrapper.PlanRematch)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/games/{id}/rematch", wrapper.RematchGame)
@@ -3977,6 +4041,43 @@ func (response PlanJobCommit503ApplicationProblemPlusJSONResponse) VisitPlanJobC
 	return err
 }
 
+type GetLibraryCheckRequestObject struct {
+}
+
+type GetLibraryCheckResponseObject interface {
+	VisitGetLibraryCheckResponse(w http.ResponseWriter) error
+}
+
+type GetLibraryCheck200JSONResponse IntegrityStatus
+
+func (response GetLibraryCheck200JSONResponse) VisitGetLibraryCheckResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLibraryCheck401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetLibraryCheck401ApplicationProblemPlusJSONResponse) VisitGetLibraryCheckResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CheckLibraryRequestObject struct {
 }
 
@@ -4475,6 +4576,9 @@ type StrictServerInterface interface {
 	// PlanJobCommit Preview where a reviewed upload would be stored
 	// (POST /jobs/{id}/plan)
 	PlanJobCommit(ctx context.Context, request PlanJobCommitRequestObject) (PlanJobCommitResponseObject, error)
+	// GetLibraryCheck The last integrity check (it runs at start and every hour)
+	// (GET /library/check)
+	GetLibraryCheck(ctx context.Context, request GetLibraryCheckRequestObject) (GetLibraryCheckResponseObject, error)
 	// CheckLibrary Run the integrity check now (it also runs every hour)
 	// (POST /library/check)
 	CheckLibrary(ctx context.Context, request CheckLibraryRequestObject) (CheckLibraryResponseObject, error)
@@ -5304,6 +5408,30 @@ func (sh *strictHandler) PlanJobCommit(w http.ResponseWriter, r *http.Request, i
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PlanJobCommitResponseObject); ok {
 		if err := validResponse.VisitPlanJobCommitResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetLibraryCheck operation middleware
+func (sh *strictHandler) GetLibraryCheck(w http.ResponseWriter, r *http.Request) {
+	var request GetLibraryCheckRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetLibraryCheck(ctx, request.(GetLibraryCheckRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetLibraryCheck")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetLibraryCheckResponseObject); ok {
+		if err := validResponse.VisitGetLibraryCheckResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

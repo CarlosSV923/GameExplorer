@@ -61,62 +61,80 @@ interface HelpBarProps {
   actions: readonly HelpAction[]
   /** What to show without a gamepad: real buttons, or nothing. */
   children?: ReactNode
+  /** Shown at the end in both modes (the language switch on the login). */
+  aside?: ReactNode
 }
 
 /**
  * The bottom bar (RNF-06): gamepad glyphs only while a gamepad is
  * connected; otherwise regular buttons (children) or no bar at all.
  */
-export function HelpBar({ actions, children }: HelpBarProps) {
+export function HelpBar({ actions, children, aside }: HelpBarProps) {
   const gamepad = useGamepadConnected()
   if (gamepad) {
     return (
       <footer className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 bg-bar px-6 py-4 text-heading font-medium">
         {actions.map((a) => (
-          <span key={a.glyph} className="inline-flex items-center gap-2.5">
+          <span key={a.glyph + a.label} className="inline-flex items-center gap-2.5">
             <Glyph name={a.glyph} />
             {a.label}
           </span>
         ))}
+        {aside}
       </footer>
     )
   }
-  if (!children) return null
+  if (!children && !aside) return null
   return (
     <footer className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 bg-bar px-4 py-3 sm:px-6 lg:px-10">
       {children}
+      {aside}
     </footer>
   )
 }
 
+/** Classes of the 44 px "Back" link above a page title (a router link). */
+export const backLinkClass =
+  'inline-flex min-h-control-sm items-center gap-1.5 self-start text-body-sm text-ink-2 no-underline hover:text-ink-1'
+
 interface PageHeaderProps {
-  back?: { href: string; label: string }
+  /** The back link (rendered by the caller: it is a router link). */
+  back?: ReactNode
   title: ReactNode
+  /** A line under the title (file name, counts). */
+  meta?: ReactNode
   aside?: ReactNode
 }
 
-/** Back link (44 px), the page's h1 and an optional aside. */
-export function PageHeader({ back, title, aside }: PageHeaderProps) {
+/** Back link, the page's h1 and an optional aside. */
+export function PageHeader({ back, title, meta, aside }: PageHeaderProps) {
   return (
     <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-4 pt-7 pb-5 sm:px-6 lg:px-10">
-      <div className="flex flex-col gap-1.5">
-        {back && (
-          <a
-            href={back.href}
-            className="inline-flex min-h-control-sm items-center gap-1.5 text-body-sm text-ink-2 no-underline hover:text-ink-1"
-          >
-            <ChevronLeftIcon size={16} />
-            {back.label}
-          </a>
-        )}
-        <h1 className="m-0 text-display font-bold tracking-display uppercase">{title}</h1>
+      <div className="flex min-w-0 flex-col gap-1.5">
+        {back}
+        <h1 className="m-0 text-display font-bold tracking-display break-words uppercase">
+          {title}
+        </h1>
+        {meta}
       </div>
-      {aside}
+      {aside && <div className="flex flex-wrap items-center gap-4">{aside}</div>}
     </header>
+  )
+}
+
+/** Back link content: chevron and label. */
+export function BackLabel({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <ChevronLeftIcon size={16} />
+      {children}
+    </>
   )
 }
 
 /** A table container that scrolls sideways on narrow screens. */
 export function TableBox({ children }: { children: ReactNode }) {
-  return <div className="overflow-x-auto rounded-lg border border-line">{children}</div>
+  // relative: screen-reader-only labels (position: absolute) stay inside the
+  // scrolling box instead of widening the page.
+  return <div className="relative overflow-x-auto rounded-lg border border-line">{children}</div>
 }

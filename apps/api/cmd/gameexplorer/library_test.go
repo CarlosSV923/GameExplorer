@@ -19,6 +19,7 @@ import (
 
 type gameSummaryJSON struct {
 	ID        int64  `json:"id"`
+	IgdbID    int64  `json:"igdbId"`
 	Console   string `json:"console"`
 	Title     string `json:"title"`
 	Folder    string `json:"folder"`
@@ -93,17 +94,27 @@ func TestLibraryListsConsolesGamesAndDetail(t *testing.T) {
 	consoles := decode[[]struct {
 		Slug      string `json:"slug"`
 		GameCount int    `json:"gameCount"`
+		BuiltIn   bool   `json:"builtIn"`
+		Detection string `json:"detection"`
 	}](t, get(t, srv, cookie, "/api/consoles"))
 	counts := map[string]int{}
+	detections := map[string]string{}
 	for _, c := range consoles {
 		counts[c.Slug] = c.GameCount
+		detections[c.Slug] = c.Detection
+		if !c.BuiltIn {
+			t.Errorf("%s is not built in", c.Slug)
+		}
 	}
 	if counts["switch"] != 2 || counts["psx"] != 0 {
 		t.Fatalf("game counts = %v", counts)
 	}
+	if detections["switch"] != "titleId" || detections["ps3"] != "structure" || detections["gc"] != "header" {
+		t.Fatalf("detections = %v", detections)
+	}
 
 	games := decode[[]gameSummaryJSON](t, get(t, srv, cookie, "/api/consoles/switch/games"))
-	if len(games) != 2 || games[0].Title != "Mario Kart 8 Deluxe" || games[0].ItemCount != 2 ||
+	if len(games) != 2 || games[0].Title != "Mario Kart 8 Deluxe" || games[0].IgdbID != 26764 || games[0].ItemCount != 2 ||
 		games[0].Size != int64(len("PFS0 base")+len("PFS0 update!")) || games[1].Folder != "The Legend of Zelda - Tears of the Kingdom" {
 		t.Fatalf("switch games = %+v", games)
 	}

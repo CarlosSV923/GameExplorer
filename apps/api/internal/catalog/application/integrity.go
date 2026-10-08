@@ -11,9 +11,11 @@ import (
 
 // IntegrityReport summarizes an integrity check.
 type IntegrityReport struct {
-	Checked int // items looked at
-	Missing int // items that went missing in this check
-	Found   int // missing items whose files are back
+	CheckedAt    time.Time
+	Checked      int // items looked at
+	Missing      int // items that went missing in this check
+	Found        int // missing items whose files are back
+	MissingTotal int // items still missing afterwards
 }
 
 // ErrNotMissing is returned when forgetting an item whose files are on disk.
@@ -24,7 +26,7 @@ var ErrNotMissing = errors.New("item is not missing")
 func (s *LibraryService) CheckIntegrity(ctx context.Context) (IntegrityReport, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var rep IntegrityReport
+	rep := IntegrityReport{CheckedAt: s.now()}
 	games, err := s.repo.ListGames(ctx)
 	if err != nil {
 		return rep, err
@@ -60,6 +62,9 @@ func (s *LibraryService) CheckIntegrity(ctx context.Context) (IntegrityReport, e
 				}
 				complete = complete && ok
 			}
+			if !complete {
+				rep.MissingTotal++
+			}
 			switch {
 			case !complete && it.MissingSince == nil:
 				rep.Missing++
@@ -72,9 +77,10 @@ func (s *LibraryService) CheckIntegrity(ctx context.Context) (IntegrityReport, e
 		}
 	}
 	if len(changes) == 0 {
+		s.lastCheck = &rep
 		return rep, nil
 	}
-	return rep, s.repo.Apply(ctx, "", func(tx domain.LibraryTx) error {
+	err = s.repo.Apply(ctx, "", func(tx domain.LibraryTx) error {
 		for _, c := range changes {
 			if err := tx.SetMissing(ctx, c.id, c.since); err != nil {
 				return err
@@ -82,6 +88,21 @@ func (s *LibraryService) CheckIntegrity(ctx context.Context) (IntegrityReport, e
 		}
 		return nil
 	})
+	if err == nil {
+		s.lastCheck = &rep
+	}
+	return rep, err
+}
+
+// LastIntegrity returns the last integrity check, or nil before the first.
+func (s *LibraryService) LastIntegrity() *IntegrityReport {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.lastCheck == nil {
+		return nil
+	}
+	rep := *s.lastCheck
+	return &rep
 }
 
 // Forget removes a missing item from the library: there are no files left

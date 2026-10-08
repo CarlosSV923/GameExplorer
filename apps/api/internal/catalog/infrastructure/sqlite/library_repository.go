@@ -39,7 +39,7 @@ func (r *LibraryRepository) ListGames(ctx context.Context) ([]domain.GameSummary
 	out := make([]domain.GameSummary, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, domain.GameSummary{
-			ID: domain.GameID(row.ID), ConsoleID: domain.ConsoleID(row.ConsoleID), Title: row.Title, Folder: row.Folder,
+			ID: domain.GameID(row.ID), ConsoleID: domain.ConsoleID(row.ConsoleID), IGDBID: row.IgdbID, Title: row.Title, Folder: row.Folder,
 			ItemCount: int(row.ItemCount), MissingCount: int(row.MissingCount), Size: row.Size,
 			ReleaseYear: intPtr(row.ReleaseYear), CoverImageID: stringPtr(row.CoverImageID),
 		})

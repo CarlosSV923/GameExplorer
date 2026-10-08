@@ -200,6 +200,7 @@ type Operation struct {
 type GameSummary struct {
 	ID           GameID
 	ConsoleID    ConsoleID
+	IGDBID       int64
 	Title        string
 	Folder       string
 	ReleaseYear  *int
