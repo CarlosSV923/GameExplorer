@@ -147,7 +147,7 @@ Depende de: 10 · Cubre: RF-03, RF-07b, RF-26, RF-26a, RF-27, RF-27a · Versión
 - [x] Subida sin consola: consola e IGDB opcionales en el formulario; extraer todo a `_unassigned/<nombre>/`, agregar a entradas existentes con sufijo en choques, guardar IGDB en la entrada (RF-03, RF-07b)
 - [x] Asignar una entrada completa: un formulario, una confirmación con tipo o «No guardar» por archivo, una sola operación revertible (RF-27a). Los archivos no se mueven al asignar: quedan en la entrada, marcados «Asignándose» y sin acciones, hasta guardarlos; cancelar solo los libera.
 - [x] Contrato OpenAPI, migración `00003`, i18n ES/EN y tests (Go y web)
-- [ ] Prueba real en el NAS: copiar por Samba a `_unassigned/`, subir sin consola un comprimido con base/update/DLC y asignarlo de una vez
+- [x] Prueba real en el NAS con `v0.11.0` (2026-10-09): copia por Samba a `_unassigned/` (aparece como «Copiando…» y luego queda lista), subida sin consola de un comprimido a `_unassigned/<nombre>/`, asignación de la entrada completa con archivos en «No guardar», y los archivos que escaneos anteriores dejaron en `_unassigned/switch/` salieron de esa carpeta agrupados por juego.
 
 ## Fase 11 — Modo demo
 Depende de: 10.5 · Cubre: RF-60 a RF-65
