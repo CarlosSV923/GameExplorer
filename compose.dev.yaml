@@ -5,7 +5,7 @@
 # Values come from .env.local (loaded by Task) with safe dev defaults.
 services:
   api:
-    image: gameexplorer-dev:2
+    image: gameexplorer-dev:3
     build:
       context: .
       dockerfile: deploy/dev/Dockerfile

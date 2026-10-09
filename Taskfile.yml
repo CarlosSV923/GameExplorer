@@ -6,7 +6,7 @@ dotenv: ['.env.local']
 vars:
   API_DIR: apps/api
   # Go toolchain + official 7-Zip (deploy/dev/Dockerfile); built by dev:image.
-  GO_IMAGE: gameexplorer-dev:2
+  GO_IMAGE: gameexplorer-dev:3
   SQLC_IMAGE: sqlc/sqlc:1.31.1
   LINT_IMAGE: golangci/golangci-lint:v2.14.0
   # Go tooling runs in Docker: identical to CI on every OS, and avoids Windows

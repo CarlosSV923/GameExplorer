@@ -1,6 +1,6 @@
 # Development/test image: the Go toolchain plus the official 7-Zip (with RAR).
 # Built by `task dev:image`; used by compose.dev.yaml and the Taskfile's Go tasks.
-FROM golang:1.27
+FROM golang:1.27.2
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends xz-utils \

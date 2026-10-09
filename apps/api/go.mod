@@ -2,6 +2,8 @@ module github.com/CarlosSV923/GameExplorer/apps/api
 
 go 1.27.0
 
+toolchain go1.27.2
+
 require (
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/oapi-codegen/runtime v1.7.0
