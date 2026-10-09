@@ -154,6 +154,11 @@ func sourcesDir(libraryPath string) string {
 
 // newApp wires every adapter. It is the only place that knows them all.
 func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, error) {
+	// Without its data folder the app cannot even keep sessions: say why
+	// instead of SQLite's "unable to open database file".
+	if err := system.WritableDir("data-writable", cfg.DataPath).Run(ctx); err != nil {
+		return nil, fmt.Errorf("DATA_PATH: %w", err)
+	}
 	db, err := database.Open(ctx, cfg.DataPath)
 	if err != nil {
 		return nil, err
