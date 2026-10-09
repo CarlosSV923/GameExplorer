@@ -6,22 +6,22 @@ services:
     restart: unless-stopped
     # The user that owns what the app writes. Give it a Modify ACL entry on
     # the library dataset (a container does not inherit supplementary groups).
-    user: "3000:3000"
+    user: '3000:3000'
     ports:
-      - "8080:8080"
+      - '8080:8080'
     environment:
       LIBRARY_PATH: /library
       DATA_PATH: /data
-      APP_PASSWORD: "CHANGE-me"            # or APP_PASSWORD_HASH (argon2id)
-      SESSION_SECRET: "CHANGE-32-or-more-random-characters"
-      COOKIE_SECURE: "false"               # true only behind HTTPS
-      IGDB_CLIENT_ID: ""                   # optional
-      IGDB_CLIENT_SECRET: ""               # optional
+      APP_PASSWORD: 'CHANGE-me' # or APP_PASSWORD_HASH (argon2id)
+      SESSION_SECRET: 'CHANGE-32-or-more-random-characters'
+      COOKIE_SECURE: 'false' # true only behind HTTPS
+      IGDB_CLIENT_ID: '' # optional
+      IGDB_CLIENT_SECRET: '' # optional
       LIBRARY_SCAN_INTERVAL: 15m
-      TRASH_RETENTION_DAYS: "30"
+      TRASH_RETENTION_DAYS: '30'
       # SWITCH_EXTENSIONS: .nsp,.xci
       # WII_EXTENSIONS: .iso,.wbfs,.rvz,.nkit.iso
       # PSP_EXTENSIONS: .iso,.cso
     volumes:
-      - /mnt/CHANGE-pool/games:/library     # the SMB dataset
-      - /mnt/CHANGE-pool/apps/gameexplorer:/data   # SQLite + image cache
+      - /mnt/CHANGE-pool/games:/library # the SMB dataset
+      - /mnt/CHANGE-pool/apps/gameexplorer:/data # SQLite + image cache
