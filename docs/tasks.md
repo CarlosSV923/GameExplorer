@@ -132,7 +132,12 @@ Depende de: 9 · Cubre: el ajuste del 2026-10-08 (aviso al inicio de `spec.md`):
 - [x] **Carrusel** (RF-20): solo consolas con juegos; No asignados al final si tiene archivos; estado vacío. Se borran las carpetas de juego y de consola que quedan vacías (RF-25)
 - [x] **IGDB opcional** (RF-54): la app arranca y funciona sin credenciales
 - [x] **Datos**: se reemplazan las migraciones por un esquema nuevo y se borra la base de `.dev` (no hay nada en producción). `contracts/detection-cases.json` fuera; `openapi.yaml`, `task gen`, tests de Go y web, `CLAUDE.md` y README EN/ES al día
-- [ ] Prueba real con `~/Downloads/PruebaJuegos` (Switch, Wii, PSP) y con archivos agregados, renombrados y borrados por Samba en `.dev/library`. Ya probado en el navegador contra la API: el escaneo movió a No asignados los 9 archivos que quedaron de la prueba anterior; asignar uno, confirmarlo, renombrarlo con nombre propio, editar su tipo y devolverlo a No asignados (con borrado de carpetas vacías); un `.zip` subido como Switch con un `.nkit.iso` dentro dio el error de validación, pasó a Wii sin volver a descomprimir y se guardó; extensiones propias en Ajustes
+- [x] Prueba real con `~/Downloads/PruebaJuegos` (Switch, Wii, PSP) y con archivos agregados, renombrados y borrados por Samba en `.dev/library` (2026-10-09):
+  - 16 subidas (~36 GB) con nombre y consola en los metadatos de tus, 2 a la vez a ~40–50 MB/s; la API se mantuvo en ~35 MB de RAM. Todas se descomprimieron y validaron: los 4 `.7z`/`.zip` de Wii traían un `.nkit.iso` cada uno, que conservó su extensión doble; los 4 `.iso` de PSP pasaron la validación previa.
+  - Se guardaron 3 juegos de Switch con base, update y DLC (`Animal Crossing - New Horizons [DLC Happy Home Paradise].nsp`, `[UPDATE v3.0.3]`…), 4 de Wii y 4 de PSP. Ōkami, subido a propósito como Switch, dio el error de validación y pasó a Wii sin volver a descomprimir.
+  - Asignar desde No asignados un update que ya existía dio el choque como `undecided` y guardar sin decidir respondió 409; al cancelar, el archivo volvió a la sección.
+  - Samba: un `.iso` de PS2 copiado a `ps2/`, un archivo renombrado, otro borrado y un `.txt` dentro de la carpeta de un juego. El escaneo quitó del catálogo lo renombrado y lo borrado, y en el escaneo siguiente movió lo desconocido a `_unassigned/` conservando su ruta y borró las carpetas vacías.
+  - Hallazgo corregido: al cancelar una asignación, el archivo volvía con el motivo «manual» y la ruta como origen; ahora el trabajo guarda el origen y el motivo originales (migración `00002`).
 
 ## Fase 11 — Modo demo
 Depende de: 10 · Cubre: RF-60 a RF-65

@@ -37,6 +37,7 @@ func (r *JobRepository) Create(ctx context.Context, j *domain.UploadJob) error {
 		Console: j.Console, Title: j.Title, IgdbID: nullInt(j.IGDBID), InvalidReason: string(j.InvalidReason),
 		GroupID: j.GroupID, GroupSize: int64(j.GroupSize), MergedInto: string(j.MergedInto),
 		StoragePath: j.StoragePath, UnassignedOrigin: j.UnassignedOrigin,
+		UnassignedFrom: j.UnassignedFrom, UnassignedReason: j.UnassignedReason,
 		CreatedAt: formatTime(j.CreatedAt), UpdatedAt: formatTime(j.UpdatedAt),
 	})
 }
@@ -127,6 +128,7 @@ func toDomain(row sqlcgen.UploadJob) (*domain.UploadJob, error) {
 		},
 		InvalidReason: domain.InvalidReason(row.InvalidReason), MergedInto: domain.JobID(row.MergedInto),
 		StoragePath: row.StoragePath, UnassignedOrigin: row.UnassignedOrigin,
+		UnassignedFrom: row.UnassignedFrom, UnassignedReason: row.UnassignedReason,
 		CreatedAt: created, UpdatedAt: updated,
 	}
 	if row.IgdbID.Valid {

@@ -165,7 +165,7 @@ func (s *Service) Assign(ctx context.Context, unassigned int64, spec domain.Spec
 	if src, err = s.library.TakeUnassigned(ctx, unassigned, dest); err != nil {
 		return nil, err
 	}
-	job.UnassignedOrigin = src.Path
+	job.UnassignedOrigin, job.UnassignedFrom, job.UnassignedReason = src.Path, src.Origin, src.Reason
 	if err := job.MarkUploaded(dest, s.now()); err != nil {
 		return nil, err
 	}

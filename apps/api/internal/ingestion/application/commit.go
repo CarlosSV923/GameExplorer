@@ -99,6 +99,9 @@ type UnassignedSource struct {
 	// Path is relative to the unassigned folder.
 	Path string
 	Size int64
+	// Origin and Reason say where it came from (kept if it is given back).
+	Origin string
+	Reason string
 }
 
 // Library is the catalog seen from ingestion (wired in the composition root).

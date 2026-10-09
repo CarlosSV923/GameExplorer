@@ -13,8 +13,8 @@ import (
 const createJob = `-- name: CreateJob :exec
 INSERT INTO upload_jobs (id, file_name, size, received, status, error, warning, progress, console, title, igdb_id,
                          invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin,
-                         created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         unassigned_from, unassigned_reason, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateJobParams struct {
@@ -35,6 +35,8 @@ type CreateJobParams struct {
 	MergedInto       string
 	StoragePath      string
 	UnassignedOrigin string
+	UnassignedFrom   string
+	UnassignedReason string
 	CreatedAt        string
 	UpdatedAt        string
 }
@@ -58,6 +60,8 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) error {
 		arg.MergedInto,
 		arg.StoragePath,
 		arg.UnassignedOrigin,
+		arg.UnassignedFrom,
+		arg.UnassignedReason,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -65,7 +69,7 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) error {
 }
 
 const getJob = `-- name: GetJob :one
-SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at FROM upload_jobs WHERE id = ?
+SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at, unassigned_from, unassigned_reason FROM upload_jobs WHERE id = ?
 `
 
 func (q *Queries) GetJob(ctx context.Context, id string) (UploadJob, error) {
@@ -91,6 +95,8 @@ func (q *Queries) GetJob(ctx context.Context, id string) (UploadJob, error) {
 		&i.UnassignedOrigin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UnassignedFrom,
+		&i.UnassignedReason,
 	)
 	return i, err
 }
@@ -107,7 +113,7 @@ func (q *Queries) JobExists(ctx context.Context, id string) (bool, error) {
 }
 
 const listGroup = `-- name: ListGroup :many
-SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at FROM upload_jobs WHERE group_id = ? ORDER BY created_at, id
+SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at, unassigned_from, unassigned_reason FROM upload_jobs WHERE group_id = ? ORDER BY created_at, id
 `
 
 func (q *Queries) ListGroup(ctx context.Context, groupID string) ([]UploadJob, error) {
@@ -139,6 +145,8 @@ func (q *Queries) ListGroup(ctx context.Context, groupID string) ([]UploadJob, e
 			&i.UnassignedOrigin,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.UnassignedFrom,
+			&i.UnassignedReason,
 		); err != nil {
 			return nil, err
 		}
@@ -154,7 +162,7 @@ func (q *Queries) ListGroup(ctx context.Context, groupID string) ([]UploadJob, e
 }
 
 const listJobs = `-- name: ListJobs :many
-SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at FROM upload_jobs ORDER BY created_at DESC LIMIT ?
+SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at, unassigned_from, unassigned_reason FROM upload_jobs ORDER BY created_at DESC LIMIT ?
 `
 
 func (q *Queries) ListJobs(ctx context.Context, limit int64) ([]UploadJob, error) {
@@ -186,6 +194,8 @@ func (q *Queries) ListJobs(ctx context.Context, limit int64) ([]UploadJob, error
 			&i.UnassignedOrigin,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.UnassignedFrom,
+			&i.UnassignedReason,
 		); err != nil {
 			return nil, err
 		}
@@ -201,7 +211,7 @@ func (q *Queries) ListJobs(ctx context.Context, limit int64) ([]UploadJob, error
 }
 
 const listStaleJobs = `-- name: ListStaleJobs :many
-SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at FROM upload_jobs WHERE status = ? AND updated_at < ? ORDER BY updated_at
+SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at, unassigned_from, unassigned_reason FROM upload_jobs WHERE status = ? AND updated_at < ? ORDER BY updated_at
 `
 
 type ListStaleJobsParams struct {
@@ -238,6 +248,8 @@ func (q *Queries) ListStaleJobs(ctx context.Context, arg ListStaleJobsParams) ([
 			&i.UnassignedOrigin,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.UnassignedFrom,
+			&i.UnassignedReason,
 		); err != nil {
 			return nil, err
 		}

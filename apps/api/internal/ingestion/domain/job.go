@@ -124,6 +124,10 @@ type UploadJob struct {
 	// UnassignedOrigin is the path inside the unassigned folder the job's
 	// file came from (RF-27); "" for uploads.
 	UnassignedOrigin string
+	// UnassignedFrom and UnassignedReason are that file's origin and reason
+	// in the section, to give it back as it was if the job is cancelled.
+	UnassignedFrom   string
+	UnassignedReason string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }

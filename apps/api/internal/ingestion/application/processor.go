@@ -150,9 +150,13 @@ func (p *Processor) giveBack(ctx context.Context, job *domain.UploadJob) {
 	if !p.d.Staging.Exists(src) {
 		return
 	}
+	origin, reason := job.UnassignedFrom, job.UnassignedReason
+	if origin == "" || reason == "" {
+		origin, reason = job.UnassignedOrigin, "manual"
+	}
 	err := p.d.Library.PutAside(ctx, SetAsideRequest{
 		Source: string(job.ID), Root: filepath.Dir(src), Files: []string{filepath.Base(src)},
-		Folder: path.Dir(job.UnassignedOrigin), Origin: job.UnassignedOrigin, Reason: "manual",
+		Folder: path.Dir(job.UnassignedOrigin), Origin: origin, Reason: reason,
 	})
 	if err != nil {
 		p.d.Log.Error("give file back to the unassigned section", "job", job.ID, "error", err)

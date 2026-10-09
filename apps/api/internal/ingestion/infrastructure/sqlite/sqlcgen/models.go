@@ -106,4 +106,6 @@ type UploadJob struct {
 	UnassignedOrigin string
 	CreatedAt        string
 	UpdatedAt        string
+	UnassignedFrom   string
+	UnassignedReason string
 }

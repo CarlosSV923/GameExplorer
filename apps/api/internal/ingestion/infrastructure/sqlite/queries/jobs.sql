@@ -1,8 +1,8 @@
 -- name: CreateJob :exec
 INSERT INTO upload_jobs (id, file_name, size, received, status, error, warning, progress, console, title, igdb_id,
                          invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin,
-                         created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                         unassigned_from, unassigned_reason, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetJob :one
 SELECT * FROM upload_jobs WHERE id = ?;

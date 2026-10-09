@@ -103,7 +103,9 @@ func (l libraryPort) UnassignedFile(ctx context.Context, id int64) (ingestionapp
 	if err != nil {
 		return ingestionapp.UnassignedSource{}, libraryError(err)
 	}
-	return ingestionapp.UnassignedSource{Name: f.Name(), Path: f.Path, Size: f.Size}, nil
+	return ingestionapp.UnassignedSource{
+		Name: f.Name(), Path: f.Path, Size: f.Size, Origin: f.Origin, Reason: string(f.Reason),
+	}, nil
 }
 
 func (l libraryPort) TakeUnassigned(ctx context.Context, id int64, dest string) (ingestionapp.UnassignedSource, error) {
@@ -111,7 +113,9 @@ func (l libraryPort) TakeUnassigned(ctx context.Context, id int64, dest string) 
 	if err != nil {
 		return ingestionapp.UnassignedSource{}, libraryError(err)
 	}
-	return ingestionapp.UnassignedSource{Name: f.Name(), Path: f.Path, Size: f.Size}, nil
+	return ingestionapp.UnassignedSource{
+		Name: f.Name(), Path: f.Path, Size: f.Size, Origin: f.Origin, Reason: string(f.Reason),
+	}, nil
 }
 
 func storeRequest(req ingestionapp.LibraryRequest) catalogapp.StoreRequest {

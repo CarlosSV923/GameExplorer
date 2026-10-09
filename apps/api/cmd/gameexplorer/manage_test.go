@@ -280,8 +280,30 @@ func TestScanFindsChangesMadeOverSMB(t *testing.T) {
 	if status.LastScan == nil || status.LastScan.Unassigned != 1 {
 		t.Fatalf("last scan = %+v", status)
 	}
-	if n := len(unassignedList(t, srv, cookie)); n != 3 {
-		t.Fatalf("unassigned = %d, want 3", n)
+	files := unassignedList(t, srv, cookie)
+	if len(files) != 3 {
+		t.Fatalf("unassigned = %d, want 3", len(files))
+	}
+
+	// An assignment that is cancelled gives the file back as it arrived.
+	var extra unassignedJSON
+	for _, f := range files {
+		if f.Name == "extra.nsp" {
+			extra = f
+		}
+	}
+	if extra.Reason != "samba" {
+		t.Fatalf("extra.nsp = %+v", extra)
+	}
+	res := post(t, srv, cookie, "/api/unassigned/"+id(extra.ID)+"/assign", `{"console":"switch","title":"Extra"}`)
+	wantStatus(t, res, http.StatusCreated, "assign")
+	job := decode[jobJSON](t, res)
+	waitStatus(t, srv, cookie, job.ID, "confirm")
+	wantStatus(t, post(t, srv, cookie, "/api/jobs/"+job.ID+"/cancel", ""), http.StatusOK, "cancel")
+	for _, f := range unassignedList(t, srv, cookie) {
+		if f.Name == "extra.nsp" && (f.Reason != extra.Reason || f.Origin != extra.Origin || f.Path != extra.Path) {
+			t.Fatalf("given back as %+v, want %+v", f, extra)
+		}
 	}
 }
 
