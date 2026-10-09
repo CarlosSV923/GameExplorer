@@ -46,7 +46,6 @@ func TestNewUploadJobNeedsItsForm(t *testing.T) {
 	t.Parallel()
 
 	bad := []domain.Spec{
-		{Title: "Limbo"},
 		{Console: "switch"},
 		{Console: "switch", Title: "   "},
 		{Console: "switch", Title: "Limbo", GroupID: "g"},
@@ -56,6 +55,11 @@ func TestNewUploadJobNeedsItsForm(t *testing.T) {
 		if _, err := domain.NewUploadJob("x", "a.nsp", 1, s, t0); !errors.Is(err, domain.ErrInvalidSpec) {
 			t.Errorf("spec %+v: err = %v", s, err)
 		}
+	}
+	// Without console the upload goes to the unassigned section (RF-07b).
+	j, err := domain.NewUploadJob("x", "a.zip", 1, domain.Spec{Title: "Limbo"}, t0)
+	if err != nil || !j.Unassigned() || j.FromEntry() {
+		t.Fatalf("job without console = %+v, %v", j, err)
 	}
 }
 

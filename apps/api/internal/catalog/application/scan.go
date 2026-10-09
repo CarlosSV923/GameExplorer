@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -45,9 +44,9 @@ func ignoredName(rel string) bool {
 
 // Scan compares the library with what the app knows (RF-26): files deleted
 // over SMB leave the library; unknown files in the console folders or the
-// root move to the unassigned section, keeping their path, once a later
-// scan finds them unchanged; files copied straight into the unassigned
-// folder join the section.
+// root move to the unassigned section once a later
+// scan finds them unchanged, leaving their console folder behind; files
+// copied straight into the unassigned folder join the section once settled.
 func (s *LibraryService) Scan(ctx context.Context) (ScanReport, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -119,20 +118,39 @@ func (s *LibraryService) Scan(ctx context.Context) (ScanReport, error) {
 		gone = nil
 	}
 
-	newRows, staleRows, err := s.syncUnassignedFolder(ctx)
+	newRows, staleRows, copying, err := s.readUnassignedFolder(ctx)
 	if err != nil {
 		return rep, err
+	}
+	consoles, err := s.consoles.List(ctx)
+	if err != nil {
+		return rep, err
+	}
+	isConsole := map[string]bool{}
+	for _, c := range consoles {
+		isConsole[string(c.Slug)] = true
 	}
 
 	b := s.newOp("scan")
 	type moved struct {
-		rel  string
-		from string
-		size int64
+		rel     string
+		from    string
+		size    int64
+		console domain.Slug
 	}
 	var moves []moved
 	for _, f := range stable {
-		target, err := b.freeName(s.files.UnassignedPath(), f.Rel)
+		// A console folder is not kept: the file's console becomes a fact
+		// of the entry instead (RF-26).
+		target, console := f.Rel, domain.Slug("")
+		if first, rest, ok := strings.Cut(f.Rel, "/"); ok && isConsole[first] {
+			target, console = rest, domain.Slug(first)
+		}
+		target, err = s.entryFolder(target)
+		if err != nil {
+			return rep, err
+		}
+		target, err = b.freeName(s.files.UnassignedPath(), target)
 		if err != nil {
 			return rep, err
 		}
@@ -141,7 +159,7 @@ func (s *LibraryService) Scan(ctx context.Context) (ScanReport, error) {
 			return rep, err
 		}
 		b.pruneParents(s.files.LibraryPath(), f.Rel)
-		moves = append(moves, moved{target, f.Rel, f.Size})
+		moves = append(moves, moved{target, f.Rel, f.Size, console})
 	}
 	for _, f := range gone {
 		b.pruneGame(f.Console, f.Folder)
@@ -150,7 +168,7 @@ func (s *LibraryService) Scan(ctx context.Context) (ScanReport, error) {
 	err = s.run(ctx, b, func(tx domain.LibraryTx) error {
 		for _, m := range moves {
 			if _, err := tx.InsertUnassigned(ctx, domain.UnassignedFile{
-				Path: m.rel, Origin: m.from, Reason: domain.UnassignedSamba, Size: m.size, ArrivedAt: now,
+				Path: m.rel, Origin: m.from, Reason: domain.UnassignedSamba, Size: m.size, ArrivedAt: now, Console: m.console,
 			}); err != nil {
 				return err
 			}
@@ -181,58 +199,12 @@ func (s *LibraryService) Scan(ctx context.Context) (ScanReport, error) {
 	if err := s.repo.SetPendingFiles(ctx, stillPending); err != nil {
 		return rep, err
 	}
-	rep.Unassigned, rep.Removed, rep.Pending = len(moves)+len(newRows), len(gone), len(stillPending)
+	rep.Unassigned, rep.Removed, rep.Pending = len(moves)+len(newRows), len(gone), len(stillPending)+len(copying)
 	s.lastScan = &rep
 	if rep.Unassigned > 0 || rep.Removed > 0 {
 		s.log.Info("library scan", "unassigned", rep.Unassigned, "removed", rep.Removed, "pending", rep.Pending)
 	}
 	return rep, nil
-}
-
-// syncUnassignedFolder finds files copied into the unassigned folder over
-// SMB (new rows) and rows whose file is gone.
-func (s *LibraryService) syncUnassignedFolder(ctx context.Context) ([]domain.UnassignedFile, []domain.UnassignedID, error) {
-	rows, err := s.repo.UnassignedFiles(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	byPath := map[string]domain.UnassignedID{}
-	for _, r := range rows {
-		byPath[strings.ToLower(r.Path)] = r.ID
-	}
-	exists, err := s.files.Exists(s.files.UnassignedPath())
-	if err != nil {
-		return nil, nil, err
-	}
-	var tree []TreeFile
-	if exists {
-		if tree, err = s.files.Tree(s.files.UnassignedPath()); err != nil {
-			return nil, nil, err
-		}
-	}
-	now := s.now()
-	var added []domain.UnassignedFile
-	present := map[string]bool{}
-	for _, f := range tree {
-		rel := filepath.ToSlash(f.Rel)
-		if ignoredName(rel) {
-			continue
-		}
-		key := strings.ToLower(rel)
-		present[key] = true
-		if _, ok := byPath[key]; !ok {
-			added = append(added, domain.UnassignedFile{
-				Path: rel, Origin: unassignedDir + "/" + rel, Reason: domain.UnassignedSamba, Size: f.Size, ArrivedAt: now,
-			})
-		}
-	}
-	var stale []domain.UnassignedID
-	for key, id := range byPath {
-		if !present[key] {
-			stale = append(stale, id)
-		}
-	}
-	return added, stale, nil
 }
 
 // LastScan returns the last scan, or nil before the first.

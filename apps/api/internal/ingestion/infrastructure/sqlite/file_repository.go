@@ -38,7 +38,11 @@ func (r *FileRepository) Replace(ctx context.Context, id domain.JobID, files []d
 		return err
 	}
 	for _, f := range files {
-		if err := q.InsertFile(ctx, sqlcgen.InsertFileParams{JobID: string(id), Path: f.Path, Size: f.Size}); err != nil {
+		var un sql.NullInt64
+		if f.Unassigned != nil {
+			un = sql.NullInt64{Int64: *f.Unassigned, Valid: true}
+		}
+		if err := q.InsertFile(ctx, sqlcgen.InsertFileParams{JobID: string(id), Path: f.Path, Size: f.Size, UnassignedID: un}); err != nil {
 			return fmt.Errorf("insert %q: %w", f.Path, err)
 		}
 	}
@@ -53,7 +57,12 @@ func (r *FileRepository) List(ctx context.Context, id domain.JobID) ([]domain.St
 	}
 	out := make([]domain.StagedFile, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, domain.StagedFile{JobID: id, Path: row.Path, Size: row.Size})
+		f := domain.StagedFile{JobID: id, Path: row.Path, Size: row.Size}
+		if row.UnassignedID.Valid {
+			un := row.UnassignedID.Int64
+			f.Unassigned = &un
+		}
+		out = append(out, f)
 	}
 	return out, nil
 }

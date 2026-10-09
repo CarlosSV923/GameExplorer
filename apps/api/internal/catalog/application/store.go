@@ -19,6 +19,9 @@ type NewFile struct {
 	Kind        domain.ItemKind
 	Label       string
 	OnDuplicate domain.DuplicateAction
+	// Unassigned is set when the file comes straight from the unassigned
+	// section (Root is its folder): it leaves the section when stored (RF-27a).
+	Unassigned domain.UnassignedID
 }
 
 // StoreRequest adds the files of one upload to one game.
@@ -182,6 +185,7 @@ func (s *LibraryService) Store(ctx context.Context, req StoreRequest) (StoreResu
 	}
 	var replacements []replacement
 	var stored []domain.GameItem
+	var taken []domain.UnassignedID
 	for i, f := range p.Files {
 		if f.Action != ActionStore && f.Action != ActionReplace {
 			continue
@@ -198,6 +202,10 @@ func (s *LibraryService) Store(ctx context.Context, req StoreRequest) (StoreResu
 			return res, err
 		}
 		stored = append(stored, p.items[i])
+		if src.Unassigned != 0 {
+			taken = append(taken, src.Unassigned)
+			b.pruneParents(src.Root, src.Path)
+		}
 	}
 
 	now := s.now()
@@ -220,6 +228,11 @@ func (s *LibraryService) Store(ctx context.Context, req StoreRequest) (StoreResu
 		for _, it := range stored {
 			it.GameID = game.ID
 			if _, err := tx.InsertItem(ctx, it, now); err != nil {
+				return err
+			}
+		}
+		for _, id := range taken {
+			if err := tx.DeleteUnassigned(ctx, id); err != nil {
 				return err
 			}
 		}

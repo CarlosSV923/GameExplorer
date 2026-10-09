@@ -140,6 +140,24 @@ func (h *Handler) DownloadUnassigned(ctx context.Context, req httpapi.DownloadUn
 	if prob, ok := downloadProblem(err, "El archivo no existe."); ok {
 		return httpapi.DownloadUnassigned404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(prob)}, nil
 	}
+	if status, prob, _ := problemFor(err); status == http.StatusConflict {
+		return httpapi.DownloadUnassigned409ApplicationProblemPlusJSONResponse{ConflictApplicationProblemPlusJSONResponse: httpapi.ConflictApplicationProblemPlusJSONResponse(prob)}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return h.download(ctx, d), nil
+}
+
+// DownloadUnassignedEntry implements httpapi.StrictServerInterface.
+func (h *Handler) DownloadUnassignedEntry(ctx context.Context, req httpapi.DownloadUnassignedEntryRequestObject) (httpapi.DownloadUnassignedEntryResponseObject, error) {
+	d, err := h.library.UnassignedEntryDownload(ctx, domain.UnassignedID(req.Id))
+	if prob, ok := downloadProblem(err, "La entrada no existe en No asignados."); ok {
+		return httpapi.DownloadUnassignedEntry404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(prob)}, nil
+	}
+	if status, prob, _ := problemFor(err); status == http.StatusConflict {
+		return httpapi.DownloadUnassignedEntry409ApplicationProblemPlusJSONResponse{ConflictApplicationProblemPlusJSONResponse: httpapi.ConflictApplicationProblemPlusJSONResponse(prob)}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +235,10 @@ func (d downloadResponse) VisitDownloadItemResponse(w http.ResponseWriter) error
 func (d downloadResponse) VisitDownloadGameResponse(w http.ResponseWriter) error { return d.visit(w) }
 
 func (d downloadResponse) VisitDownloadUnassignedResponse(w http.ResponseWriter) error {
+	return d.visit(w)
+}
+
+func (d downloadResponse) VisitDownloadUnassignedEntryResponse(w http.ResponseWriter) error {
 	return d.visit(w)
 }
 

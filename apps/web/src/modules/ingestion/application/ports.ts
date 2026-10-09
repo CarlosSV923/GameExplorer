@@ -36,8 +36,8 @@ export interface UploadHandle {
 export interface IngestionPorts {
   /** Resumable upload (tus): the bytes never pass through memory twice. */
   upload(file: File, options: UploadOptions, callbacks: UploadCallbacks): UploadHandle
-  /** Starts a job from an unassigned file (RF-27). */
-  assign(unassignedId: number, spec: Omit<UploadSpec, 'group' | 'groupSize'>): Promise<UploadJob>
+  /** Starts a job that assigns an unassigned entry (RF-27a). */
+  assign(entryId: number, spec: Omit<UploadSpec, 'group' | 'groupSize'>): Promise<UploadJob>
   jobs(): Promise<UploadJob[]>
   job(id: string): Promise<UploadJob>
   /** Live job changes. Returns a function that stops watching. */

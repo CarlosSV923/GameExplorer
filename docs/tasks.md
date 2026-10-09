@@ -141,12 +141,12 @@ Depende de: 9 · Cubre: el ajuste del 2026-10-08 (aviso al inicio de `spec.md`):
 
 ## Fase 10.5 — Ajustes tras la prueba en el NAS
 Depende de: 10 · Cubre: RF-03, RF-07b, RF-26, RF-26a, RF-27, RF-27a · Versión: `v0.11.0`
-- [ ] `_unassigned/` se crea al arrancar; la sección lee la carpeta al abrirse y con «Revisar ahora», con estado «Copiando…» para archivos inestables (RF-26a)
-- [ ] Escaneo: quitar la carpeta de consola al mover a `_unassigned/` y guardar la consola de origen (RF-26)
-- [ ] No asignados por entradas (carpeta de primer nivel o archivo suelto): listado, descarga (zip para carpetas), papelera y borrado por entrada y por archivo (RF-27)
-- [ ] Subida sin consola: consola e IGDB opcionales en el formulario; extraer todo a `_unassigned/<nombre>/`, agregar a entradas existentes con sufijo en choques, guardar IGDB en la entrada (RF-03, RF-07b)
-- [ ] Asignar una entrada completa: un formulario, una confirmación con tipo o «No guardar» por archivo, una sola operación revertible (RF-27a)
-- [ ] Contrato OpenAPI, migración, i18n ES/EN y tests (Go y web)
+- [x] `_unassigned/` se crea al arrancar; la sección lee la carpeta al abrirse y con «Revisar ahora», con estado «Copiando…» para archivos inestables (RF-26a)
+- [x] Escaneo: quitar la carpeta de consola al mover a `_unassigned/` y guardar la consola de origen (RF-26). Al arrancar, lo que escaneos anteriores dejaron en `_unassigned/<consola>/` sale de esa carpeta de la misma forma.
+- [x] No asignados por entradas (carpeta de primer nivel o archivo suelto): listado, descarga (zip para carpetas), papelera y borrado por entrada y por archivo (RF-27)
+- [x] Subida sin consola: consola e IGDB opcionales en el formulario; extraer todo a `_unassigned/<nombre>/`, agregar a entradas existentes con sufijo en choques, guardar IGDB en la entrada (RF-03, RF-07b)
+- [x] Asignar una entrada completa: un formulario, una confirmación con tipo o «No guardar» por archivo, una sola operación revertible (RF-27a). Los archivos no se mueven al asignar: quedan en la entrada, marcados «Asignándose» y sin acciones, hasta guardarlos; cancelar solo los libera.
+- [x] Contrato OpenAPI, migración `00003`, i18n ES/EN y tests (Go y web)
 - [ ] Prueba real en el NAS: copiar por Samba a `_unassigned/`, subir sin consola un comprimido con base/update/DLC y asignarlo de una vez
 
 ## Fase 11 — Modo demo

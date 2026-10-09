@@ -11,7 +11,7 @@ import type {
   RestoreResult,
   ScanReport,
   TrashEntry,
-  UnassignedFile,
+  UnassignedEntry,
 } from '../domain/types'
 
 /** Consoles: the carousel and Settings (RF-40 to RF-42). */
@@ -46,12 +46,19 @@ export interface LibraryPorts {
   itemDownloadUrl(itemId: number): string
 }
 
-/** The unassigned section (RF-27); assigning starts an upload job (ingestion). */
+/**
+ * The unassigned section by entry (RF-27); assigning an entry starts an
+ * upload job (ingestion). Files and entries are acted on by id (an entry's
+ * id is one of its files').
+ */
 export interface UnassignedPorts {
-  list(): Promise<UnassignedFile[]>
-  trash(id: number): Promise<void>
-  remove(id: number): Promise<void>
-  downloadUrl(id: number): string
+  list(): Promise<UnassignedEntry[]>
+  trash(fileId: number): Promise<void>
+  remove(fileId: number): Promise<void>
+  downloadUrl(fileId: number): string
+  trashEntry(entryId: number): Promise<void>
+  removeEntry(entryId: number): Promise<void>
+  entryDownloadUrl(entryId: number): string
 }
 
 /** The trash (RF-30). */

@@ -41,8 +41,12 @@ interface Entry extends FormFile {
 
 function entriesOf(request: UploadFormRequest): Entry[] {
   if (request.kind === 'unassigned') {
-    const f = request.file
-    return [{ key: `u${String(f.id)}`, name: f.name, size: f.size, archive: f.archive }]
+    return request.entry.files.map((f) => ({
+      key: `u${f.path}`,
+      name: f.path,
+      size: f.size,
+      archive: f.archive,
+    }))
   }
   return request.files.map((file, i) => ({
     key: `${String(i)}-${file.name}`,
@@ -54,10 +58,24 @@ function entriesOf(request: UploadFormRequest): Entry[] {
 
 const modes: readonly UploadMode[] = ['parts', 'same', 'separate']
 
+/** The console option that sends an upload to the unassigned section (RF-07b). */
+const noConsole = '-'
+
+/** The name Asignar starts with: the entry's, without the extension of a loose file. */
+function entryTitle(request: UploadFormRequest): string {
+  if (request.kind !== 'unassigned') return ''
+  const { name, folder } = request.entry
+  const dot = name.lastIndexOf('.')
+  return folder || dot <= 0 ? name : name.slice(0, dot)
+}
+
 /**
- * The upload form (RF-03, RF-03a, RF-27): the game's name (IGDB suggestions
- * or free text) and console, before anything is sent. Files that are not
+ * The upload form (RF-03, RF-03a, RF-07b, RF-27a): the game's name (IGDB
+ * suggestions or free text) and console, before anything is sent. Without
+ * console the upload goes to the unassigned section. Files that are not
  * archives must fit the console. "Juegos distintos" asks once per file.
+ * Assigning an unassigned entry asks once for all its files, and the
+ * console is required.
  */
 export function UploadFormDialog({
   request,
@@ -77,21 +95,28 @@ export function UploadFormDialog({
   const [entries, setEntries] = useState(() => entriesOf(request))
   const [mode, setMode] = useState<UploadMode>(() => defaultMode(entries.map((e) => e.name)))
   const [step, setStep] = useState(0)
-  const [slug, setSlug] = useState(request.kind === 'files' ? (request.console ?? '') : '')
-  const [name, setName] = useState<NameValue>({ text: '' })
+  const assigning = request.kind === 'unassigned'
+  const [slug, setSlug] = useState(() => {
+    if (request.kind === 'unassigned') return request.entry.console ?? ''
+    return request.console ?? noConsole
+  })
+  const prefilled = entryTitle(request)
+  const [name, setName] = useState<NameValue>({ text: prefilled })
   const [tried, setTried] = useState(false)
 
   const all = consoles.data ?? []
   const target = all.find((c) => c.slug === slug)
+  const toUnassigned = !assigning && slug === noConsole
   const multi = entries.length > 1
-  const separate = multi && mode === 'separate'
+  const separate = !assigning && multi && mode === 'separate'
   // In "juegos distintos" the form is about one file at a time.
   const current = separate ? entries.slice(step, step + 1) : entries
-  const checks = current.map((e) => checkFile(e, target, all))
+  // An entry's files that do not fit are just not stored (RF-27a).
+  const checks = current.map((e) => (assigning ? 'ok' : checkFile(e, target, all)))
   const badFiles = checks.some((c) => c === 'invalid')
   const folder = gameFolder(name.text)
   const nameError = !folder.ok ? t('upload.needName') : undefined
-  const blocked = !target || !folder.ok || badFiles || current.length === 0
+  const blocked = (!target && !toUnassigned) || !folder.ok || badFiles || current.length === 0
   const last = !separate || step === entries.length - 1
 
   const remove = (key: string) => {
@@ -107,14 +132,17 @@ export function UploadFormDialog({
   const submit = () => {
     setTried(true)
     if (blocked) return
-    const igdbId = linkedId(name)
+    // The entry's IGDB game holds while its name is untouched.
+    const kept =
+      request.kind === 'unassigned' && name.text === prefilled ? request.entry.igdbId : undefined
+    const igdbId = linkedId(name) ?? kept ?? undefined
     const spec: UploadSpec = {
-      console: slug,
+      console: toUnassigned ? '' : slug,
       title: name.text.trim(),
       ...(igdbId === undefined ? {} : { igdbId }),
     }
     if (request.kind === 'unassigned') {
-      assign.mutate({ id: request.file.id, spec }, { onSuccess: onDone })
+      assign.mutate({ id: request.entry.id, spec }, { onSuccess: onDone })
       return
     }
     const files = current.flatMap((e) => (e.file ? [e.file] : []))
@@ -138,7 +166,7 @@ export function UploadFormDialog({
   })
 
   let title: string
-  if (request.kind === 'unassigned') title = t('upload.assignTitle', { name: request.file.name })
+  if (request.kind === 'unassigned') title = t('upload.assignTitle', { name: request.entry.name })
   else if (multi) title = t('upload.titleMany', { count: entries.length })
   else title = t('upload.title')
 
@@ -148,17 +176,31 @@ export function UploadFormDialog({
   else if (current.length > 1) submitLabel = t('upload.submitMany', { count: current.length })
   else submitLabel = t('upload.submit')
 
-  const afterHint = target
-    ? singleFile(target)
-      ? t('upload.afterOne', { exts: consoleExtensions(target).join(' ') })
-      : t('upload.afterKinds')
-    : undefined
+  let afterHint: string | undefined
+  if (toUnassigned) afterHint = t('upload.afterUnassigned')
+  else if (target && assigning) afterHint = t('upload.afterAssign')
+  else if (target && singleFile(target))
+    afterHint = t('upload.afterOne', { exts: consoleExtensions(target).join(' ') })
+  else if (target) afterHint = t('upload.afterKinds')
+
+  const consoleOptions = all.map((c) => ({
+    value: c.slug,
+    title: c.displayName,
+    detail: consoleExtensions(c).join(' '),
+  }))
+  if (!assigning) {
+    consoleOptions.unshift({
+      value: noConsole,
+      title: t('upload.noConsole'),
+      detail: t('upload.noConsoleDetail'),
+    })
+  }
 
   return (
     <Dialog
       size="lg"
       title={title}
-      subtitle={request.kind === 'unassigned' ? t('upload.assignSubtitle') : t('upload.subtitle')}
+      subtitle={assigning ? t('upload.assignSubtitle') : t('upload.subtitle')}
       onClose={onClose}
       initialFocus="field"
       actions={
@@ -269,11 +311,7 @@ export function UploadFormDialog({
         onChange={(next) => {
           setSlug(next)
         }}
-        options={all.map((c) => ({
-          value: c.slug,
-          title: c.displayName,
-          detail: consoleExtensions(c).join(' '),
-        }))}
+        options={consoleOptions}
         hint={
           <>
             {request.kind === 'files' && request.console && (
@@ -282,7 +320,7 @@ export function UploadFormDialog({
                 {t('upload.preselected')}
               </span>
             )}
-            {tried && !target && (
+            {tried && !target && !toUnassigned && (
               <span className="flex items-start gap-2 text-body-sm text-danger">
                 <ErrorIcon className="mt-px shrink-0" />
                 {t('upload.needConsole')}
@@ -302,8 +340,11 @@ export function UploadFormDialog({
       />
 
       <div className="flex flex-col gap-1.5">
-        <PathPreview label={t('upload.storedIn')} complete={Boolean(target) && folder.ok}>
-          {`${slug || '…'}/${folder.ok ? folder.name : '…'}/`}
+        <PathPreview
+          label={t('upload.storedIn')}
+          complete={(Boolean(target) || toUnassigned) && folder.ok}
+        >
+          {`${toUnassigned ? '_unassigned' : slug || '…'}/${folder.ok ? folder.name : '…'}/`}
         </PathPreview>
         {afterHint && <span className="text-caption font-semibold text-ink-3">{afterHint}</span>}
       </div>

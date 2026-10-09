@@ -321,22 +321,46 @@ func (h *Handler) UnassignItem(ctx context.Context, req httpapi.UnassignItemRequ
 
 // ListUnassigned implements httpapi.StrictServerInterface.
 func (h *Handler) ListUnassigned(ctx context.Context, _ httpapi.ListUnassignedRequestObject) (httpapi.ListUnassignedResponseObject, error) {
-	files, err := h.library.Unassigned(ctx)
+	entries, err := h.library.Unassigned(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := make(httpapi.ListUnassigned200JSONResponse, 0, len(files))
-	for _, f := range files {
-		out = append(out, unassignedToAPI(f))
+	out := make(httpapi.ListUnassigned200JSONResponse, 0, len(entries))
+	for _, e := range entries {
+		v := httpapi.UnassignedEntry{
+			Id: int64(e.ID), Name: e.Name, Folder: e.Folder, Size: e.Size, IgdbId: e.IGDBID,
+			ArrivedAt: e.ArrivedAt, Copying: e.Copying, Busy: e.Busy,
+			Files: make([]httpapi.UnassignedFile, 0, len(e.Files)),
+		}
+		if e.Console != "" {
+			c := string(e.Console)
+			v.Console = &c
+		}
+		for _, f := range e.Files {
+			v.Files = append(v.Files, unassignedToAPI(f))
+		}
+		out = append(out, v)
 	}
 	return out, nil
 }
 
 func unassignedToAPI(f application.UnassignedView) httpapi.UnassignedFile {
-	return httpapi.UnassignedFile{
-		Id: int64(f.ID), Path: f.Path, Name: f.Name(), Origin: f.Origin, Reason: httpapi.UnassignedFileReason(f.Reason),
-		Size: f.Size, ArrivedAt: f.ArrivedAt, Consoles: f.Consoles, Archive: f.Archive,
+	reason, origin := f.Reason, f.Origin
+	if f.Copying {
+		reason, origin = domain.UnassignedSamba, "_unassigned/"+f.Path
 	}
+	out := httpapi.UnassignedFile{
+		Id: int64(f.ID), Path: f.Path, Name: f.Name(), Origin: origin, Reason: httpapi.UnassignedFileReason(reason),
+		Size: f.Size, ArrivedAt: f.ArrivedAt, Consoles: f.Consoles, Archive: f.Archive, IgdbId: f.IGDBID,
+	}
+	if f.Copying {
+		out.Copying = &f.Copying
+	}
+	if f.Console != "" {
+		c := string(f.Console)
+		out.Console = &c
+	}
+	return out
 }
 
 // DeleteUnassigned implements httpapi.StrictServerInterface.
@@ -345,8 +369,41 @@ func (h *Handler) DeleteUnassigned(ctx context.Context, req httpapi.DeleteUnassi
 	if err == nil {
 		return httpapi.DeleteUnassigned204Response{}, nil
 	}
-	if status, p, _ := problemFor(err); status == http.StatusNotFound {
+	switch status, p, _ := problemFor(err); status {
+	case http.StatusNotFound:
 		return httpapi.DeleteUnassigned404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+	case http.StatusConflict:
+		return httpapi.DeleteUnassigned409ApplicationProblemPlusJSONResponse{ConflictApplicationProblemPlusJSONResponse: httpapi.ConflictApplicationProblemPlusJSONResponse(p)}, nil
+	}
+	return nil, err
+}
+
+// DeleteUnassignedEntry implements httpapi.StrictServerInterface.
+func (h *Handler) DeleteUnassignedEntry(ctx context.Context, req httpapi.DeleteUnassignedEntryRequestObject) (httpapi.DeleteUnassignedEntryResponseObject, error) {
+	err := h.library.DeleteUnassignedEntry(context.WithoutCancel(ctx), domain.UnassignedID(req.Id))
+	if err == nil {
+		return httpapi.DeleteUnassignedEntry204Response{}, nil
+	}
+	switch status, p, _ := problemFor(err); status {
+	case http.StatusNotFound:
+		return httpapi.DeleteUnassignedEntry404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+	case http.StatusConflict:
+		return httpapi.DeleteUnassignedEntry409ApplicationProblemPlusJSONResponse{ConflictApplicationProblemPlusJSONResponse: httpapi.ConflictApplicationProblemPlusJSONResponse(p)}, nil
+	}
+	return nil, err
+}
+
+// TrashUnassignedEntry implements httpapi.StrictServerInterface.
+func (h *Handler) TrashUnassignedEntry(ctx context.Context, req httpapi.TrashUnassignedEntryRequestObject) (httpapi.TrashUnassignedEntryResponseObject, error) {
+	err := h.library.TrashUnassignedEntry(context.WithoutCancel(ctx), domain.UnassignedID(req.Id))
+	if err == nil {
+		return httpapi.TrashUnassignedEntry204Response{}, nil
+	}
+	switch status, p, _ := problemFor(err); status {
+	case http.StatusNotFound:
+		return httpapi.TrashUnassignedEntry404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+	case http.StatusConflict:
+		return httpapi.TrashUnassignedEntry409ApplicationProblemPlusJSONResponse{ConflictApplicationProblemPlusJSONResponse: httpapi.ConflictApplicationProblemPlusJSONResponse(p)}, nil
 	}
 	return nil, err
 }

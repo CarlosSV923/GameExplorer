@@ -103,6 +103,16 @@ func (a *app) start(ctx context.Context) {
 		a.log.Error("recover interrupted commits", "error", err)
 	}
 	if a.uploads != nil {
+		// The unassigned folder exists from the start, so files can be
+		// copied into it over SMB right away (RF-26a).
+		if err := a.library.EnsureUnassignedDir(); err != nil {
+			a.log.Warn("create the unassigned folder", "error", err)
+		}
+		if n, err := a.library.FlattenConsoleFolders(ctx); err != nil {
+			a.log.Warn("flatten console folders of the unassigned section", "error", err)
+		} else if n > 0 {
+			a.log.Info("unassigned files moved out of their console folder", "files", n)
+		}
 		go a.uploads.Run(ctx, a.ingestion)
 		go a.ingestion.RunPurge(ctx, time.Hour)
 		go a.processor.Run(ctx, a.cfg.ExtractConcurrency)

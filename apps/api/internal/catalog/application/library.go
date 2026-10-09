@@ -134,6 +134,9 @@ type LibraryService struct {
 	mu sync.Mutex
 	// lastScan is the last scan report (guarded by mu).
 	lastScan *ScanReport
+	// unassignedSeen is the unassigned folder's unknown files as the last
+	// read saw them (guarded by mu, RF-26a).
+	unassignedSeen map[string]seenFile
 }
 
 // NewLibraryService builds the service. now may be nil (time.Now).

@@ -88,7 +88,7 @@ WHERE trash_entry_id IS NOT NULL
 ORDER BY id;
 
 -- name: ListTrashUnassigned :many
-SELECT id, path, origin, reason, size, arrived_at, trash_entry_id
+SELECT id, path, origin, reason, size, arrived_at, trash_entry_id, console, igdb_id, job_id
 FROM unassigned_files
 WHERE trash_entry_id IS NOT NULL
 ORDER BY id;
@@ -100,19 +100,19 @@ DELETE FROM trash_entries WHERE id = ?;
 UPDATE trash_entries SET game_id = sqlc.arg(to_game) WHERE game_id = sqlc.arg(from_game);
 
 -- name: ListUnassigned :many
-SELECT id, path, origin, reason, size, arrived_at, trash_entry_id
+SELECT id, path, origin, reason, size, arrived_at, trash_entry_id, console, igdb_id, job_id
 FROM unassigned_files
 WHERE trash_entry_id IS NULL
 ORDER BY arrived_at DESC, id DESC;
 
 -- name: GetUnassigned :one
-SELECT id, path, origin, reason, size, arrived_at, trash_entry_id
+SELECT id, path, origin, reason, size, arrived_at, trash_entry_id, console, igdb_id, job_id
 FROM unassigned_files
 WHERE id = ?;
 
 -- name: InsertUnassigned :one
-INSERT INTO unassigned_files (path, origin, reason, size, arrived_at, trash_entry_id)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO unassigned_files (path, origin, reason, size, arrived_at, trash_entry_id, console, igdb_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING id;
 
 -- name: SetUnassignedPlace :exec
@@ -141,3 +141,9 @@ ORDER BY created_at, id;
 
 -- name: DeleteOperation :exec
 DELETE FROM library_operations WHERE id = ?;
+
+-- name: SetUnassignedJob :exec
+UPDATE unassigned_files SET job_id = ? WHERE id = ?;
+
+-- name: ReleaseUnassignedJob :exec
+UPDATE unassigned_files SET job_id = '' WHERE job_id = ?;

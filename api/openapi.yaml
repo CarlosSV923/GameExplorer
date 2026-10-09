@@ -9,8 +9,10 @@ info:
 
     Uploads are NOT described here: they use the tus resumable upload protocol
     (https://tus.io/protocols/resumable-upload) mounted at /api/uploads/.
-    Upload-Metadata keys: `filename` and `consoleSlug` and `title` (required),
-    `igdbId` (optional, the IGDB game the title was picked from), and for the
+    Upload-Metadata keys: `filename` and `title` (required), `consoleSlug`
+    (optional: without it the upload's files, extracted, go to the unassigned
+    section under the title, RF-07b), `igdbId` (optional, the IGDB game the
+    title was picked from), and for the
     parts of one multi-volume archive `group` (a client-made id shared by the
     parts) and `groupSize` (how many parts).
 
@@ -294,7 +296,7 @@ paths:
       summary: Recent upload jobs, newest first
       description: |
         A job is created when the browser starts a tus upload at /api/uploads/
-        (see the metadata above) or assigns a file from the unassigned section,
+        (see the metadata above) or assigns an entry of the unassigned section,
         and follows it through extraction, validation, confirmation and commit.
       responses:
         '200':
@@ -865,16 +867,19 @@ paths:
     get:
       tags: [unassigned]
       operationId: listUnassigned
-      summary: Files in the unassigned section, newest first (RF-27)
+      summary: Entries of the unassigned section, newest first (RF-27)
+      description: |
+        Reads the unassigned folder first: files copied into it over SMB show
+        up right away, as copying until they settle (RF-26a).
       responses:
         '200':
-          description: Files.
+          description: Entries.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/UnassignedFile'
+                  $ref: '#/components/schemas/UnassignedEntry'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -892,6 +897,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /unassigned/{id}/download:
     get:
@@ -919,6 +926,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '416':
           description: The requested range is not satisfiable.
 
@@ -939,15 +948,81 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
-  /unassigned/{id}/assign:
+  /unassigned/entries/{id}:
+    delete:
+      tags: [unassigned]
+      operationId: deleteUnassignedEntry
+      summary: Delete every file of an entry for good (RF-27)
+      parameters:
+        - $ref: '#/components/parameters/UnassignedId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /unassigned/entries/{id}/download:
+    get:
+      tags: [unassigned]
+      operationId: downloadUnassignedEntry
+      summary: Download an entry; a folder as a zip without compression (RF-27)
+      parameters:
+        - $ref: '#/components/parameters/UnassignedId'
+      responses:
+        '200':
+          description: The file, or the zip.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: The requested range (single files only).
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '416':
+          description: The requested range is not satisfiable.
+
+  /unassigned/entries/{id}/trash:
+    post:
+      tags: [trash]
+      operationId: trashUnassignedEntry
+      summary: Send an entry to the trash, as one trash entry (RF-27)
+      parameters:
+        - $ref: '#/components/parameters/UnassignedId'
+      responses:
+        '204':
+          description: In the trash.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /unassigned/entries/{id}/assign:
     post:
       tags: [unassigned]
-      operationId: assignUnassigned
-      summary: Start an upload job from an unassigned file (RF-27)
+      operationId: assignUnassignedEntry
+      summary: Start a job that assigns a whole entry (RF-27a)
       description: |
-        The file leaves the section and follows the upload pipeline
-        (extraction if it is an archive, validation, confirmation). Cancelling
-        the job gives it back to the section.
+        The entry's files stay in the section, without actions, while the job
+        extracts its archives, validates the files for the console and waits
+        for the confirmation, where each file gets a kind or "No guardar".
+        Cancelling the job frees them.
       parameters:
         - $ref: '#/components/parameters/UnassignedId'
       requestBody:
@@ -1467,7 +1542,7 @@ components:
           $ref: '#/components/schemas/JobStatus'
         console:
           type: string
-          description: Console slug chosen in the form.
+          description: Console slug chosen in the form; empty for an upload to the unassigned section.
         title:
           type: string
           description: Game name chosen in the form.
@@ -1554,6 +1629,11 @@ components:
           description: Every console whose extensions accept the file.
           items:
             type: string
+        inPlace:
+          type: boolean
+          description: |
+            A file of an assigned unassigned entry that is not an archive: it
+            stays in the section until it is stored (RF-27a).
 
     CommitRequest:
       type: object
@@ -1581,6 +1661,12 @@ components:
           description: Update version (digits and dots) or DLC name.
         onDuplicate:
           $ref: '#/components/schemas/DuplicateAction'
+        skip:
+          type: boolean
+          description: |
+            "No guardar": the file stays in the unassigned section. Only for
+            jobs assigned from it (RF-27a); every valid file is still listed,
+            and one-file consoles keep exactly one.
 
     DuplicateAction:
       type: string
@@ -1841,7 +1927,7 @@ components:
         path:
           type: string
           description: Relative to the unassigned folder.
-          example: wii/Zelda/Zelda.iso
+          example: Zelda/Zelda.iso
         name:
           type: string
         origin:
@@ -1865,6 +1951,56 @@ components:
         archive:
           type: boolean
           description: A zip, 7z or rar; it is validated once extracted.
+        copying:
+          type: boolean
+          description: Still being copied over SMB (id is 0); it admits no action (RF-26a).
+        console:
+          type: string
+          description: The console it came from, if known.
+        igdbId:
+          type: integer
+          format: int64
+          nullable: true
+          description: The IGDB game picked when it was uploaded without console.
+
+    UnassignedEntry:
+      type: object
+      required: [id, name, folder, size, arrivedAt, copying, busy, files]
+      description: A first-level folder of the unassigned section, or a loose file (RF-27).
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Identifies the entry (the lowest id of its files); 0 while every file is copying.
+        name:
+          type: string
+          example: Splatoon 3
+        folder:
+          type: boolean
+        size:
+          type: integer
+          format: int64
+        console:
+          type: string
+          description: Prefills Asignar.
+        igdbId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Prefills Asignar.
+        arrivedAt:
+          type: string
+          format: date-time
+        copying:
+          type: boolean
+          description: A file is still being copied; the entry admits no action.
+        busy:
+          type: boolean
+          description: An assignment in progress is using it; it admits no action.
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnassignedFile'
 
     AssignRequest:
       type: object

@@ -94,6 +94,9 @@ export function fakeServices(overrides: { signedIn?: boolean } = {}): Services {
         trash: vi.fn(never),
         remove: vi.fn(never),
         downloadUrl: (id) => `/api/unassigned/${String(id)}/download`,
+        trashEntry: vi.fn(never),
+        removeEntry: vi.fn(never),
+        entryDownloadUrl: (id) => `/api/unassigned/entries/${String(id)}/download`,
       },
       trash: {
         list: vi.fn(() => Promise.resolve([])),

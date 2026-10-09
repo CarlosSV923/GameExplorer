@@ -18,6 +18,7 @@ import {
   cx,
   DownloadIcon,
   EmptyState,
+  FileIcon,
   FolderIcon,
   HelpBar,
   IconButton,
@@ -32,16 +33,26 @@ import { useCatalogPorts } from '../application/ports'
 import {
   useConsoles,
   useDeleteUnassigned,
+  useDeleteUnassignedEntry,
   useTrashUnassigned,
+  useTrashUnassignedEntry,
   useUnassigned,
 } from '../application/queries'
-import type { UnassignedFile } from '../domain/types'
+import type { UnassignedEntry, UnassignedFile } from '../domain/types'
 import { ScanCard } from './ScanCard'
 
-/** Whether the file can be assigned: an archive, or some console takes its extension. */
-function assignable(f: UnassignedFile): boolean {
-  return f.archive || f.consoles.length > 0
+/** Whether an entry can be assigned: some file is an archive, or some console takes it. */
+function assignable(e: UnassignedEntry): boolean {
+  return e.files.some((f) => f.archive || f.consoles.length > 0)
 }
+
+/** An entry admits actions once every file settled and no assignment uses it. */
+function actionable(e: UnassignedEntry): boolean {
+  return e.id !== 0 && !e.copying && !e.busy
+}
+
+/** What the section is asked to delete for good: a whole entry or one of its files. */
+type Deleting = { kind: 'entry'; entry: UnassignedEntry } | { kind: 'file'; file: UnassignedFile }
 
 function extensionOfName(name: string): string {
   const dot = name.lastIndexOf('.')
@@ -49,8 +60,10 @@ function extensionOfName(name: string): string {
 }
 
 /**
- * The unassigned section (RF-27): files that arrived over Samba outside a
- * game folder, uploads that did not fit, and what the user moved here.
+ * The unassigned section (RF-27): files that arrived over Samba, uploads
+ * without console or that did not fit, and what the user moved here. A
+ * first-level folder is one entry, assigned at once (RF-27a); files still
+ * being copied show up as such, without actions (RF-26a).
  */
 export function UnassignedScreen() {
   const { t } = useTranslation()
@@ -62,13 +75,28 @@ export function UnassignedScreen() {
   const slow = useDelayedFlag(files.isPending)
   const openForm = useOpenUploadForm()
   const trash = useTrashUnassigned()
+  const trashEntry = useTrashUnassignedEntry()
   const remove = useDeleteUnassigned()
-  const [deleting, setDeleting] = useState<UnassignedFile | null>(null)
+  const removeEntry = useDeleteUnassignedEntry()
+  const [deleting, setDeleting] = useState<Deleting | null>(null)
   const [notice, setNotice] = useState<{ tone: 'info' | 'danger'; text: string } | null>(null)
 
   const list = files.data ?? []
   const names = new Map((consoles.data ?? []).map((c) => [c.slug, c.displayName]))
-  const total = list.reduce((s, f) => s + f.size, 0)
+  const total = list.reduce((s, e) => s + e.size, 0)
+
+  const sendToTrash = (kind: 'entry' | 'file', id: number, name: string) => {
+    setNotice(null)
+    const mutation = kind === 'entry' ? trashEntry : trash
+    mutation.mutate(id, {
+      onSuccess: () => {
+        setNotice({ tone: 'info', text: t('unassigned.trashed', { name }) })
+      },
+      onError: (e) => {
+        setNotice({ tone: 'danger', text: describeError(t, e) })
+      },
+    })
+  }
 
   useAction('back', () => {
     void navigate({ to: '/' })
@@ -123,98 +151,180 @@ export function UnassignedScreen() {
               </tr>
             </thead>
             <tbody className="text-body">
-              {list.map((f) => {
-                const fits = fit(f)
-                return (
-                  <tr key={f.id} className="border-t border-line">
+              {list.map((e) => {
+                const ready = actionable(e)
+                const loose = !e.folder ? e.files[0] : undefined
+                const fits = loose && !loose.copying ? fit(loose) : undefined
+                let state: string
+                if (e.copying) state = t('unassigned.copying')
+                else if (e.busy) state = t('unassigned.busy')
+                else if (e.folder) state = t('unassigned.files', { count: e.files.length })
+                else state = t(`unassigned.reason.${e.files[0]?.reason ?? 'samba'}`)
+                return [
+                  <tr key={`e${e.name}`} className="border-t border-line">
                     <td className="px-5 py-3.5">
                       <div className="flex flex-col gap-1">
-                        <span className="font-mono text-caption font-medium [overflow-wrap:anywhere] text-ink-1">
-                          {f.name}
-                        </span>
-                        <span className="text-caption text-ink-3">
-                          {t('unassigned.origin')}{' '}
-                          <span className="font-mono [overflow-wrap:anywhere]">{f.origin}</span>
-                        </span>
-                        <span
-                          className={cx(
-                            'text-caption font-bold',
-                            fits.tone === 'ok' && 'text-success',
-                            fits.tone === 'muted' && 'text-ink-2',
-                            fits.tone === 'bad' && 'text-danger',
+                        <span className="flex items-center gap-2 font-mono text-caption font-medium [overflow-wrap:anywhere] text-ink-1">
+                          {e.folder ? (
+                            <FolderIcon size={16} className="shrink-0 text-ink-2" />
+                          ) : (
+                            <FileIcon size={16} className="shrink-0 text-ink-2" />
                           )}
-                        >
-                          {fits.text}
+                          {e.name}
                         </span>
+                        {e.console && (
+                          <span className="text-caption text-ink-3">
+                            {t('unassigned.cameFrom', { name: names.get(e.console) ?? e.console })}
+                          </span>
+                        )}
+                        {loose && !loose.copying && (
+                          <span className="text-caption text-ink-3">
+                            {t('unassigned.origin')}{' '}
+                            <span className="font-mono [overflow-wrap:anywhere]">
+                              {loose.origin}
+                            </span>
+                          </span>
+                        )}
+                        {fits && <FitNote text={fits.text} tone={fits.tone} />}
                       </div>
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <div className="flex flex-col gap-1">
-                        <span className="text-ink-1">{format.date(f.arrivedAt)}</span>
-                        <span className="text-caption text-ink-2">
-                          {t(`unassigned.reason.${f.reason}`)}
+                        <span className="text-ink-1">{format.date(e.arrivedAt)}</span>
+                        <span
+                          className={cx(
+                            'text-caption',
+                            e.copying || e.busy ? 'font-bold text-warning-ink' : 'text-ink-2',
+                          )}
+                        >
+                          {state}
                         </span>
                       </div>
                     </td>
                     <td className="px-5 py-3.5 text-right whitespace-nowrap text-ink-2">
-                      {format.size(f.size)}
+                      {format.size(e.size)}
                     </td>
                     <td className="px-4 py-2 text-right whitespace-nowrap">
                       <span className="inline-flex items-center gap-1">
                         <Button
                           size="sm"
                           variant="primary"
-                          disabled={!assignable(f)}
+                          disabled={!ready || !assignable(e)}
                           aria-label={
-                            assignable(f)
-                              ? t('unassigned.assignFile', { name: f.name })
-                              : t('unassigned.assignBlocked', { name: f.name })
+                            assignable(e)
+                              ? t('unassigned.assignFile', { name: e.name })
+                              : t('unassigned.assignBlocked', { name: e.name })
                           }
                           onClick={() => {
-                            openForm({ kind: 'unassigned', file: f })
+                            openForm({ kind: 'unassigned', entry: e })
                           }}
                         >
                           {t('unassigned.assign')}
                         </Button>
-                        <IconLink
-                          href={ports.downloadUrl(f.id)}
-                          download=""
-                          label={t('game.downloadItem', { name: f.name })}
-                        >
-                          <DownloadIcon />
-                        </IconLink>
+                        {ready ? (
+                          <IconLink
+                            href={ports.entryDownloadUrl(e.id)}
+                            download=""
+                            label={t('unassigned.download', { name: e.name })}
+                          >
+                            <DownloadIcon />
+                          </IconLink>
+                        ) : (
+                          <IconButton disabled label={t('unassigned.download', { name: e.name })}>
+                            <DownloadIcon />
+                          </IconButton>
+                        )}
                         <IconButton
-                          label={t('unassigned.trash', { name: f.name })}
+                          disabled={!ready}
+                          label={t('unassigned.trash', { name: e.name })}
                           onClick={() => {
-                            setNotice(null)
-                            trash.mutate(f.id, {
-                              onSuccess: () => {
-                                setNotice({
-                                  tone: 'info',
-                                  text: t('unassigned.trashed', { name: f.name }),
-                                })
-                              },
-                              onError: (e) => {
-                                setNotice({ tone: 'danger', text: describeError(t, e) })
-                              },
-                            })
+                            sendToTrash('entry', e.id, e.name)
                           }}
                         >
                           <TrashIcon />
                         </IconButton>
                         <IconButton
                           tone="danger"
-                          label={t('unassigned.delete', { name: f.name })}
+                          disabled={!ready}
+                          label={t('unassigned.delete', { name: e.name })}
                           onClick={() => {
-                            setDeleting(f)
+                            setDeleting({ kind: 'entry', entry: e })
                           }}
                         >
                           <CloseIcon />
                         </IconButton>
                       </span>
                     </td>
-                  </tr>
-                )
+                  </tr>,
+                  ...(e.folder
+                    ? e.files.map((f) => {
+                        const fileReady = !f.copying && !e.busy && f.id !== 0
+                        const note = f.copying ? undefined : fit(f)
+                        const rel = f.path.slice(e.name.length + 1)
+                        return (
+                          <tr key={`f${f.path}`} className="bg-surface-card/40">
+                            <td className="py-2 pr-5 pl-12">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-mono text-caption [overflow-wrap:anywhere] text-ink-1">
+                                  {rel}
+                                </span>
+                                {f.copying ? (
+                                  <span className="text-caption font-bold text-warning-ink">
+                                    {t('unassigned.copying')}
+                                  </span>
+                                ) : (
+                                  note && <FitNote text={note.text} tone={note.tone} />
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-5 py-2" />
+                            <td className="px-5 py-2 text-right text-caption whitespace-nowrap text-ink-2">
+                              {format.size(f.size)}
+                            </td>
+                            <td className="px-4 py-1.5 text-right whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1">
+                                {fileReady ? (
+                                  <IconLink
+                                    href={ports.downloadUrl(f.id)}
+                                    download=""
+                                    label={t('game.downloadItem', { name: f.name })}
+                                  >
+                                    <DownloadIcon />
+                                  </IconLink>
+                                ) : (
+                                  <IconButton
+                                    disabled
+                                    label={t('game.downloadItem', { name: f.name })}
+                                  >
+                                    <DownloadIcon />
+                                  </IconButton>
+                                )}
+                                <IconButton
+                                  disabled={!fileReady}
+                                  label={t('unassigned.trash', { name: f.name })}
+                                  onClick={() => {
+                                    sendToTrash('file', f.id, f.name)
+                                  }}
+                                >
+                                  <TrashIcon />
+                                </IconButton>
+                                <IconButton
+                                  tone="danger"
+                                  disabled={!fileReady}
+                                  label={t('unassigned.delete', { name: f.name })}
+                                  onClick={() => {
+                                    setDeleting({ kind: 'file', file: f })
+                                  }}
+                                >
+                                  <CloseIcon />
+                                </IconButton>
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    : []),
+                ]
               })}
             </tbody>
           </table>
@@ -269,26 +379,52 @@ export function UnassignedScreen() {
           tone="danger"
           title={t('unassigned.deleteTitle')}
           confirmLabel={t('unassigned.deleteConfirm')}
-          busy={remove.isPending}
+          busy={remove.isPending || removeEntry.isPending}
           onCancel={() => {
             setDeleting(null)
           }}
           onConfirm={() => {
-            remove.mutate(deleting.id, {
+            const options = {
               onSettled: () => {
                 setDeleting(null)
               },
-              onError: (e) => {
+              onError: (e: unknown) => {
                 setNotice({ tone: 'danger', text: describeError(t, e) })
               },
-            })
+            }
+            if (deleting.kind === 'entry') removeEntry.mutate(deleting.entry.id, options)
+            else remove.mutate(deleting.file.id, options)
           }}
         >
           <p className="m-0">
-            {t('unassigned.deleteBody', { name: deleting.name, size: format.size(deleting.size) })}
+            {deleting.kind === 'entry'
+              ? t('unassigned.deleteBody', {
+                  name: deleting.entry.name,
+                  size: format.size(deleting.entry.size),
+                })
+              : t('unassigned.deleteBody', {
+                  name: deleting.file.name,
+                  size: format.size(deleting.file.size),
+                })}
           </p>
         </ConfirmDialog>
       )}
     </div>
+  )
+}
+
+/** Which consoles take a file, under its name. */
+function FitNote({ text, tone }: { text: string; tone: 'ok' | 'muted' | 'bad' }) {
+  return (
+    <span
+      className={cx(
+        'text-caption font-bold',
+        tone === 'ok' && 'text-success',
+        tone === 'muted' && 'text-ink-2',
+        tone === 'bad' && 'text-danger',
+      )}
+    >
+      {text}
+    </span>
   )
 }

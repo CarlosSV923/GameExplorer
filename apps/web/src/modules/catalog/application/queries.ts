@@ -202,6 +202,16 @@ export function useDeleteUnassigned() {
   return useLibraryMutation((id: number) => unassigned.remove(id))
 }
 
+export function useTrashUnassignedEntry() {
+  const { unassigned } = useCatalogPorts()
+  return useLibraryMutation((id: number) => unassigned.trashEntry(id))
+}
+
+export function useDeleteUnassignedEntry() {
+  const { unassigned } = useCatalogPorts()
+  return useLibraryMutation((id: number) => unassigned.removeEntry(id))
+}
+
 // ---------- trash ----------
 
 export function useTrash() {

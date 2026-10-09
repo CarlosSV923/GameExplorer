@@ -2,7 +2,7 @@ import { consoles } from '@/test/fakeServices'
 
 import { cleanVersion, kindDraftError, previewFileName } from '@/modules/catalog/domain/naming'
 
-import { initialDraft, toCommitFile } from './details'
+import { initialDraft, initialSkips, toCommitFile } from './details'
 import { checkFile, defaultMode, specsFor } from './uploadForm'
 
 const [switchConsole, wii] = consoles
@@ -34,6 +34,18 @@ describe('upload form', () => {
 })
 
 describe('file details', () => {
+  it('keeps one file of an assigned entry on a one-file console (RF-27a)', () => {
+    expect([...initialSkips({ kinds: ['game'] }, ['a.iso', 'b.iso'])]).toEqual(['b.iso'])
+    const kinds = { kinds: ['base', 'update', 'dlc'] as const }
+    expect(initialSkips({ kinds: [...kinds.kinds] }, ['a.nsp', 'b.nsp']).size).toBe(0)
+    const draft = {
+      ...initialDraft({ kinds: [...kinds.kinds] }, 2),
+      kind: 'dlc' as const,
+      skip: true,
+    }
+    expect(toCommitFile('a.nsp', draft)).toEqual({ path: 'a.nsp', skip: true })
+  })
+
   it('needs nothing on a one-file console and a kind on Switch', () => {
     expect(initialDraft({ kinds: ['game'] }, 1).kind).toBe('game')
     expect(initialDraft({ kinds: ['base', 'update', 'dlc'] }, 1).kind).toBe('base')

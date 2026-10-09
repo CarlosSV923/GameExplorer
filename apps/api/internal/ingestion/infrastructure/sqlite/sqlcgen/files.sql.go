@@ -7,6 +7,7 @@ package sqlcgen
 
 import (
 	"context"
+	"database/sql"
 )
 
 const deleteFiles = `-- name: DeleteFiles :exec
@@ -19,27 +20,34 @@ func (q *Queries) DeleteFiles(ctx context.Context, jobID string) error {
 }
 
 const insertFile = `-- name: InsertFile :exec
-INSERT INTO staged_files (job_id, path, size) VALUES (?, ?, ?)
+INSERT INTO staged_files (job_id, path, size, unassigned_id) VALUES (?, ?, ?, ?)
 `
 
 type InsertFileParams struct {
-	JobID string
-	Path  string
-	Size  int64
+	JobID        string
+	Path         string
+	Size         int64
+	UnassignedID sql.NullInt64
 }
 
 func (q *Queries) InsertFile(ctx context.Context, arg InsertFileParams) error {
-	_, err := q.db.ExecContext(ctx, insertFile, arg.JobID, arg.Path, arg.Size)
+	_, err := q.db.ExecContext(ctx, insertFile,
+		arg.JobID,
+		arg.Path,
+		arg.Size,
+		arg.UnassignedID,
+	)
 	return err
 }
 
 const listFiles = `-- name: ListFiles :many
-SELECT path, size FROM staged_files WHERE job_id = ? ORDER BY path
+SELECT path, size, unassigned_id FROM staged_files WHERE job_id = ? ORDER BY path
 `
 
 type ListFilesRow struct {
-	Path string
-	Size int64
+	Path         string
+	Size         int64
+	UnassignedID sql.NullInt64
 }
 
 func (q *Queries) ListFiles(ctx context.Context, jobID string) ([]ListFilesRow, error) {
@@ -51,7 +59,7 @@ func (q *Queries) ListFiles(ctx context.Context, jobID string) ([]ListFilesRow, 
 	var items []ListFilesRow
 	for rows.Next() {
 		var i ListFilesRow
-		if err := rows.Scan(&i.Path, &i.Size); err != nil {
+		if err := rows.Scan(&i.Path, &i.Size, &i.UnassignedID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"time"
@@ -97,7 +96,8 @@ func (s *Service) SpecFromMeta(ctx context.Context, m UploadMeta) (domain.Spec, 
 	if err != nil {
 		return spec, err
 	}
-	if _, ok := rules[m.Console]; !ok {
+	// No console sends the upload to the unassigned section (RF-07b).
+	if _, ok := rules[m.Console]; m.Console != "" && !ok {
 		return spec, fmt.Errorf("%w: unknown console %q", ErrInvalidMeta, m.Console)
 	}
 	if m.IGDBID != "" {
@@ -142,38 +142,49 @@ func (s *Service) UploadCreated(ctx context.Context, id domain.JobID, size int64
 	return nil
 }
 
-// Assign starts a job from a file of the unassigned section (RF-27): the
-// file leaves the section and follows the upload pipeline.
+// Assign starts a job from the entry of the unassigned section a file
+// belongs to (RF-27a): the entry's files stay in the section, without
+// actions, until the job stores them or ends.
 func (s *Service) Assign(ctx context.Context, unassigned int64, spec domain.Spec) (*domain.UploadJob, error) {
 	if s.library == nil || s.queue == nil {
 		return nil, errors.New("uploads are disabled: the library is not writable")
 	}
 	spec.GroupID, spec.GroupSize = "", 0
-	src, err := s.library.UnassignedFile(ctx, unassigned)
-	if err != nil {
-		return nil, err
+	if spec.Console == "" {
+		return nil, fmt.Errorf("%w: console is required", ErrInvalidMeta)
 	}
-	if _, err := s.SpecFromMeta(ctx, UploadMeta{FileName: src.Name, Console: spec.Console, Title: spec.Title}); err != nil {
+	if _, err := s.SpecFromMeta(ctx, UploadMeta{FileName: "entry", Console: spec.Console, Title: spec.Title}); err != nil {
 		return nil, err
 	}
 	id := domain.JobID(s.newID())
-	job, err := domain.NewUploadJob(id, src.Name, src.Size, spec, s.now())
+	entry, err := s.library.TakeEntry(ctx, unassigned, string(id))
 	if err != nil {
 		return nil, err
 	}
-	dest := filepath.Join(s.staging.SourceDir(id), src.Name)
-	if src, err = s.library.TakeUnassigned(ctx, unassigned, dest); err != nil {
+	job, err := s.entryJob(ctx, id, entry, spec)
+	if err != nil {
+		if rerr := s.library.ReleaseJob(ctx, string(id)); rerr != nil {
+			s.log.Error("release unassigned entry", "job", id, "error", rerr)
+		}
 		return nil, err
 	}
-	job.UnassignedOrigin, job.UnassignedFrom, job.UnassignedReason = src.Path, src.Origin, src.Reason
-	if err := job.MarkUploaded(dest, s.now()); err != nil {
+	s.pub.Publish(*job)
+	s.queue.Enqueue(id)
+	return job, nil
+}
+
+func (s *Service) entryJob(ctx context.Context, id domain.JobID, entry UnassignedEntry, spec domain.Spec) (*domain.UploadJob, error) {
+	job, err := domain.NewUploadJob(id, entry.Name, entry.Size, spec, s.now())
+	if err != nil {
+		return nil, err
+	}
+	job.UnassignedOrigin = entry.Name
+	if err := job.MarkUploaded("", s.now()); err != nil {
 		return nil, err
 	}
 	if err := s.repo.Create(ctx, job); err != nil {
 		return nil, fmt.Errorf("create job: %w", err)
 	}
-	s.pub.Publish(*job)
-	s.queue.Enqueue(id)
 	return job, nil
 }
 

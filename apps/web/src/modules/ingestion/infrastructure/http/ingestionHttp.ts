@@ -18,7 +18,8 @@ function uploadError(error: Error): AppError {
 function metadata(fileName: string, spec: UploadSpec): Record<string, string> {
   return {
     filename: fileName,
-    consoleSlug: spec.console,
+    // Without console the upload goes to the unassigned section (RF-07b).
+    ...(spec.console === '' ? {} : { consoleSlug: spec.console }),
     title: spec.title,
     ...(spec.igdbId === undefined ? {} : { igdbId: String(spec.igdbId) }),
     ...(spec.group === undefined ? {} : { group: spec.group }),
@@ -56,9 +57,9 @@ export function createIngestionHttp(client: ApiClient, baseUrl = '/api'): Ingest
         },
       }
     },
-    assign: (unassignedId, body) =>
+    assign: (entryId, body) =>
       unwrap(
-        client.POST('/unassigned/{id}/assign', { params: { path: { id: unassignedId } }, body }),
+        client.POST('/unassigned/entries/{id}/assign', { params: { path: { id: entryId } }, body }),
       ),
     jobs: () => unwrap(client.GET('/jobs')),
     job: (jobId) => unwrap(client.GET('/jobs/{id}', id(jobId))),

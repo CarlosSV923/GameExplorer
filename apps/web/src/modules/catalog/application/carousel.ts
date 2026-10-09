@@ -1,5 +1,5 @@
 import { unassignedSlug } from '../domain/items'
-import type { Console, UnassignedFile } from '../domain/types'
+import type { Console, UnassignedEntry } from '../domain/types'
 import { useConsoles, useUnassigned } from './queries'
 
 /** One stop of the carousel: a console with games, or the unassigned section. */
@@ -19,7 +19,7 @@ export interface CarouselEntry {
  */
 export function carouselEntries(
   consoles: readonly Console[],
-  unassigned: readonly UnassignedFile[],
+  unassigned: readonly UnassignedEntry[],
 ): CarouselEntry[] {
   const entries = consoles
     .filter((c) => c.gameCount > 0)
@@ -32,7 +32,8 @@ export function carouselEntries(
       unassigned: false,
     }))
   if (unassigned.length > 0) {
-    entries.push({ slug: unassignedSlug, name: '', count: unassigned.length, unassigned: true })
+    const files = unassigned.reduce((n, e) => n + e.files.length, 0)
+    entries.push({ slug: unassignedSlug, name: '', count: files, unassigned: true })
   }
   return entries
 }

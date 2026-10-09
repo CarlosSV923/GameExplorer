@@ -65,25 +65,25 @@ func (h *Handler) SubmitJobPassword(ctx context.Context, req httpapi.SubmitJobPa
 	return httpapi.SubmitJobPassword202JSONResponse(ToAPI(*job)), nil
 }
 
-// AssignUnassigned implements httpapi.StrictServerInterface.
-func (h *Handler) AssignUnassigned(ctx context.Context, req httpapi.AssignUnassignedRequestObject) (httpapi.AssignUnassignedResponseObject, error) {
+// AssignUnassignedEntry implements httpapi.StrictServerInterface.
+func (h *Handler) AssignUnassignedEntry(ctx context.Context, req httpapi.AssignUnassignedEntryRequestObject) (httpapi.AssignUnassignedEntryResponseObject, error) {
 	if req.Body == nil {
-		return httpapi.AssignUnassigned400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: badRequest("Falta el cuerpo de la petición.")}, nil
+		return httpapi.AssignUnassignedEntry400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: badRequest("Falta el cuerpo de la petición.")}, nil
 	}
 	spec := domain.Spec{Console: req.Body.Console, Title: req.Body.Title, IGDBID: req.Body.IgdbId}
 	job, err := h.svc.Assign(context.WithoutCancel(ctx), req.Id, spec)
 	switch {
 	case err == nil:
-		return httpapi.AssignUnassigned201JSONResponse(ToAPI(*job)), nil
+		return httpapi.AssignUnassignedEntry201JSONResponse(ToAPI(*job)), nil
 	case errors.Is(err, application.ErrUnassignedNotFound):
-		return httpapi.AssignUnassigned404ApplicationProblemPlusJSONResponse{
+		return httpapi.AssignUnassignedEntry404ApplicationProblemPlusJSONResponse{
 			NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(problem(http.StatusNotFound, "Not Found", "El archivo no existe en No asignados.")),
 		}, nil
 	case errors.Is(err, application.ErrInvalidMeta):
-		return httpapi.AssignUnassigned400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: badRequest("Elige una consola y escribe el nombre del juego.")}, nil
+		return httpapi.AssignUnassignedEntry400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: badRequest("Elige una consola y escribe el nombre del juego.")}, nil
 	}
 	if status, p := commitProblem(err); status == http.StatusConflict {
-		return httpapi.AssignUnassigned409ApplicationProblemPlusJSONResponse{ConflictApplicationProblemPlusJSONResponse: httpapi.ConflictApplicationProblemPlusJSONResponse(p)}, nil
+		return httpapi.AssignUnassignedEntry409ApplicationProblemPlusJSONResponse{ConflictApplicationProblemPlusJSONResponse: httpapi.ConflictApplicationProblemPlusJSONResponse(p)}, nil
 	}
 	return nil, err
 }

@@ -13,6 +13,10 @@ type StagedFile struct {
 	// Path is relative to the job's staging directory ("/" separators).
 	Path string
 	Size int64
+	// Unassigned is set for a file of an assigned unassigned entry that is
+	// not in staging: it stays in the section (Path is relative to the
+	// unassigned folder) until it is stored (RF-27a).
+	Unassigned *int64
 }
 
 // StagedFileRepository persists the files found in each job.
@@ -62,4 +66,15 @@ func Validate(rule ConsoleRule, files []StagedFile, known []string) ([]StagedFil
 		return valid, InvalidMany
 	}
 	return valid, ""
+}
+
+// ValidateFor is Validate for a job: an assigned unassigned entry may hold
+// several game files of a one-file console, and the user keeps one of them
+// in the confirmation (RF-27a).
+func ValidateFor(job *UploadJob, rule ConsoleRule, files []StagedFile, known []string) ([]StagedFile, InvalidReason) {
+	valid, reason := Validate(rule, files, known)
+	if reason == InvalidMany && job.FromEntry() {
+		reason = ""
+	}
+	return valid, reason
 }

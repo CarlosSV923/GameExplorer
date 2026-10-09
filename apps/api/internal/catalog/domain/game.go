@@ -126,6 +126,12 @@ type UnassignedFile struct {
 	ArrivedAt time.Time
 	// TrashEntry is set while the file is in the trash.
 	TrashEntry *TrashEntryID
+	// Console is the console it came from, "" when unknown (prefills Asignar).
+	Console Slug
+	// IGDBID is the IGDB game picked when it was uploaded without console.
+	IGDBID *int64
+	// Job is the assignment in progress using the file ("" when free).
+	Job string
 }
 
 // Name is the file's base name.
@@ -134,6 +140,20 @@ func (u UnassignedFile) Name() string {
 		return u.Path[i+1:]
 	}
 	return u.Path
+}
+
+// EntryKey is the entry of the section the file belongs to (RF-27): its
+// first-level folder, or the file itself when it is loose.
+func (u UnassignedFile) EntryKey() string {
+	return EntryKeyOf(u.Path)
+}
+
+// EntryKeyOf is the entry of a path relative to the unassigned folder.
+func EntryKeyOf(rel string) string {
+	if i := strings.Index(rel, "/"); i >= 0 {
+		return rel[:i]
+	}
+	return rel
 }
 
 // TrashReason says why something went to the trash.
@@ -250,6 +270,10 @@ type LibraryRepository interface {
 	UnassignedFiles(ctx context.Context) ([]UnassignedFile, error)
 	// UnassignedByID returns one file of the section, even while trashed (ErrUnassignedNotFound).
 	UnassignedByID(ctx context.Context, id UnassignedID) (UnassignedFile, error)
+	// SetUnassignedJob marks a file as used by an assignment ("" frees it).
+	SetUnassignedJob(ctx context.Context, id UnassignedID, job string) error
+	// ReleaseUnassignedJob frees every file the assignment was using.
+	ReleaseUnassignedJob(ctx context.Context, job string) error
 
 	// TrashEntries returns every entry with its files, newest first.
 	TrashEntries(ctx context.Context) ([]TrashEntry, error)

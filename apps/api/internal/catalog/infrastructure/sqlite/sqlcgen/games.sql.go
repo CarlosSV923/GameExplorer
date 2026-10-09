@@ -172,7 +172,7 @@ func (q *Queries) GetTrashEntry(ctx context.Context, id int64) (TrashEntry, erro
 }
 
 const getUnassigned = `-- name: GetUnassigned :one
-SELECT id, path, origin, reason, size, arrived_at, trash_entry_id
+SELECT id, path, origin, reason, size, arrived_at, trash_entry_id, console, igdb_id, job_id
 FROM unassigned_files
 WHERE id = ?
 `
@@ -188,6 +188,9 @@ func (q *Queries) GetUnassigned(ctx context.Context, id int64) (UnassignedFile, 
 		&i.Size,
 		&i.ArrivedAt,
 		&i.TrashEntryID,
+		&i.Console,
+		&i.IgdbID,
+		&i.JobID,
 	)
 	return i, err
 }
@@ -338,8 +341,8 @@ func (q *Queries) InsertTrashEntry(ctx context.Context, arg InsertTrashEntryPara
 }
 
 const insertUnassigned = `-- name: InsertUnassigned :one
-INSERT INTO unassigned_files (path, origin, reason, size, arrived_at, trash_entry_id)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO unassigned_files (path, origin, reason, size, arrived_at, trash_entry_id, console, igdb_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING id
 `
 
@@ -350,6 +353,8 @@ type InsertUnassignedParams struct {
 	Size         int64
 	ArrivedAt    string
 	TrashEntryID sql.NullInt64
+	Console      string
+	IgdbID       sql.NullInt64
 }
 
 func (q *Queries) InsertUnassigned(ctx context.Context, arg InsertUnassignedParams) (int64, error) {
@@ -360,6 +365,8 @@ func (q *Queries) InsertUnassigned(ctx context.Context, arg InsertUnassignedPara
 		arg.Size,
 		arg.ArrivedAt,
 		arg.TrashEntryID,
+		arg.Console,
+		arg.IgdbID,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -642,7 +649,7 @@ func (q *Queries) ListTrashItems(ctx context.Context) ([]GameItem, error) {
 }
 
 const listTrashUnassigned = `-- name: ListTrashUnassigned :many
-SELECT id, path, origin, reason, size, arrived_at, trash_entry_id
+SELECT id, path, origin, reason, size, arrived_at, trash_entry_id, console, igdb_id, job_id
 FROM unassigned_files
 WHERE trash_entry_id IS NOT NULL
 ORDER BY id
@@ -665,6 +672,9 @@ func (q *Queries) ListTrashUnassigned(ctx context.Context) ([]UnassignedFile, er
 			&i.Size,
 			&i.ArrivedAt,
 			&i.TrashEntryID,
+			&i.Console,
+			&i.IgdbID,
+			&i.JobID,
 		); err != nil {
 			return nil, err
 		}
@@ -680,7 +690,7 @@ func (q *Queries) ListTrashUnassigned(ctx context.Context) ([]UnassignedFile, er
 }
 
 const listUnassigned = `-- name: ListUnassigned :many
-SELECT id, path, origin, reason, size, arrived_at, trash_entry_id
+SELECT id, path, origin, reason, size, arrived_at, trash_entry_id, console, igdb_id, job_id
 FROM unassigned_files
 WHERE trash_entry_id IS NULL
 ORDER BY arrived_at DESC, id DESC
@@ -703,6 +713,9 @@ func (q *Queries) ListUnassigned(ctx context.Context) ([]UnassignedFile, error) 
 			&i.Size,
 			&i.ArrivedAt,
 			&i.TrashEntryID,
+			&i.Console,
+			&i.IgdbID,
+			&i.JobID,
 		); err != nil {
 			return nil, err
 		}
@@ -745,6 +758,15 @@ func (q *Queries) MoveTrashEntries(ctx context.Context, arg MoveTrashEntriesPara
 	return err
 }
 
+const releaseUnassignedJob = `-- name: ReleaseUnassignedJob :exec
+UPDATE unassigned_files SET job_id = '' WHERE job_id = ?
+`
+
+func (q *Queries) ReleaseUnassignedJob(ctx context.Context, jobID string) error {
+	_, err := q.db.ExecContext(ctx, releaseUnassignedJob, jobID)
+	return err
+}
+
 const setItemTrash = `-- name: SetItemTrash :exec
 UPDATE game_items SET trash_entry_id = ? WHERE id = ?
 `
@@ -756,6 +778,20 @@ type SetItemTrashParams struct {
 
 func (q *Queries) SetItemTrash(ctx context.Context, arg SetItemTrashParams) error {
 	_, err := q.db.ExecContext(ctx, setItemTrash, arg.TrashEntryID, arg.ID)
+	return err
+}
+
+const setUnassignedJob = `-- name: SetUnassignedJob :exec
+UPDATE unassigned_files SET job_id = ? WHERE id = ?
+`
+
+type SetUnassignedJobParams struct {
+	JobID string
+	ID    int64
+}
+
+func (q *Queries) SetUnassignedJob(ctx context.Context, arg SetUnassignedJobParams) error {
+	_, err := q.db.ExecContext(ctx, setUnassignedJob, arg.JobID, arg.ID)
 	return err
 }
 

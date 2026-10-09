@@ -288,36 +288,51 @@ export function ValidationError({
             )}
             {change.isError && <Banner tone="danger">{describeError(t, change.error)}</Banner>}
           </article>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
-            <ActionCard
-              icon={<FolderIcon />}
-              title={t('invalid.unassigned')}
-              body={t('invalid.unassignedBody')}
-              busy={resolve.isPending}
-              onClick={() => {
-                setAside('unassigned')
-              }}
-            />
-            <ActionCard
-              icon={<TrashIcon />}
-              title={t('invalid.trash')}
-              body={t('invalid.trashBody')}
-              busy={resolve.isPending}
-              onClick={() => {
-                setAside('trash')
-              }}
-            />
-            <ActionCard
-              danger
-              icon={<CloseIcon />}
-              title={t('invalid.delete')}
-              body={t('invalid.deleteBody')}
-              busy={resolve.isPending}
-              onClick={() => {
-                setDeleting(true)
-              }}
-            />
-          </div>
+          {job.fromUnassigned ? (
+            // The entry never left the section: setting it aside is ending the assignment (RF-27a).
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+              <ActionCard
+                icon={<FolderIcon />}
+                title={t('invalid.release')}
+                body={t('invalid.releaseBody')}
+                busy={resolve.isPending}
+                onClick={() => {
+                  setAside('unassigned')
+                }}
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+              <ActionCard
+                icon={<FolderIcon />}
+                title={t('invalid.unassigned')}
+                body={t('invalid.unassignedBody')}
+                busy={resolve.isPending}
+                onClick={() => {
+                  setAside('unassigned')
+                }}
+              />
+              <ActionCard
+                icon={<TrashIcon />}
+                title={t('invalid.trash')}
+                body={t('invalid.trashBody')}
+                busy={resolve.isPending}
+                onClick={() => {
+                  setAside('trash')
+                }}
+              />
+              <ActionCard
+                danger
+                icon={<CloseIcon />}
+                title={t('invalid.delete')}
+                body={t('invalid.deleteBody')}
+                busy={resolve.isPending}
+                onClick={() => {
+                  setDeleting(true)
+                }}
+              />
+            </div>
+          )}
           {resolve.isError && <Banner tone="danger">{describeError(t, resolve.error)}</Banner>}
         </section>
       </main>

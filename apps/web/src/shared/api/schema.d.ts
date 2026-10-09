@@ -193,7 +193,7 @@ export interface paths {
         /**
          * Recent upload jobs, newest first
          * @description A job is created when the browser starts a tus upload at /api/uploads/
-         *     (see the metadata above) or assigns a file from the unassigned section,
+         *     (see the metadata above) or assigns an entry of the unassigned section,
          *     and follows it through extraction, validation, confirmation and commit.
          */
         get: operations["listJobs"];
@@ -626,7 +626,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Files in the unassigned section, newest first (RF-27) */
+        /**
+         * Entries of the unassigned section, newest first (RF-27)
+         * @description Reads the unassigned folder first: files copied into it over SMB show
+         *     up right away, as copying until they settle (RF-26a).
+         */
         get: operations["listUnassigned"];
         put?: never;
         post?: never;
@@ -687,7 +691,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/unassigned/{id}/assign": {
+    "/unassigned/entries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete every file of an entry for good (RF-27) */
+        delete: operations["deleteUnassignedEntry"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/unassigned/entries/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download an entry; a folder as a zip without compression (RF-27) */
+        get: operations["downloadUnassignedEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/unassigned/entries/{id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send an entry to the trash, as one trash entry (RF-27) */
+        post: operations["trashUnassignedEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/unassigned/entries/{id}/assign": {
         parameters: {
             query?: never;
             header?: never;
@@ -697,12 +752,13 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Start an upload job from an unassigned file (RF-27)
-         * @description The file leaves the section and follows the upload pipeline
-         *     (extraction if it is an archive, validation, confirmation). Cancelling
-         *     the job gives it back to the section.
+         * Start a job that assigns a whole entry (RF-27a)
+         * @description The entry's files stay in the section, without actions, while the job
+         *     extracts its archives, validates the files for the console and waits
+         *     for the confirmation, where each file gets a kind or "No guardar".
+         *     Cancelling the job frees them.
          */
-        post: operations["assignUnassigned"];
+        post: operations["assignUnassignedEntry"];
         delete?: never;
         options?: never;
         head?: never;
@@ -930,7 +986,7 @@ export interface components {
             /** Format: int64 */
             received: number;
             status: components["schemas"]["JobStatus"];
-            /** @description Console slug chosen in the form. */
+            /** @description Console slug chosen in the form; empty for an upload to the unassigned section. */
             console: string;
             /** @description Game name chosen in the form. */
             title: string;
@@ -980,6 +1036,11 @@ export interface components {
             valid: boolean;
             /** @description Every console whose extensions accept the file. */
             consoles: string[];
+            /**
+             * @description A file of an assigned unassigned entry that is not an archive: it
+             *     stays in the section until it is stored (RF-27a).
+             */
+            inPlace?: boolean;
         };
         CommitRequest: {
             /** @description One entry per valid file. */
@@ -993,6 +1054,12 @@ export interface components {
             /** @description Update version (digits and dots) or DLC name. */
             label?: string;
             onDuplicate?: components["schemas"]["DuplicateAction"];
+            /**
+             * @description "No guardar": the file stays in the unassigned section. Only for
+             *     jobs assigned from it (RF-27a); every valid file is still listed,
+             *     and one-file consoles keep exactly one.
+             */
+            skip?: boolean;
         };
         /**
          * @description replace sends the existing file to the trash; skip keeps it and drops the new one.
@@ -1137,7 +1204,7 @@ export interface components {
             id: number;
             /**
              * @description Relative to the unassigned folder.
-             * @example wii/Zelda/Zelda.iso
+             * @example Zelda/Zelda.iso
              */
             path: string;
             name: string;
@@ -1156,6 +1223,42 @@ export interface components {
             consoles: string[];
             /** @description A zip, 7z or rar; it is validated once extracted. */
             archive: boolean;
+            /** @description Still being copied over SMB (id is 0); it admits no action (RF-26a). */
+            copying?: boolean;
+            /** @description The console it came from, if known. */
+            console?: string;
+            /**
+             * Format: int64
+             * @description The IGDB game picked when it was uploaded without console.
+             */
+            igdbId?: number | null;
+        };
+        /** @description A first-level folder of the unassigned section, or a loose file (RF-27). */
+        UnassignedEntry: {
+            /**
+             * Format: int64
+             * @description Identifies the entry (the lowest id of its files); 0 while every file is copying.
+             */
+            id: number;
+            /** @example Splatoon 3 */
+            name: string;
+            folder: boolean;
+            /** Format: int64 */
+            size: number;
+            /** @description Prefills Asignar. */
+            console?: string;
+            /**
+             * Format: int64
+             * @description Prefills Asignar.
+             */
+            igdbId?: number | null;
+            /** Format: date-time */
+            arrivedAt: string;
+            /** @description A file is still being copied; the entry admits no action. */
+            copying: boolean;
+            /** @description An assignment in progress is using it; it admits no action. */
+            busy: boolean;
+            files: components["schemas"]["UnassignedFile"][];
         };
         AssignRequest: {
             console: string;
@@ -2189,13 +2292,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Files. */
+            /** @description Entries. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UnassignedFile"][];
+                    "application/json": components["schemas"]["UnassignedEntry"][];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -2221,6 +2324,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     downloadUnassigned: {
@@ -2254,6 +2358,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             /** @description The requested range is not satisfiable. */
             416: {
                 headers: {
@@ -2286,7 +2391,94 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
-    assignUnassigned: {
+    deleteUnassignedEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UnassignedId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    downloadUnassignedEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UnassignedId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file, or the zip. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description The requested range (single files only). */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description The requested range is not satisfiable. */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    trashUnassignedEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UnassignedId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In the trash. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    assignUnassignedEntry: {
         parameters: {
             query?: never;
             header?: never;

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -20,6 +21,9 @@ type CommitFile struct {
 	Kind        string // "" on consoles with one kind
 	Label       string
 	OnDuplicate string // "", "replace" or "skip"
+	// Skip leaves the file in the unassigned section ("No guardar"); only
+	// for assigned entries (RF-27a).
+	Skip bool
 }
 
 // LibraryFile is a staged file handed to the library.
@@ -31,6 +35,9 @@ type LibraryFile struct {
 	Kind        string
 	Label       string
 	OnDuplicate string
+	// Unassigned is the file's id in the unassigned section when it comes
+	// straight from there (Root is the section's folder).
+	Unassigned int64
 }
 
 // LibraryRequest is a commit as the library sees it.
@@ -88,20 +95,30 @@ type SetAsideRequest struct {
 	Files  []string
 	Folder string
 	Origin string
-	// Reason is upload (did not fit its console) or manual (given back).
-	Reason  string
+	// Reason is upload (did not fit its console or had none) or manual
+	// (given back).
+	Reason string
+	// Console and IGDBID prefill a later assignment (optional).
+	Console string
+	IGDBID  *int64
 	ToTrash bool
 }
 
 // UnassignedSource is a file of the unassigned section.
 type UnassignedSource struct {
+	ID   int64
 	Name string
-	// Path is relative to the unassigned folder.
+	// Path is relative to the unassigned folder; Abs is absolute.
 	Path string
+	Abs  string
 	Size int64
-	// Origin and Reason say where it came from (kept if it is given back).
-	Origin string
-	Reason string
+}
+
+// UnassignedEntry is an entry of the section an assignment took (RF-27a).
+type UnassignedEntry struct {
+	Name  string
+	Size  int64
+	Files []UnassignedSource
 }
 
 // Library is the catalog seen from ingestion (wired in the composition root).
@@ -114,10 +131,17 @@ type Library interface {
 	Recover(ctx context.Context) (int, error)
 	HasItemsFrom(ctx context.Context, source string) (bool, error)
 	PutAside(ctx context.Context, req SetAsideRequest) error
-	// UnassignedFile describes a file of the section (ErrUnassignedNotFound).
-	UnassignedFile(ctx context.Context, id int64) (UnassignedSource, error)
-	// TakeUnassigned moves a file of the section to dest and forgets it.
-	TakeUnassigned(ctx context.Context, id int64, dest string) (UnassignedSource, error)
+	// TakeEntry marks the entry a file of the section belongs to as used by
+	// the job (ErrUnassignedNotFound, or a CommitRejected if it is busy).
+	TakeEntry(ctx context.Context, id int64, job string) (UnassignedEntry, error)
+	// JobFiles returns the files of the section the job uses.
+	JobFiles(ctx context.Context, job string) ([]UnassignedSource, error)
+	// ReleaseJob frees them.
+	ReleaseJob(ctx context.Context, job string) error
+	// DeleteJobFiles deletes some of them for good (extracted archives).
+	DeleteJobFiles(ctx context.Context, job string, ids []int64) error
+	// UnassignedDir is the section's absolute folder.
+	UnassignedDir() string
 }
 
 // Errors of the commit and the unassigned section.
@@ -202,7 +226,7 @@ func (c *Committer) Files(ctx context.Context, id domain.JobID) ([]FileView, err
 	if err != nil {
 		return nil, err
 	}
-	valid, _ := domain.Validate(rules[job.Console], files, known)
+	valid, _ := domain.ValidateFor(job, rules[job.Console], files, known)
 	isValid := map[string]bool{}
 	for _, f := range valid {
 		isValid[f.Path] = true
@@ -295,6 +319,7 @@ func (c *Committer) Commit(ctx context.Context, id domain.JobID, req []CommitFil
 	if err := c.save(ctx, job); err != nil {
 		return nil, res, err
 	}
+	c.finishEntry(ctx, job)
 	c.cleanUp(job)
 	return job, res, nil
 }
@@ -323,7 +348,7 @@ func (c *Committer) ChangeConsole(ctx context.Context, id domain.JobID, console 
 	if err != nil {
 		return nil, err
 	}
-	_, reason := domain.Validate(rule, files, known)
+	_, reason := domain.ValidateFor(job, rule, files, known)
 	if err := job.Validated(console, reason, c.now()); err != nil {
 		return nil, err
 	}
@@ -353,6 +378,24 @@ func (c *Committer) Resolve(ctx context.Context, id domain.JobID, r Resolution) 
 		return nil, ErrNotInvalid
 	}
 	ctx = context.WithoutCancel(ctx)
+	if job.FromEntry() {
+		// The files are still in the section: setting them aside is just
+		// ending the assignment (RF-27a).
+		if r != ResolveDelete && r != ResolveUnassigned {
+			return nil, invalid("Los archivos siguen en No asignados: cancela la asignación.")
+		}
+		if err := job.Cancel(c.now()); err != nil {
+			return nil, err
+		}
+		if err := c.library.ReleaseJob(ctx, string(job.ID)); err != nil {
+			return nil, err
+		}
+		if err := c.save(ctx, job); err != nil {
+			return nil, err
+		}
+		c.cleanUp(job)
+		return job, nil
+	}
 	switch r {
 	case ResolveUnassigned, ResolveTrash:
 		files, err := c.files.List(ctx, id)
@@ -366,7 +409,7 @@ func (c *Committer) Resolve(ctx context.Context, id domain.JobID, r Resolution) 
 		if len(paths) > 0 {
 			if err := c.library.PutAside(ctx, SetAsideRequest{
 				Source: string(job.ID), Root: c.staging.Dir(id), Files: paths, Folder: job.Title,
-				Origin: job.FileName, Reason: "upload", ToTrash: r == ResolveTrash,
+				Origin: job.FileName, Reason: "upload", Console: job.Console, IGDBID: job.IGDBID, ToTrash: r == ResolveTrash,
 			}); err != nil {
 				return nil, err
 			}
@@ -420,6 +463,7 @@ func (c *Committer) Recover(ctx context.Context) error {
 			return err
 		}
 		if stored {
+			c.finishEntry(ctx, job)
 			c.cleanUp(job)
 		}
 	}
@@ -438,7 +482,7 @@ func (c *Committer) libraryRequest(ctx context.Context, job *domain.UploadJob, r
 	if err != nil {
 		return LibraryRequest{}, nil, err
 	}
-	valid, reason := domain.Validate(rules[job.Console], files, known)
+	valid, reason := domain.ValidateFor(job, rules[job.Console], files, known)
 	if reason != "" {
 		return LibraryRequest{}, nil, invalid("Los archivos ya no encajan en la consola: vuelve a elegirla.")
 	}
@@ -455,6 +499,7 @@ func (c *Committer) libraryRequest(ctx context.Context, job *domain.UploadJob, r
 
 	out := LibraryRequest{Source: string(job.ID), Console: job.Console, Title: job.Title, IGDBID: job.IGDBID}
 	seen := map[string]bool{}
+	kept := 0
 	for _, f := range req {
 		s, ok := byPath[f.Path]
 		if !ok {
@@ -464,22 +509,101 @@ func (c *Committer) libraryRequest(ctx context.Context, job *domain.UploadJob, r
 			return out, nil, invalid("%q aparece dos veces.", f.Path)
 		}
 		seen[f.Path] = true
+		if f.Skip {
+			if !job.FromEntry() {
+				return out, nil, invalid("%q: solo los archivos de No asignados se pueden dejar sin guardar.", f.Path)
+			}
+			continue
+		}
+		kept++
 		switch f.OnDuplicate {
 		case "", "replace", "skip":
 		default:
 			return out, nil, invalid("%q: decisión de duplicado %q desconocida.", f.Path, f.OnDuplicate)
 		}
-		out.Files = append(out.Files, LibraryFile{
+		lf := LibraryFile{
 			Ref: f.Path, Root: c.staging.Dir(job.ID), Path: s.Path, Size: s.Size,
 			Kind: f.Kind, Label: strings.TrimSpace(f.Label), OnDuplicate: f.OnDuplicate,
-		})
+		}
+		if s.Unassigned != nil {
+			lf.Root, lf.Unassigned = c.library.UnassignedDir(), *s.Unassigned
+		}
+		out.Files = append(out.Files, lf)
 	}
 	for _, f := range valid {
 		if !seen[f.Path] {
 			return out, nil, invalid("Faltan los datos de %q.", f.Path)
 		}
 	}
+	if job.FromEntry() {
+		switch {
+		case kept == 0:
+			return out, nil, invalid("Elige al menos un archivo para guardar.")
+		case kept > 1 && !rules[job.Console].MultipleFiles:
+			return out, nil, invalid("Esta consola guarda un solo archivo por juego: marca los demás como «No guardar».")
+		}
+	}
 	return out, discarded, nil
+}
+
+// finishEntry completes a stored assignment (RF-27a): extracted files that
+// were not stored stay in the entry, the extracted archives are deleted
+// (RF-06) and the entry's other files are free again.
+func (c *Committer) finishEntry(ctx context.Context, job *domain.UploadJob) {
+	if !job.FromEntry() {
+		return
+	}
+	id := string(job.ID)
+	sources, err := c.library.JobFiles(ctx, id)
+	if err != nil {
+		c.log.Error("finish assignment: list entry", "job", id, "error", err)
+		return
+	}
+	staged, err := c.files.List(ctx, job.ID)
+	if err != nil {
+		c.log.Error("finish assignment: list files", "job", id, "error", err)
+		return
+	}
+	inPlace := map[int64]bool{}
+	var leftovers []string
+	for _, f := range staged {
+		switch {
+		case f.Unassigned != nil:
+			inPlace[*f.Unassigned] = true
+		case c.staging.Exists(filepath.Join(c.staging.Dir(job.ID), filepath.FromSlash(f.Path))):
+			leftovers = append(leftovers, f.Path)
+		}
+	}
+	// Archives of a folder entry were extracted under it; a loose one's
+	// files need a folder: the title's.
+	folder := job.Title
+	for _, s := range sources {
+		if strings.Contains(s.Path, "/") {
+			folder = ""
+		}
+	}
+	if len(leftovers) > 0 {
+		if err := c.library.PutAside(ctx, SetAsideRequest{
+			Source: id, Root: c.staging.Dir(job.ID), Files: leftovers, Folder: folder,
+			Origin: job.UnassignedOrigin, Reason: "upload", Console: job.Console, IGDBID: job.IGDBID,
+		}); err != nil {
+			c.log.Error("finish assignment: keep files not stored", "job", id, "error", err)
+		}
+	}
+	var archives []int64
+	for _, s := range sources {
+		if !inPlace[s.ID] {
+			archives = append(archives, s.ID)
+		}
+	}
+	if len(archives) > 0 {
+		if err := c.library.DeleteJobFiles(ctx, id, archives); err != nil {
+			c.log.Error("finish assignment: delete extracted archives", "job", id, "error", err)
+		}
+	}
+	if err := c.library.ReleaseJob(ctx, id); err != nil {
+		c.log.Error("finish assignment: release entry", "job", id, "error", err)
+	}
 }
 
 // cleanUp deletes what a finished job leaves in staging.

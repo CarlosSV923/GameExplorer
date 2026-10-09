@@ -104,7 +104,11 @@ export function UploadCard({ row }: { row: UploadRow }) {
   const cancelJob = useCancelJob()
   const consoles = useConsoles()
   const [wrongFile, setWrongFile] = useState(false)
-  const consoleName = consoles.data?.find((c) => c.slug === row.console)?.displayName ?? row.console
+  // Without console the upload goes to the unassigned section (RF-07b).
+  const consoleName =
+    row.console === ''
+      ? t('unassigned.title')
+      : (consoles.data?.find((c) => c.slug === row.console)?.displayName ?? row.console)
 
   const pct = row.size > 0 ? (row.sent / row.size) * 100 : 0
   const amounts = t('uploads.amounts', {

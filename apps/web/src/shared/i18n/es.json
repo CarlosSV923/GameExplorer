@@ -212,7 +212,7 @@
     "titleMany_other": "Subir {{count}} archivos",
     "subtitle": "La subida empieza al confirmar. Los comprimidos se descomprimen después.",
     "assignTitle": "Asignar {{name}}",
-    "assignSubtitle": "El archivo sale de No asignados. Si es un comprimido, se descomprime.",
+    "assignSubtitle": "Los archivos siguen en No asignados hasta guardarlos. Los comprimidos se descomprimen y luego eliges qué guardar.",
     "files": "Archivos elegidos",
     "removeFile": "Quitar {{name}}",
     "badFile": "No es un comprimido y su extensión no vale para {{console}} ({{exts}}). Elige otra consola o quita el archivo.",
@@ -239,7 +239,11 @@
     "submitMany_one": "Subir {{count}} archivo",
     "submitMany_other": "Subir {{count}} archivos",
     "submitNext": "Subir y seguir con el siguiente",
-    "assign": "Asignar"
+    "assign": "Asignar",
+    "noConsole": "Sin consola",
+    "noConsoleDetail": "A No asignados",
+    "afterUnassigned": "Se descomprime todo en No asignados, junto con lo que ya haya con ese nombre. Después lo asignas a una consola.",
+    "afterAssign": "Al terminar de descomprimir eliges el tipo de cada archivo o «No guardar»."
   },
   "uploads": {
     "title": "Subidas",
@@ -333,7 +337,14 @@
     "cancelUpload": "Cancelar subida",
     "cancelTitle": "¿Cancelar la subida?",
     "cancelBody": "Se borran los archivos de «{{name}}» que se subieron y descomprimieron. No se puede deshacer.",
-    "cancelBodyUnassigned": "«{{name}}» vuelve a No asignados tal como estaba."
+    "cancelBodyUnassigned": "Los archivos de «{{name}}» siguen en No asignados, tal como estaban.",
+    "keep": "Guardar este archivo",
+    "stays": "· se queda en No asignados",
+    "keepSome": "Elige al menos un archivo para guardar.",
+    "keepOne": "{{console}} guarda un solo archivo por juego: deja los demás sin guardar.",
+    "notGameFiles": "No son de la consola y se quedan en No asignados:",
+    "cancelAssign": "Cancelar asignación",
+    "cancelAssignTitle": "¿Cancelar la asignación?"
   },
   "invalid": {
     "noneTitle": "Estos archivos no son de {{console}}",
@@ -364,15 +375,17 @@
     "delete": "Borrar definitivamente",
     "deleteBody": "Se libera el espacio. Pide confirmación.",
     "deleteTitle": "¿Borrar definitivamente?",
-    "deleteConfirm": "Se borra lo que trajo «{{name}}» sin pasar por la papelera y se liberan {{size}}. No se puede deshacer."
+    "deleteConfirm": "Se borra lo que trajo «{{name}}» sin pasar por la papelera y se liberan {{size}}. No se puede deshacer.",
+    "release": "Cancelar la asignación",
+    "releaseBody": "Los archivos siguen en No asignados, tal como estaban."
   },
   "unassigned": {
     "title": "No asignados",
     "files_one": "{{count}} archivo",
     "files_other": "{{count}} archivos",
-    "intro": "Archivos que llegaron por Samba fuera de una carpeta de juego de la app, o de subidas que no encajaron en su consola. Están en _unassigned/.",
-    "summary_one": "{{count}} archivo · {{size}}",
-    "summary_other": "{{count}} archivos · {{size}}",
+    "intro": "Lo que llegó por Samba, las subidas sin consola o que no encajaron y lo que moviste aquí. Cada carpeta de _unassigned/ es una entrada y se asigna entera.",
+    "summary_one": "{{count}} entrada · {{size}}",
+    "summary_other": "{{count}} entradas · {{size}}",
     "file": "Archivo",
     "arrived": "Llegó",
     "origin": "Origen:",
@@ -393,9 +406,13 @@
     "deleteTitle": "¿Borrar definitivamente?",
     "deleteBody": "«{{name}}» se borra sin pasar por la papelera y se liberan {{size}}. No se puede deshacer.",
     "deleteConfirm": "Borrar definitivamente",
-    "footnote": "«Asignar» abre el formulario de subida con el archivo ya elegido: nombre, consola y, si es comprimido, se descomprime. Aquí no se pueden subir archivos.",
+    "footnote": "«Asignar» abre el formulario con el nombre de la entrada: eliges la consola y, en la confirmación, el tipo de cada archivo o «No guardar». Lo que copies por Samba a _unassigned/ aparece aquí al momento.",
     "emptyTitle": "No hay archivos sin asignar",
-    "emptyBody": "Lo que llegue por Samba fuera de una carpeta de juego, o las subidas que no encajen, aparecerán aquí."
+    "emptyBody": "Copia archivos por Samba a _unassigned/, o súbelos sin consola: aparecerán aquí para asignarlos.",
+    "copying": "Copiando…",
+    "busy": "Asignándose",
+    "cameFrom": "Venía de {{name}}",
+    "download": "Descargar {{name}}"
   },
   "scan": {
     "title": "Revisión de la biblioteca",

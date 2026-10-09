@@ -4,22 +4,33 @@ import userEvent from '@testing-library/user-event'
 
 import { createI18n } from '@/shared/i18n'
 import { AppError } from '@/shared/kernel/errors'
-import type { UnassignedFile } from '@/modules/catalog/domain/types'
+import type { UnassignedEntry } from '@/modules/catalog/domain/types'
 import { consoles, fakeServices } from '@/test/fakeServices'
 
 import { App } from './App'
 import { safeRedirect } from './router'
 
-const unassignedFile: UnassignedFile = {
+const unassignedEntry: UnassignedEntry = {
   id: 1,
-  path: 'n64/Mario.z64',
-  name: 'Mario.z64',
-  origin: 'n64/',
-  reason: 'samba',
+  name: 'n64',
+  folder: true,
   size: 8_000_000,
   arrivedAt: '2026-10-08T10:00:00Z',
-  consoles: [],
-  archive: false,
+  copying: false,
+  busy: false,
+  files: [
+    {
+      id: 1,
+      path: 'n64/Mario.z64',
+      name: 'Mario.z64',
+      origin: 'n64/Mario.z64',
+      reason: 'samba',
+      size: 8_000_000,
+      arrivedAt: '2026-10-08T10:00:00Z',
+      consoles: [],
+      archive: false,
+    },
+  ],
 }
 
 function renderAt(path: string, services = fakeServices()) {
@@ -44,7 +55,7 @@ describe('App', () => {
   it('moves through the consoles with games and the unassigned section', async () => {
     const user = userEvent.setup()
     const services = fakeServices()
-    services.catalog.unassigned.list = vi.fn(() => Promise.resolve([unassignedFile]))
+    services.catalog.unassigned.list = vi.fn(() => Promise.resolve([unassignedEntry]))
     const { history } = renderAt('/', services)
     await screen.findByRole('heading', { level: 1, name: 'Nintendo Switch' })
 

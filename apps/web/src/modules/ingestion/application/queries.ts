@@ -11,7 +11,7 @@ import { invalidateLibrary } from '@/modules/catalog/application/queries'
 import { createPortContext } from '@/shared/kernel/ports'
 import { useDebounced, useNow } from '@/shared/kernel/hooks'
 
-import type { UnassignedFile } from '@/modules/catalog/domain/types'
+import type { UnassignedEntry } from '@/modules/catalog/domain/types'
 
 import type {
   CommitRequest,
@@ -34,10 +34,11 @@ export const [UploadQueueContext, useUploadQueue] = createPortContext<UploadQueu
 
 /**
  * What the upload form opens with (RF-03): picked or dropped files with the
- * console of the screen, or an unassigned file to assign (RF-27).
+ * console of the screen, or an unassigned entry to assign (RF-27a).
  */
 export type UploadFormRequest =
-  { kind: 'files'; files: File[]; console?: string } | { kind: 'unassigned'; file: UnassignedFile }
+  | { kind: 'files'; files: File[]; console?: string }
+  | { kind: 'unassigned'; entry: UnassignedEntry }
 
 /** Opens the upload form over the current screen (the app shell hosts it). */
 export const [UploadFormContext, useOpenUploadForm] =
@@ -145,7 +146,7 @@ export function useResolveJob(jobId: string) {
   })
 }
 
-/** Starts a job from an unassigned file (RF-27). */
+/** Starts a job that assigns an unassigned entry (RF-27a). */
 export function useAssign() {
   const ports = useIngestionPorts()
   const client = useQueryClient()
@@ -165,7 +166,7 @@ export function useCancelJob() {
     mutationFn: (id: string) => ports.cancel(id),
     onSuccess: async (job) => {
       upsert(client, job)
-      // An assigned file goes back to the unassigned section.
+      // An assigned entry is free again in the unassigned section.
       if (job.fromUnassigned) await invalidateLibrary(client)
     },
   })

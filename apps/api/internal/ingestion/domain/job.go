@@ -34,7 +34,8 @@ const (
 	StatusInvalid    Status = "invalid"
 	StatusCommitting Status = "committing"
 	StatusDone       Status = "done"
-	// StatusUnassigned and StatusTrashed: an invalid upload set aside.
+	// StatusUnassigned and StatusTrashed: an invalid upload set aside, or
+	// an upload without console stored in the unassigned section (RF-07b).
 	StatusUnassigned Status = "unassigned"
 	StatusTrashed    Status = "trashed"
 	StatusFailed     Status = "failed"
@@ -44,9 +45,9 @@ const (
 // transitions lists the allowed next states of each state.
 var transitions = map[Status][]Status{
 	StatusUploading:     {StatusUploaded, StatusFailed, StatusCancelled},
-	StatusUploaded:      {StatusExtracting, StatusConfirm, StatusInvalid, StatusWaitingParts, StatusFailed, StatusCancelled},
+	StatusUploaded:      {StatusExtracting, StatusConfirm, StatusInvalid, StatusUnassigned, StatusWaitingParts, StatusFailed, StatusCancelled},
 	StatusWaitingParts:  {StatusUploaded, StatusMerged, StatusFailed, StatusCancelled},
-	StatusExtracting:    {StatusConfirm, StatusInvalid, StatusNeedsPassword, StatusFailed, StatusCancelled},
+	StatusExtracting:    {StatusConfirm, StatusInvalid, StatusUnassigned, StatusNeedsPassword, StatusFailed, StatusCancelled},
 	StatusNeedsPassword: {StatusExtracting, StatusFailed, StatusCancelled},
 	StatusConfirm:       {StatusCommitting, StatusConfirm, StatusInvalid, StatusFailed, StatusCancelled},
 	StatusInvalid:       {StatusConfirm, StatusInvalid, StatusUnassigned, StatusTrashed, StatusFailed, StatusCancelled},
@@ -87,12 +88,13 @@ var (
 	ErrJobNotFound = errors.New("upload job not found")
 	// ErrInvalidFileName is returned for unusable upload file names.
 	ErrInvalidFileName = errors.New("invalid file name")
-	// ErrInvalidSpec is returned for an upload without console or title.
+	// ErrInvalidSpec is returned for an upload without title.
 	ErrInvalidSpec = errors.New("invalid upload form")
 )
 
 // Spec is what the user said about an upload in the form (RF-03).
 type Spec struct {
+	// Console is "" for an upload that goes to the unassigned section (RF-07b).
 	Console string
 	Title   string
 	// IGDBID is the IGDB game the title was picked from, if any.
@@ -121,11 +123,12 @@ type UploadJob struct {
 	MergedInto JobID
 	// StoragePath is where the uploaded bytes live (opaque to the domain).
 	StoragePath string
-	// UnassignedOrigin is the path inside the unassigned folder the job's
-	// file came from (RF-27); "" for uploads.
+	// UnassignedOrigin is the unassigned entry the job assigns (RF-27a);
+	// "" for uploads.
 	UnassignedOrigin string
-	// UnassignedFrom and UnassignedReason are that file's origin and reason
-	// in the section, to give it back as it was if the job is cancelled.
+	// UnassignedFrom and UnassignedReason are only set by jobs of the
+	// previous single-file assignment, which moved the file to staging:
+	// its origin and reason, to give it back as it was if cancelled.
 	UnassignedFrom   string
 	UnassignedReason string
 	CreatedAt        time.Time
@@ -142,8 +145,8 @@ func NewUploadJob(id JobID, fileName string, size int64, spec Spec, now time.Tim
 		return nil, fmt.Errorf("negative size %d", size)
 	}
 	spec.Title = strings.Join(strings.Fields(spec.Title), " ")
-	if spec.Console == "" || spec.Title == "" || len(spec.Title) > 200 {
-		return nil, fmt.Errorf("%w: console and title are required", ErrInvalidSpec)
+	if spec.Title == "" || len(spec.Title) > 200 {
+		return nil, fmt.Errorf("%w: title is required", ErrInvalidSpec)
 	}
 	if (spec.GroupID == "") != (spec.GroupSize == 0) || spec.GroupSize < 0 || spec.GroupSize > 100 {
 		return nil, fmt.Errorf("%w: group", ErrInvalidSpec)
@@ -152,6 +155,18 @@ func NewUploadJob(id JobID, fileName string, size int64, spec Spec, now time.Tim
 		ID: id, FileName: name, Size: size, Status: StatusUploading, Spec: spec,
 		CreatedAt: now, UpdatedAt: now,
 	}, nil
+}
+
+// FromEntry reports a job that assigns an unassigned entry in place: its
+// files stay in the section until they are stored (RF-27a).
+func (j *UploadJob) FromEntry() bool {
+	return j.UnassignedOrigin != "" && j.UnassignedFrom == ""
+}
+
+// Unassigned reports an upload without console: its files go to the
+// unassigned section instead of a console (RF-07b).
+func (j *UploadJob) Unassigned() bool {
+	return j.Console == "" && j.UnassignedOrigin == ""
 }
 
 // RecordProgress stores how many bytes arrived so far.

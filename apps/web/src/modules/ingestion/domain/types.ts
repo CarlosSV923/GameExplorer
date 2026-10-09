@@ -44,7 +44,7 @@ export interface UploadJob {
   /** IGDB game the name was picked from. */
   igdbId?: number | null
   invalidReason?: InvalidReason | null
-  /** Started from an unassigned file. */
+  /** Assigns an unassigned entry (RF-27a). */
   fromUnassigned?: boolean
   /** Extraction percentage while extracting. */
   progress?: number
@@ -59,6 +59,7 @@ export interface UploadJob {
 
 /** What the form decided for an upload (RF-03): it travels with the upload. */
 export interface UploadSpec {
+  /** "" sends the upload to the unassigned section (RF-07b). */
   console: string
   title: string
   igdbId?: number
@@ -76,6 +77,8 @@ export interface StagedFile {
   valid: boolean
   /** Every console whose extensions accept it. */
   consoles: string[]
+  /** Of an assigned unassigned entry, not an archive: it stays there until stored (RF-27a). */
+  inPlace?: boolean
 }
 
 export interface CommitFile {
@@ -84,6 +87,8 @@ export interface CommitFile {
   kind?: ItemKind
   label?: string
   onDuplicate?: DuplicateAction
+  /** "No guardar": stays in the unassigned section (assigned entries only, RF-27a). */
+  skip?: boolean
 }
 
 export interface CommitRequest {

@@ -41,6 +41,7 @@ type fileJSON struct {
 	Size     int64    `json:"size"`
 	Valid    bool     `json:"valid"`
 	Consoles []string `json:"consoles"`
+	InPlace  bool     `json:"inPlace"`
 }
 
 type itemJSON struct {
@@ -98,6 +99,21 @@ type unassignedJSON struct {
 	Size     int64    `json:"size"`
 	Consoles []string `json:"consoles"`
 	Archive  bool     `json:"archive"`
+	Copying  bool     `json:"copying"`
+	Console  *string  `json:"console"`
+	IgdbID   *int64   `json:"igdbId"`
+}
+
+type entryJSON struct {
+	ID      int64            `json:"id"`
+	Name    string           `json:"name"`
+	Folder  bool             `json:"folder"`
+	Size    int64            `json:"size"`
+	Console *string          `json:"console"`
+	IgdbID  *int64           `json:"igdbId"`
+	Copying bool             `json:"copying"`
+	Busy    bool             `json:"busy"`
+	Files   []unassignedJSON `json:"files"`
 }
 
 type trashJSON struct {
@@ -319,6 +335,17 @@ func writeFile(t *testing.T, path, content string) {
 	}
 }
 
+// writeSettled writes a file that looks copied a while ago: the unassigned
+// section takes files modified in the last minute as still being copied.
+func writeSettled(t *testing.T, path, content string) {
+	t.Helper()
+	writeFile(t, path, content)
+	old := time.Now().Add(-2 * time.Minute)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func exists(path string) bool {
 	_, err := os.Lstat(path)
 	return err == nil
@@ -346,9 +373,32 @@ func store(t *testing.T, srv *httptest.Server, cookie *http.Cookie, console, tit
 	return decode[commitJSON](t, res).GameID
 }
 
+// unassignedList is every file of the unassigned section's entries.
 func unassignedList(t *testing.T, srv *httptest.Server, cookie *http.Cookie) []unassignedJSON {
 	t.Helper()
-	return decode[[]unassignedJSON](t, get(t, srv, cookie, "/api/unassigned"))
+	var out []unassignedJSON
+	for _, e := range unassignedEntries(t, srv, cookie) {
+		out = append(out, e.Files...)
+	}
+	return out
+}
+
+func unassignedEntries(t *testing.T, srv *httptest.Server, cookie *http.Cookie) []entryJSON {
+	t.Helper()
+	return decode[[]entryJSON](t, get(t, srv, cookie, "/api/unassigned"))
+}
+
+// entryNamed finds an entry of the unassigned section by name.
+func entryNamed(t *testing.T, srv *httptest.Server, cookie *http.Cookie, name string) entryJSON {
+	t.Helper()
+	entries := unassignedEntries(t, srv, cookie)
+	for _, e := range entries {
+		if e.Name == name {
+			return e
+		}
+	}
+	t.Fatalf("no entry %q in %+v", name, entries)
+	return entryJSON{}
 }
 
 func trashList(t *testing.T, srv *httptest.Server, cookie *http.Cookie) []trashJSON {

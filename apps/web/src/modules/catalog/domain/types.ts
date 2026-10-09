@@ -118,6 +118,30 @@ export interface UnassignedFile {
   consoles: string[]
   /** A zip, 7z or rar: validated once extracted. */
   archive: boolean
+  /** Still being copied over SMB (id is 0): no action yet (RF-26a). */
+  copying?: boolean
+  /** The console it came from, if known. */
+  console?: string
+  /** The IGDB game picked when it was uploaded without console. */
+  igdbId?: number | null
+}
+
+/** An entry of the unassigned section: a first-level folder, or a loose file (RF-27). */
+export interface UnassignedEntry {
+  /** The lowest id of its files; 0 while every file is still copying. */
+  id: number
+  name: string
+  folder: boolean
+  size: number
+  /** Prefill Asignar. */
+  console?: string
+  igdbId?: number | null
+  arrivedAt: string
+  /** A file is still being copied: no action. */
+  copying: boolean
+  /** An assignment in progress uses it: no action. */
+  busy: boolean
+  files: UnassignedFile[]
 }
 
 export interface TrashEntry {

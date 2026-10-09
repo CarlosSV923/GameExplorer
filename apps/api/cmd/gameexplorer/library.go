@@ -94,29 +94,54 @@ func (l libraryPort) HasItemsFrom(ctx context.Context, source string) (bool, err
 func (l libraryPort) PutAside(ctx context.Context, req ingestionapp.SetAsideRequest) error {
 	return libraryError(l.svc.PutAside(ctx, catalogapp.SetAside{
 		Source: req.Source, Root: req.Root, Files: req.Files, Folder: req.Folder, Origin: req.Origin,
-		Reason: catalogdomain.UnassignedReason(req.Reason), ToTrash: req.ToTrash,
+		Reason: catalogdomain.UnassignedReason(req.Reason), Console: catalogdomain.Slug(req.Console), IGDBID: req.IGDBID,
+		ToTrash: req.ToTrash,
 	}))
 }
 
-func (l libraryPort) UnassignedFile(ctx context.Context, id int64) (ingestionapp.UnassignedSource, error) {
-	_, f, err := l.svc.UnassignedFile(ctx, catalogdomain.UnassignedID(id))
+func (l libraryPort) TakeEntry(ctx context.Context, id int64, job string) (ingestionapp.UnassignedEntry, error) {
+	e, err := l.svc.TakeEntry(ctx, catalogdomain.UnassignedID(id), job)
 	if err != nil {
-		return ingestionapp.UnassignedSource{}, libraryError(err)
+		return ingestionapp.UnassignedEntry{}, libraryError(err)
 	}
-	return ingestionapp.UnassignedSource{
-		Name: f.Name(), Path: f.Path, Size: f.Size, Origin: f.Origin, Reason: string(f.Reason),
-	}, nil
+	out := ingestionapp.UnassignedEntry{Name: e.Name, Files: l.sources(e.Files)}
+	for _, f := range out.Files {
+		out.Size += f.Size
+	}
+	return out, nil
 }
 
-func (l libraryPort) TakeUnassigned(ctx context.Context, id int64, dest string) (ingestionapp.UnassignedSource, error) {
-	f, err := l.svc.TakeUnassigned(ctx, catalogdomain.UnassignedID(id), dest)
+func (l libraryPort) JobFiles(ctx context.Context, job string) ([]ingestionapp.UnassignedSource, error) {
+	files, err := l.svc.JobFiles(ctx, job)
 	if err != nil {
-		return ingestionapp.UnassignedSource{}, libraryError(err)
+		return nil, libraryError(err)
 	}
-	return ingestionapp.UnassignedSource{
-		Name: f.Name(), Path: f.Path, Size: f.Size, Origin: f.Origin, Reason: string(f.Reason),
-	}, nil
+	return l.sources(files), nil
 }
+
+func (l libraryPort) sources(files []catalogdomain.UnassignedFile) []ingestionapp.UnassignedSource {
+	out := make([]ingestionapp.UnassignedSource, 0, len(files))
+	for _, f := range files {
+		out = append(out, ingestionapp.UnassignedSource{
+			ID: int64(f.ID), Name: f.Name(), Path: f.Path, Abs: l.svc.UnassignedPath(f.Path), Size: f.Size,
+		})
+	}
+	return out
+}
+
+func (l libraryPort) ReleaseJob(ctx context.Context, job string) error {
+	return libraryError(l.svc.ReleaseJob(ctx, job))
+}
+
+func (l libraryPort) DeleteJobFiles(ctx context.Context, job string, ids []int64) error {
+	out := make([]catalogdomain.UnassignedID, len(ids))
+	for i, id := range ids {
+		out[i] = catalogdomain.UnassignedID(id)
+	}
+	return libraryError(l.svc.DeleteJobFiles(ctx, job, out))
+}
+
+func (l libraryPort) UnassignedDir() string { return l.svc.UnassignedPath("") }
 
 func storeRequest(req ingestionapp.LibraryRequest) catalogapp.StoreRequest {
 	out := catalogapp.StoreRequest{
@@ -126,6 +151,7 @@ func storeRequest(req ingestionapp.LibraryRequest) catalogapp.StoreRequest {
 		out.Files = append(out.Files, catalogapp.NewFile{
 			Ref: f.Ref, Root: f.Root, Path: f.Path, Size: f.Size,
 			Kind: catalogdomain.ItemKind(f.Kind), Label: f.Label, OnDuplicate: catalogdomain.DuplicateAction(f.OnDuplicate),
+			Unassigned: catalogdomain.UnassignedID(f.Unassigned),
 		})
 	}
 	return out

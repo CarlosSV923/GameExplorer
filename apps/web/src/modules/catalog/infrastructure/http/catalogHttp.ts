@@ -48,6 +48,9 @@ export function createCatalogHttp(client: ApiClient, baseUrl = '/api'): CatalogP
       trash: (n) => unwrapVoid(client.POST('/unassigned/{id}/trash', id(n))),
       remove: (n) => unwrapVoid(client.DELETE('/unassigned/{id}', id(n))),
       downloadUrl: (n) => `${baseUrl}/unassigned/${String(n)}/download`,
+      trashEntry: (n) => unwrapVoid(client.POST('/unassigned/entries/{id}/trash', id(n))),
+      removeEntry: (n) => unwrapVoid(client.DELETE('/unassigned/entries/{id}', id(n))),
+      entryDownloadUrl: (n) => `${baseUrl}/unassigned/entries/${String(n)}/download`,
     },
     trash: {
       list: () => unwrap(client.GET('/trash')),

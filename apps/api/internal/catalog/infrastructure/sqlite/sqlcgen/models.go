@@ -62,9 +62,10 @@ type ScanPending struct {
 }
 
 type StagedFile struct {
-	JobID string
-	Path  string
-	Size  int64
+	JobID        string
+	Path         string
+	Size         int64
+	UnassignedID sql.NullInt64
 }
 
 type TrashEntry struct {
@@ -84,6 +85,9 @@ type UnassignedFile struct {
 	Size         int64
 	ArrivedAt    string
 	TrashEntryID sql.NullInt64
+	Console      string
+	IgdbID       sql.NullInt64
+	JobID        string
 }
 
 type UploadJob struct {

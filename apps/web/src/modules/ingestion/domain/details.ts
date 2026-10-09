@@ -7,6 +7,8 @@ import type { CommitFile, CommitPlan } from './types'
 export interface FileDraft extends KindDraft {
   /** What to do if its final name is taken (RF-09). */
   onDuplicate: DuplicateAction
+  /** "No guardar": it stays in the unassigned section (assigned entries only, RF-27a). */
+  skip?: boolean
 }
 
 /**
@@ -23,8 +25,20 @@ export function initialDraft(console: Pick<Console, 'kinds'>, validCount: number
   }
 }
 
+/**
+ * Which valid files of an assigned entry start as "No guardar": on a
+ * one-file console only the first one is kept (RF-27a).
+ */
+export function initialSkips(
+  console: Pick<Console, 'kinds'>,
+  paths: readonly string[],
+): ReadonlySet<string> {
+  return console.kinds.length === 1 ? new Set(paths.slice(1)) : new Set()
+}
+
 /** The commit (or plan) entry for a complete file. */
 export function toCommitFile(path: string, d: FileDraft): CommitFile {
+  if (d.skip) return { path, skip: true }
   const label = kindDraftLabel(d)
   return {
     path,

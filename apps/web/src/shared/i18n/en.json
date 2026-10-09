@@ -212,7 +212,7 @@
     "titleMany_other": "Upload {{count}} files",
     "subtitle": "The upload starts when you confirm. Archives are extracted afterwards.",
     "assignTitle": "Assign {{name}}",
-    "assignSubtitle": "The file leaves Unassigned. If it is an archive, it is extracted.",
+    "assignSubtitle": "The files stay in Unassigned until they are stored. Archives are extracted, then you choose what to store.",
     "files": "Chosen files",
     "removeFile": "Remove {{name}}",
     "badFile": "It is not an archive and its extension does not fit {{console}} ({{exts}}). Choose another console or remove the file.",
@@ -239,7 +239,11 @@
     "submitMany_one": "Upload {{count}} file",
     "submitMany_other": "Upload {{count}} files",
     "submitNext": "Upload and go to the next",
-    "assign": "Assign"
+    "assign": "Assign",
+    "noConsole": "No console",
+    "noConsoleDetail": "To Unassigned",
+    "afterUnassigned": "Everything is extracted into Unassigned, next to anything already there with that name. You assign it to a console later.",
+    "afterAssign": "Once extracted, you choose each file’s type or “Don’t store”."
   },
   "uploads": {
     "title": "Uploads",
@@ -333,7 +337,14 @@
     "cancelUpload": "Cancel upload",
     "cancelTitle": "Cancel the upload?",
     "cancelBody": "The uploaded and extracted files of “{{name}}” are deleted. This cannot be undone.",
-    "cancelBodyUnassigned": "“{{name}}” goes back to Unassigned as it was."
+    "cancelBodyUnassigned": "The files of “{{name}}” stay in Unassigned, as they were.",
+    "keep": "Store this file",
+    "stays": "· stays in Unassigned",
+    "keepSome": "Choose at least one file to store.",
+    "keepOne": "{{console}} stores one file per game: leave the others unstored.",
+    "notGameFiles": "Not files of the console; they stay in Unassigned:",
+    "cancelAssign": "Cancel assignment",
+    "cancelAssignTitle": "Cancel the assignment?"
   },
   "invalid": {
     "noneTitle": "These files are not {{console}} files",
@@ -364,15 +375,17 @@
     "delete": "Delete for good",
     "deleteBody": "Frees the space. Asks for confirmation.",
     "deleteTitle": "Delete for good?",
-    "deleteConfirm": "What “{{name}}” brought is deleted without going through the trash, freeing {{size}}. This cannot be undone."
+    "deleteConfirm": "What “{{name}}” brought is deleted without going through the trash, freeing {{size}}. This cannot be undone.",
+    "release": "Cancel the assignment",
+    "releaseBody": "The files stay in Unassigned, as they were."
   },
   "unassigned": {
     "title": "Unassigned",
     "files_one": "{{count}} file",
     "files_other": "{{count}} files",
-    "intro": "Files that arrived over Samba outside a game folder of the app, or from uploads that did not fit their console. They are in _unassigned/.",
-    "summary_one": "{{count}} file · {{size}}",
-    "summary_other": "{{count}} files · {{size}}",
+    "intro": "What arrived over Samba, uploads without a console or that did not fit, and what you moved here. Each folder of _unassigned/ is one entry, assigned as a whole.",
+    "summary_one": "{{count}} entry · {{size}}",
+    "summary_other": "{{count}} entries · {{size}}",
     "file": "File",
     "arrived": "Arrived",
     "origin": "From:",
@@ -393,9 +406,13 @@
     "deleteTitle": "Delete for good?",
     "deleteBody": "“{{name}}” is deleted without going through the trash, freeing {{size}}. This cannot be undone.",
     "deleteConfirm": "Delete for good",
-    "footnote": "“Assign” opens the upload form with the file already chosen: name, console and, if it is an archive, extraction. Files cannot be uploaded here.",
+    "footnote": "“Assign” opens the form with the entry’s name: you choose the console and, when confirming, each file’s type or “Don’t store”. Files you copy over Samba into _unassigned/ show up here right away.",
     "emptyTitle": "No unassigned files",
-    "emptyBody": "Whatever arrives over Samba outside a game folder, or uploads that do not fit, will show up here."
+    "emptyBody": "Copy files over Samba into _unassigned/, or upload them without a console: they will show up here to be assigned.",
+    "copying": "Copying…",
+    "busy": "Being assigned",
+    "cameFrom": "Came from {{name}}",
+    "download": "Download {{name}}"
   },
   "scan": {
     "title": "Library check",

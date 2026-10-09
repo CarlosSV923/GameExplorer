@@ -25,7 +25,13 @@ import {
 } from '@/shared/ui'
 
 import { useCancelJob, useCommit, useCommitPlan } from '../application/queries'
-import { initialDraft, storedCount, toCommitFile, type FileDraft } from '../domain/details'
+import {
+  initialDraft,
+  initialSkips,
+  storedCount,
+  toCommitFile,
+  type FileDraft,
+} from '../domain/details'
 import type { CommitRequest, PlannedFile, StagedFile, UploadJob } from '../domain/types'
 
 /** The decision for a file whose final name is taken (RF-09). */
@@ -74,6 +80,8 @@ function DuplicateChoice({
  * The confirmation step (RF-08): on Switch each valid file needs its kind
  * (and the update's version or the DLC's name); on Wii and PSP the file and
  * its final name are confirmed. Duplicates ask Replace or Skip (RF-09).
+ * Assigning an unassigned entry, each file can also be left there ("No
+ * guardar", RF-27a); one-file consoles keep exactly one.
  */
 export function FileDetails({
   job,
@@ -93,23 +101,41 @@ export function FileDetails({
   const discarded = files.filter((f) => !f.valid)
   const kinds = !singleFile(console)
   const folder = gameFolder(job.title)
-  const [drafts, setDrafts] = useState<Record<string, FileDraft>>(() =>
-    Object.fromEntries(valid.map((f) => [f.path, initialDraft(console, valid.length)])),
-  )
+  const entry = Boolean(job.fromUnassigned)
+  const [drafts, setDrafts] = useState<Record<string, FileDraft>>(() => {
+    const skips = entry
+      ? initialSkips(
+          console,
+          valid.map((f) => f.path),
+        )
+      : new Set<string>()
+    return Object.fromEntries(
+      valid.map((f) => [
+        f.path,
+        { ...initialDraft(console, valid.length), ...(skips.has(f.path) ? { skip: true } : {}) },
+      ]),
+    )
+  })
   const [tried, setTried] = useState(false)
   const [cancelling, setCancelling] = useState(false)
 
   const draftOf = (path: string) => drafts[path] ?? initialDraft(console, valid.length)
-  const missing = valid.filter((f) => kindDraftError(draftOf(f.path)) !== null).length
+  const kept = valid.filter((f) => !draftOf(f.path).skip)
+  const missing = kept.filter((f) => kindDraftError(draftOf(f.path)) !== null).length
+  // What the server would refuse: nothing to store, or two files of a one-file game.
+  let keepError: string | null = null
+  if (kept.length === 0) keepError = t('details.keepSome')
+  else if (!kinds && kept.length > 1)
+    keepError = t('details.keepOne', { console: console.displayName })
   const request: CommitRequest | undefined =
-    missing === 0 && valid.length > 0
+    missing === 0 && keepError === null
       ? { files: valid.map((f) => toCommitFile(f.path, draftOf(f.path))) }
       : undefined
   const plan = useCommitPlan(job.id, request)
   const current = request && !plan.isPlaceholderData ? plan.data : undefined
   const undecided = current?.files.some((p) => p.action === 'undecided') ?? false
   const count = storedCount(
-    valid.map((f) => f.path),
+    kept.map((f) => f.path),
     current,
   )
   const commit = useCommit(job.id, (r) => {
@@ -187,7 +213,7 @@ export function FileDetails({
         {valid.map((f) => {
           const draft = draftOf(f.path)
           const planned = current?.files.find((p) => p.path === f.path)
-          const error = tried ? kindDraftError(draft) : null
+          const error = tried && !draft.skip ? kindDraftError(draft) : null
           const preview = previewFileName(job.title, draft, fileExtension(f.path, consoles))
           const path = (
             <PathPreview label={t('details.storedAs')} complete={preview.complete && folder.ok}>
@@ -208,7 +234,25 @@ export function FileDetails({
                 </span>
                 <span className="text-body-sm font-semibold text-ink-2">{format.size(f.size)}</span>
               </div>
-              {kinds ? (
+              {entry && (
+                <label className="inline-flex min-h-control-sm cursor-pointer items-center gap-2 self-start text-body font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={!draft.skip}
+                    onChange={(e) => {
+                      set(f.path, { ...draft, skip: !e.target.checked })
+                    }}
+                    className="size-4.5 accent-accent"
+                  />
+                  {t('details.keep')}
+                  {draft.skip && (
+                    <span className="text-body-sm font-semibold text-ink-3">
+                      {t('details.stays')}
+                    </span>
+                  )}
+                </label>
+              )}
+              {draft.skip ? null : kinds ? (
                 <FileTypeFields
                   name={`kind-${f.path}`}
                   fileName={baseName(f.path)}
@@ -223,7 +267,7 @@ export function FileDetails({
               ) : (
                 path
               )}
-              {planned && (
+              {planned && !draft.skip && (
                 <DuplicateChoice
                   path={f.path}
                   planned={planned}
@@ -241,7 +285,7 @@ export function FileDetails({
           <p className="m-0 flex items-start gap-2 text-body-sm leading-normal font-semibold text-ink-3">
             <TrashIcon size={16} className="mt-0.5 shrink-0" />
             <span>
-              {t('details.discarded')}{' '}
+              {entry ? t('details.notGameFiles') : t('details.discarded')}{' '}
               <span className="font-mono text-caption">
                 {discarded.map((d) => baseName(d.path)).join(', ')}
               </span>
@@ -252,9 +296,9 @@ export function FileDetails({
         {commit.isError && <Banner tone="danger">{describeError(t, commit.error)}</Banner>}
 
         <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
-          {tried && missing > 0 && (
+          {tried && (missing > 0 || keepError) && (
             <span role="status" className="mr-auto text-body font-bold text-danger">
-              {t('details.missing', { count: missing })}
+              {keepError ?? t('details.missing', { count: missing })}
             </span>
           )}
           <Button
@@ -263,14 +307,14 @@ export function FileDetails({
               setCancelling(true)
             }}
           >
-            {t('details.cancelUpload')}
+            {entry ? t('details.cancelAssign') : t('details.cancelUpload')}
           </Button>
           <Button
             variant="primary"
             size="lg"
             icon={<CheckIcon />}
             loading={commit.isPending}
-            disabled={tried && missing === 0 && (!current || count === 0)}
+            disabled={tried && missing === 0 && !keepError && (!current || count === 0)}
             onClick={save}
           >
             {count === 1 || !kinds ? t('details.saveOne') : t('details.save', { count })}
@@ -281,8 +325,8 @@ export function FileDetails({
       {cancelling && (
         <ConfirmDialog
           tone="danger"
-          title={t('details.cancelTitle')}
-          confirmLabel={t('details.cancelUpload')}
+          title={entry ? t('details.cancelAssignTitle') : t('details.cancelTitle')}
+          confirmLabel={entry ? t('details.cancelAssign') : t('details.cancelUpload')}
           busy={cancel.isPending}
           onCancel={() => {
             setCancelling(false)

@@ -144,83 +144,6 @@ func TestEditAFileOfSwitch(t *testing.T) {
 	wantStatus(t, call(t, srv, cookie, http.MethodPatch, "/api/items/"+id(dlc), `{"kind":"game"}`), http.StatusBadRequest, "kind of another console")
 }
 
-func TestUnassignedSection(t *testing.T) {
-	t.Parallel()
-	srv, cookie, library := libraryServer(t)
-	game := store(t, srv, cookie, "psp", "Daxter", "d.iso", "daxter", map[string]any{})
-
-	// A game moved to the section keeps its place as a path.
-	wantStatus(t, post(t, srv, cookie, "/api/games/"+id(game)+"/unassign", ""), http.StatusNoContent, "unassign")
-	files := unassignedList(t, srv, cookie)
-	if len(files) != 1 || files[0].Path != "psp/Daxter/Daxter.iso" || files[0].Reason != "manual" ||
-		len(files[0].Consoles) != 2 || files[0].Archive {
-		t.Fatalf("unassigned = %+v", files)
-	}
-	if exists(filepath.Join(library, "psp")) {
-		t.Fatal("empty folders left behind")
-	}
-	res := get(t, srv, cookie, "/api/unassigned/"+id(files[0].ID)+"/download")
-	if res.StatusCode != http.StatusOK || body(t, res) != "daxter" {
-		t.Fatalf("download = %d", res.StatusCode)
-	}
-
-	// Assigning it starts a job; it lands in Wii with a new name.
-	res = post(t, srv, cookie, "/api/unassigned/"+id(files[0].ID)+"/assign", `{"console":"wii","title":"Jak"}`)
-	wantStatus(t, res, http.StatusCreated, "assign")
-	job := decode[jobJSON](t, res)
-	if !job.FromUnassigned {
-		t.Fatalf("job = %+v", job)
-	}
-	waitStatus(t, srv, cookie, job.ID, "confirm")
-	if len(unassignedList(t, srv, cookie)) != 0 {
-		t.Fatal("assigned file must leave the section")
-	}
-	// Cancelling gives it back.
-	wantStatus(t, post(t, srv, cookie, "/api/jobs/"+job.ID+"/cancel", ""), http.StatusOK, "cancel")
-	files = unassignedList(t, srv, cookie)
-	if len(files) != 1 || files[0].Path != "psp/Daxter/Daxter.iso" {
-		t.Fatalf("unassigned after cancel = %+v", files)
-	}
-
-	// Assign again and store it.
-	res = post(t, srv, cookie, "/api/unassigned/"+id(files[0].ID)+"/assign", `{"console":"wii","title":"Jak"}`)
-	job = decode[jobJSON](t, res)
-	waitStatus(t, srv, cookie, job.ID, "confirm")
-	wantStatus(t, post(t, srv, cookie, "/api/jobs/"+job.ID+"/commit", commitBody(t, map[string]any{"path": "Daxter.iso"})), http.StatusOK, "commit")
-	if got := readFile(t, filepath.Join(library, "wii", "Jak", "Jak.iso")); got != "daxter" {
-		t.Fatalf("stored = %q", got)
-	}
-
-	// Trash and delete.
-	writeFile(t, filepath.Join(library, "_unassigned", "a.z64"), "n64")
-	writeFile(t, filepath.Join(library, "_unassigned", "b.rar"), "rar")
-	wantStatus(t, post(t, srv, cookie, "/api/library/scan", ""), http.StatusOK, "scan")
-	files = unassignedList(t, srv, cookie)
-	if len(files) != 2 {
-		t.Fatalf("unassigned = %+v", files)
-	}
-	for _, f := range files {
-		switch f.Name {
-		case "a.z64":
-			if len(f.Consoles) != 0 || f.Archive {
-				t.Errorf("a.z64 = %+v", f)
-			}
-			wantStatus(t, post(t, srv, cookie, "/api/unassigned/"+id(f.ID)+"/trash", ""), http.StatusNoContent, "trash")
-		case "b.rar":
-			if !f.Archive {
-				t.Errorf("b.rar = %+v", f)
-			}
-			wantStatus(t, call(t, srv, cookie, http.MethodDelete, "/api/unassigned/"+id(f.ID), ""), http.StatusNoContent, "delete")
-		}
-	}
-	if len(unassignedList(t, srv, cookie)) != 0 || exists(filepath.Join(library, "_unassigned", "b.rar")) {
-		t.Fatal("section not empty")
-	}
-	if trash := trashList(t, srv, cookie); len(trash) != 1 || trash[0].Files[0].Name != "a.z64" {
-		t.Fatalf("trash = %+v", trash)
-	}
-}
-
 func TestScanFindsChangesMadeOverSMB(t *testing.T) {
 	t.Parallel()
 	srv, cookie, library := libraryServer(t)
@@ -259,8 +182,8 @@ func TestScanFindsChangesMadeOverSMB(t *testing.T) {
 	if second["unassigned"] != 2 || second["pending"] != 1 {
 		t.Fatalf("second scan = %+v", second)
 	}
-	if !exists(filepath.Join(library, "_unassigned", "switch", "Limbo", "extra.nsp")) || !exists(filepath.Join(library, "_unassigned", "readme.txt")) {
-		t.Fatal("unknown files must move to _unassigned keeping their path")
+	if !exists(filepath.Join(library, "_unassigned", "Limbo", "extra.nsp")) || !exists(filepath.Join(library, "_unassigned", "readme.txt")) {
+		t.Fatal("unknown files must move to _unassigned, without their console folder")
 	}
 	if !exists(filepath.Join(library, "switch", ".DS_Store")) {
 		t.Fatal("junk must be left alone")
@@ -285,25 +208,10 @@ func TestScanFindsChangesMadeOverSMB(t *testing.T) {
 		t.Fatalf("unassigned = %d, want 3", len(files))
 	}
 
-	// An assignment that is cancelled gives the file back as it arrived.
-	var extra unassignedJSON
-	for _, f := range files {
-		if f.Name == "extra.nsp" {
-			extra = f
-		}
-	}
-	if extra.Reason != "samba" {
-		t.Fatalf("extra.nsp = %+v", extra)
-	}
-	res := post(t, srv, cookie, "/api/unassigned/"+id(extra.ID)+"/assign", `{"console":"switch","title":"Extra"}`)
-	wantStatus(t, res, http.StatusCreated, "assign")
-	job := decode[jobJSON](t, res)
-	waitStatus(t, srv, cookie, job.ID, "confirm")
-	wantStatus(t, post(t, srv, cookie, "/api/jobs/"+job.ID+"/cancel", ""), http.StatusOK, "cancel")
-	for _, f := range unassignedList(t, srv, cookie) {
-		if f.Name == "extra.nsp" && (f.Reason != extra.Reason || f.Origin != extra.Origin || f.Path != extra.Path) {
-			t.Fatalf("given back as %+v, want %+v", f, extra)
-		}
+	// The console folder it came from prefills Asignar.
+	extra := entryNamed(t, srv, cookie, "Limbo")
+	if extra.Console == nil || *extra.Console != "switch" || extra.Files[0].Reason != "samba" || extra.Files[0].Origin != "switch/Limbo/extra.nsp" {
+		t.Fatalf("Limbo entry = %+v", extra)
 	}
 }
 

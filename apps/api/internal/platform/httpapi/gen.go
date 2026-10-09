@@ -311,6 +311,11 @@ type CommitFile struct {
 
 	// Path StagedFile.path.
 	Path string `json:"path"`
+
+	// Skip "No guardar": the file stays in the unassigned section. Only for
+	// jobs assigned from it (RF-27a); every valid file is still listed,
+	// and one-file consoles keep exactly one.
+	Skip *bool `json:"skip,omitempty"`
 }
 
 // CommitPlan defines model for CommitPlan.
@@ -700,6 +705,10 @@ type StagedFile struct {
 	// Consoles Every console whose extensions accept the file.
 	Consoles []string `json:"consoles"`
 
+	// InPlace A file of an assigned unassigned entry that is not an archive: it
+	// stays in the section until it is stored (RF-27a).
+	InPlace *bool `json:"inPlace,omitempty"`
+
 	// Path Relative to the upload. Identifies the file in the commit.
 	//
 	// Example: Limbo [0100A8E005E7C000].nsp
@@ -745,23 +754,58 @@ type TrashEntryKind string
 // TrashEntryReason deleted by the user, or replaced by a duplicate.
 type TrashEntryReason string
 
+// UnassignedEntry A first-level folder of the unassigned section, or a loose file (RF-27).
+type UnassignedEntry struct {
+	ArrivedAt time.Time `json:"arrivedAt"`
+
+	// Busy An assignment in progress is using it; it admits no action.
+	Busy bool `json:"busy"`
+
+	// Console Prefills Asignar.
+	Console *string `json:"console,omitempty"`
+
+	// Copying A file is still being copied; the entry admits no action.
+	Copying bool             `json:"copying"`
+	Files   []UnassignedFile `json:"files"`
+	Folder  bool             `json:"folder"`
+
+	// Id Identifies the entry (the lowest id of its files); 0 while every file is copying.
+	Id int64 `json:"id"`
+
+	// IgdbId Prefills Asignar.
+	IgdbId *int64 `json:"igdbId,omitempty"`
+
+	// Name Example: Splatoon 3
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}
+
 // UnassignedFile defines model for UnassignedFile.
 type UnassignedFile struct {
 	// Archive A zip, 7z or rar; it is validated once extracted.
 	Archive   bool      `json:"archive"`
 	ArrivedAt time.Time `json:"arrivedAt"`
 
+	// Console The console it came from, if known.
+	Console *string `json:"console,omitempty"`
+
 	// Consoles Consoles whose extensions accept the file.
 	Consoles []string `json:"consoles"`
-	Id       int64    `json:"id"`
-	Name     string   `json:"name"`
+
+	// Copying Still being copied over SMB (id is 0); it admits no action (RF-26a).
+	Copying *bool `json:"copying,omitempty"`
+	Id      int64 `json:"id"`
+
+	// IgdbId The IGDB game picked when it was uploaded without console.
+	IgdbId *int64 `json:"igdbId,omitempty"`
+	Name   string `json:"name"`
 
 	// Origin Where it came from (a library path, or the upload's file name).
 	Origin string `json:"origin"`
 
 	// Path Relative to the unassigned folder.
 	//
-	// Example: wii/Zelda/Zelda.iso
+	// Example: Zelda/Zelda.iso
 	Path string `json:"path"`
 
 	// Reason Added over SMB, an upload that did not fit, or moved here by the user.
@@ -774,7 +818,7 @@ type UnassignedFileReason string
 
 // UploadJob defines model for UploadJob.
 type UploadJob struct {
-	// Console Console slug chosen in the form.
+	// Console Console slug chosen in the form; empty for an upload to the unassigned section.
 	Console   string    `json:"console"`
 	CreatedAt time.Time `json:"createdAt"`
 
@@ -921,8 +965,8 @@ type ResolveJobJSONRequestBody = ResolveRequest
 // RestoreTrashEntryJSONRequestBody defines body for RestoreTrashEntry for application/json ContentType.
 type RestoreTrashEntryJSONRequestBody = RestoreRequest
 
-// AssignUnassignedJSONRequestBody defines body for AssignUnassigned for application/json ContentType.
-type AssignUnassignedJSONRequestBody = AssignRequest
+// AssignUnassignedEntryJSONRequestBody defines body for AssignUnassignedEntry for application/json ContentType.
+type AssignUnassignedEntryJSONRequestBody = AssignRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -1046,15 +1090,24 @@ type ServerInterface interface {
 	// RestoreTrashEntry Put an entry back where it came from
 	// (POST /trash/{id}/restore)
 	RestoreTrashEntry(w http.ResponseWriter, r *http.Request, id TrashEntryId)
-	// ListUnassigned Files in the unassigned section, newest first (RF-27)
+	// ListUnassigned Entries of the unassigned section, newest first (RF-27)
 	// (GET /unassigned)
 	ListUnassigned(w http.ResponseWriter, r *http.Request)
+	// DeleteUnassignedEntry Delete every file of an entry for good (RF-27)
+	// (DELETE /unassigned/entries/{id})
+	DeleteUnassignedEntry(w http.ResponseWriter, r *http.Request, id UnassignedId)
+	// AssignUnassignedEntry Start a job that assigns a whole entry (RF-27a)
+	// (POST /unassigned/entries/{id}/assign)
+	AssignUnassignedEntry(w http.ResponseWriter, r *http.Request, id UnassignedId)
+	// DownloadUnassignedEntry Download an entry; a folder as a zip without compression (RF-27)
+	// (GET /unassigned/entries/{id}/download)
+	DownloadUnassignedEntry(w http.ResponseWriter, r *http.Request, id UnassignedId)
+	// TrashUnassignedEntry Send an entry to the trash, as one trash entry (RF-27)
+	// (POST /unassigned/entries/{id}/trash)
+	TrashUnassignedEntry(w http.ResponseWriter, r *http.Request, id UnassignedId)
 	// DeleteUnassigned Delete an unassigned file for good (RF-27)
 	// (DELETE /unassigned/{id})
 	DeleteUnassigned(w http.ResponseWriter, r *http.Request, id UnassignedId)
-	// AssignUnassigned Start an upload job from an unassigned file (RF-27)
-	// (POST /unassigned/{id}/assign)
-	AssignUnassigned(w http.ResponseWriter, r *http.Request, id UnassignedId)
 	// DownloadUnassigned Download an unassigned file; supports HTTP Range
 	// (GET /unassigned/{id}/download)
 	DownloadUnassigned(w http.ResponseWriter, r *http.Request, id UnassignedId)
@@ -2035,6 +2088,110 @@ func (siw *ServerInterfaceWrapper) ListUnassigned(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteUnassignedEntry operation middleware
+func (siw *ServerInterfaceWrapper) DeleteUnassignedEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id UnassignedId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteUnassignedEntry(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AssignUnassignedEntry operation middleware
+func (siw *ServerInterfaceWrapper) AssignUnassignedEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id UnassignedId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AssignUnassignedEntry(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadUnassignedEntry operation middleware
+func (siw *ServerInterfaceWrapper) DownloadUnassignedEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id UnassignedId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadUnassignedEntry(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TrashUnassignedEntry operation middleware
+func (siw *ServerInterfaceWrapper) TrashUnassignedEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id UnassignedId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TrashUnassignedEntry(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteUnassigned operation middleware
 func (siw *ServerInterfaceWrapper) DeleteUnassigned(w http.ResponseWriter, r *http.Request) {
 
@@ -2052,32 +2209,6 @@ func (siw *ServerInterfaceWrapper) DeleteUnassigned(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteUnassigned(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// AssignUnassigned operation middleware
-func (siw *ServerInterfaceWrapper) AssignUnassigned(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "id" -------------
-	var id UnassignedId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.AssignUnassigned(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2296,7 +2427,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/unassigned/{id}", wrapper.DeleteUnassigned)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/unassigned/{id}/download", wrapper.DownloadUnassigned)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/unassigned/{id}/trash", wrapper.TrashUnassigned)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/unassigned/{id}/assign", wrapper.AssignUnassigned)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/unassigned/entries/{id}", wrapper.DeleteUnassignedEntry)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/unassigned/entries/{id}/download", wrapper.DownloadUnassignedEntry)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/unassigned/entries/{id}/trash", wrapper.TrashUnassignedEntry)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/unassigned/entries/{id}/assign", wrapper.AssignUnassignedEntry)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/library/scan", wrapper.GetLibraryScan)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/library/scan", wrapper.ScanLibrary)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/trash", wrapper.EmptyTrash)
@@ -5048,7 +5182,7 @@ type ListUnassignedResponseObject interface {
 	VisitListUnassignedResponse(w http.ResponseWriter) error
 }
 
-type ListUnassigned200JSONResponse []UnassignedFile
+type ListUnassigned200JSONResponse []UnassignedEntry
 
 func (response ListUnassigned200JSONResponse) VisitListUnassignedResponse(w http.ResponseWriter) error {
 
@@ -5074,6 +5208,325 @@ func (response ListUnassigned401ApplicationProblemPlusJSONResponse) VisitListUna
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUnassignedEntryRequestObject struct {
+	Id UnassignedId `json:"id"`
+}
+
+type DeleteUnassignedEntryResponseObject interface {
+	VisitDeleteUnassignedEntryResponse(w http.ResponseWriter) error
+}
+
+type DeleteUnassignedEntry204Response struct {
+}
+
+func (response DeleteUnassignedEntry204Response) VisitDeleteUnassignedEntryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteUnassignedEntry401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUnassignedEntry401ApplicationProblemPlusJSONResponse) VisitDeleteUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUnassignedEntry404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUnassignedEntry404ApplicationProblemPlusJSONResponse) VisitDeleteUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUnassignedEntry409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUnassignedEntry409ApplicationProblemPlusJSONResponse) VisitDeleteUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignUnassignedEntryRequestObject struct {
+	Id   UnassignedId `json:"id"`
+	Body *AssignUnassignedEntryJSONRequestBody
+}
+
+type AssignUnassignedEntryResponseObject interface {
+	VisitAssignUnassignedEntryResponse(w http.ResponseWriter) error
+}
+
+type AssignUnassignedEntry201JSONResponse UploadJob
+
+func (response AssignUnassignedEntry201JSONResponse) VisitAssignUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignUnassignedEntry400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AssignUnassignedEntry400ApplicationProblemPlusJSONResponse) VisitAssignUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignUnassignedEntry401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AssignUnassignedEntry401ApplicationProblemPlusJSONResponse) VisitAssignUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignUnassignedEntry404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AssignUnassignedEntry404ApplicationProblemPlusJSONResponse) VisitAssignUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AssignUnassignedEntry409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AssignUnassignedEntry409ApplicationProblemPlusJSONResponse) VisitAssignUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadUnassignedEntryRequestObject struct {
+	Id UnassignedId `json:"id"`
+}
+
+type DownloadUnassignedEntryResponseObject interface {
+	VisitDownloadUnassignedEntryResponse(w http.ResponseWriter) error
+}
+
+type DownloadUnassignedEntry200ApplicationoctetStreamResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response DownloadUnassignedEntry200ApplicationoctetStreamResponse) VisitDownloadUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type DownloadUnassignedEntry206ApplicationoctetStreamResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response DownloadUnassignedEntry206ApplicationoctetStreamResponse) VisitDownloadUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(206)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type DownloadUnassignedEntry401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadUnassignedEntry401ApplicationProblemPlusJSONResponse) VisitDownloadUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadUnassignedEntry404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadUnassignedEntry404ApplicationProblemPlusJSONResponse) VisitDownloadUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadUnassignedEntry409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadUnassignedEntry409ApplicationProblemPlusJSONResponse) VisitDownloadUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadUnassignedEntry416Response struct {
+}
+
+func (response DownloadUnassignedEntry416Response) VisitDownloadUnassignedEntryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(416)
+	return nil
+}
+
+type TrashUnassignedEntryRequestObject struct {
+	Id UnassignedId `json:"id"`
+}
+
+type TrashUnassignedEntryResponseObject interface {
+	VisitTrashUnassignedEntryResponse(w http.ResponseWriter) error
+}
+
+type TrashUnassignedEntry204Response struct {
+}
+
+func (response TrashUnassignedEntry204Response) VisitTrashUnassignedEntryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type TrashUnassignedEntry401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response TrashUnassignedEntry401ApplicationProblemPlusJSONResponse) VisitTrashUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrashUnassignedEntry404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response TrashUnassignedEntry404ApplicationProblemPlusJSONResponse) VisitTrashUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrashUnassignedEntry409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response TrashUnassignedEntry409ApplicationProblemPlusJSONResponse) VisitTrashUnassignedEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -5126,82 +5579,11 @@ func (response DeleteUnassigned404ApplicationProblemPlusJSONResponse) VisitDelet
 	return err
 }
 
-type AssignUnassignedRequestObject struct {
-	Id   UnassignedId `json:"id"`
-	Body *AssignUnassignedJSONRequestBody
-}
-
-type AssignUnassignedResponseObject interface {
-	VisitAssignUnassignedResponse(w http.ResponseWriter) error
-}
-
-type AssignUnassigned201JSONResponse UploadJob
-
-func (response AssignUnassigned201JSONResponse) VisitAssignUnassignedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(201)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type AssignUnassigned400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response AssignUnassigned400ApplicationProblemPlusJSONResponse) VisitAssignUnassignedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type AssignUnassigned401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response AssignUnassigned401ApplicationProblemPlusJSONResponse) VisitAssignUnassignedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type AssignUnassigned404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response AssignUnassigned404ApplicationProblemPlusJSONResponse) VisitAssignUnassignedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type AssignUnassigned409ApplicationProblemPlusJSONResponse struct {
+type DeleteUnassigned409ApplicationProblemPlusJSONResponse struct {
 	ConflictApplicationProblemPlusJSONResponse
 }
 
-func (response AssignUnassigned409ApplicationProblemPlusJSONResponse) VisitAssignUnassignedResponse(w http.ResponseWriter) error {
+func (response DeleteUnassigned409ApplicationProblemPlusJSONResponse) VisitDeleteUnassignedResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5289,6 +5671,22 @@ func (response DownloadUnassigned404ApplicationProblemPlusJSONResponse) VisitDow
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadUnassigned409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DownloadUnassigned409ApplicationProblemPlusJSONResponse) VisitDownloadUnassignedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -5487,15 +5885,24 @@ type StrictServerInterface interface {
 	// RestoreTrashEntry Put an entry back where it came from
 	// (POST /trash/{id}/restore)
 	RestoreTrashEntry(ctx context.Context, request RestoreTrashEntryRequestObject) (RestoreTrashEntryResponseObject, error)
-	// ListUnassigned Files in the unassigned section, newest first (RF-27)
+	// ListUnassigned Entries of the unassigned section, newest first (RF-27)
 	// (GET /unassigned)
 	ListUnassigned(ctx context.Context, request ListUnassignedRequestObject) (ListUnassignedResponseObject, error)
+	// DeleteUnassignedEntry Delete every file of an entry for good (RF-27)
+	// (DELETE /unassigned/entries/{id})
+	DeleteUnassignedEntry(ctx context.Context, request DeleteUnassignedEntryRequestObject) (DeleteUnassignedEntryResponseObject, error)
+	// AssignUnassignedEntry Start a job that assigns a whole entry (RF-27a)
+	// (POST /unassigned/entries/{id}/assign)
+	AssignUnassignedEntry(ctx context.Context, request AssignUnassignedEntryRequestObject) (AssignUnassignedEntryResponseObject, error)
+	// DownloadUnassignedEntry Download an entry; a folder as a zip without compression (RF-27)
+	// (GET /unassigned/entries/{id}/download)
+	DownloadUnassignedEntry(ctx context.Context, request DownloadUnassignedEntryRequestObject) (DownloadUnassignedEntryResponseObject, error)
+	// TrashUnassignedEntry Send an entry to the trash, as one trash entry (RF-27)
+	// (POST /unassigned/entries/{id}/trash)
+	TrashUnassignedEntry(ctx context.Context, request TrashUnassignedEntryRequestObject) (TrashUnassignedEntryResponseObject, error)
 	// DeleteUnassigned Delete an unassigned file for good (RF-27)
 	// (DELETE /unassigned/{id})
 	DeleteUnassigned(ctx context.Context, request DeleteUnassignedRequestObject) (DeleteUnassignedResponseObject, error)
-	// AssignUnassigned Start an upload job from an unassigned file (RF-27)
-	// (POST /unassigned/{id}/assign)
-	AssignUnassigned(ctx context.Context, request AssignUnassignedRequestObject) (AssignUnassignedResponseObject, error)
 	// DownloadUnassigned Download an unassigned file; supports HTTP Range
 	// (GET /unassigned/{id}/download)
 	DownloadUnassigned(ctx context.Context, request DownloadUnassignedRequestObject) (DownloadUnassignedResponseObject, error)
@@ -6677,6 +7084,117 @@ func (sh *strictHandler) ListUnassigned(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// DeleteUnassignedEntry operation middleware
+func (sh *strictHandler) DeleteUnassignedEntry(w http.ResponseWriter, r *http.Request, id UnassignedId) {
+	var request DeleteUnassignedEntryRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteUnassignedEntry(ctx, request.(DeleteUnassignedEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteUnassignedEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteUnassignedEntryResponseObject); ok {
+		if err := validResponse.VisitDeleteUnassignedEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AssignUnassignedEntry operation middleware
+func (sh *strictHandler) AssignUnassignedEntry(w http.ResponseWriter, r *http.Request, id UnassignedId) {
+	var request AssignUnassignedEntryRequestObject
+
+	request.Id = id
+
+	var body AssignUnassignedEntryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AssignUnassignedEntry(ctx, request.(AssignUnassignedEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AssignUnassignedEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AssignUnassignedEntryResponseObject); ok {
+		if err := validResponse.VisitAssignUnassignedEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DownloadUnassignedEntry operation middleware
+func (sh *strictHandler) DownloadUnassignedEntry(w http.ResponseWriter, r *http.Request, id UnassignedId) {
+	var request DownloadUnassignedEntryRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DownloadUnassignedEntry(ctx, request.(DownloadUnassignedEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DownloadUnassignedEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DownloadUnassignedEntryResponseObject); ok {
+		if err := validResponse.VisitDownloadUnassignedEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TrashUnassignedEntry operation middleware
+func (sh *strictHandler) TrashUnassignedEntry(w http.ResponseWriter, r *http.Request, id UnassignedId) {
+	var request TrashUnassignedEntryRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TrashUnassignedEntry(ctx, request.(TrashUnassignedEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TrashUnassignedEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TrashUnassignedEntryResponseObject); ok {
+		if err := validResponse.VisitTrashUnassignedEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeleteUnassigned operation middleware
 func (sh *strictHandler) DeleteUnassigned(w http.ResponseWriter, r *http.Request, id UnassignedId) {
 	var request DeleteUnassignedRequestObject
@@ -6696,39 +7214,6 @@ func (sh *strictHandler) DeleteUnassigned(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DeleteUnassignedResponseObject); ok {
 		if err := validResponse.VisitDeleteUnassignedResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// AssignUnassigned operation middleware
-func (sh *strictHandler) AssignUnassigned(w http.ResponseWriter, r *http.Request, id UnassignedId) {
-	var request AssignUnassignedRequestObject
-
-	request.Id = id
-
-	var body AssignUnassignedJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.AssignUnassigned(ctx, request.(AssignUnassignedRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "AssignUnassigned")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(AssignUnassignedResponseObject); ok {
-		if err := validResponse.VisitAssignUnassignedResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -138,6 +138,16 @@ func (r *LibraryRepository) UnassignedByID(ctx context.Context, id domain.Unassi
 	return unassignedToDomain(row)
 }
 
+// SetUnassignedJob implements domain.LibraryRepository.
+func (r *LibraryRepository) SetUnassignedJob(ctx context.Context, id domain.UnassignedID, job string) error {
+	return r.q.SetUnassignedJob(ctx, sqlcgen.SetUnassignedJobParams{JobID: job, ID: int64(id)})
+}
+
+// ReleaseUnassignedJob implements domain.LibraryRepository.
+func (r *LibraryRepository) ReleaseUnassignedJob(ctx context.Context, job string) error {
+	return r.q.ReleaseUnassignedJob(ctx, job)
+}
+
 // TrashEntries implements domain.LibraryRepository.
 func (r *LibraryRepository) TrashEntries(ctx context.Context) ([]domain.TrashEntry, error) {
 	rows, err := r.q.ListTrashEntries(ctx)
@@ -408,6 +418,7 @@ func (t libraryTx) InsertUnassigned(ctx context.Context, f domain.UnassignedFile
 	id, err := t.q.InsertUnassigned(ctx, sqlcgen.InsertUnassignedParams{
 		Path: f.Path, Origin: f.Origin, Reason: string(f.Reason), Size: f.Size,
 		ArrivedAt: formatTime(f.ArrivedAt), TrashEntryID: nullEntry(f.TrashEntry),
+		Console: string(f.Console), IgdbID: nullInt64(f.IGDBID),
 	})
 	return domain.UnassignedID(id), err
 }
@@ -455,6 +466,7 @@ func unassignedToDomain(row sqlcgen.UnassignedFile) (domain.UnassignedFile, erro
 	f := domain.UnassignedFile{
 		ID: domain.UnassignedID(row.ID), Path: row.Path, Origin: row.Origin, Reason: domain.UnassignedReason(row.Reason),
 		Size: row.Size, TrashEntry: entryPtr(row.TrashEntryID),
+		Console: domain.Slug(row.Console), IGDBID: int64Ptr(row.IgdbID), Job: row.JobID,
 	}
 	var err error
 	if f.ArrivedAt, err = time.Parse(timeLayout, row.ArrivedAt); err != nil {

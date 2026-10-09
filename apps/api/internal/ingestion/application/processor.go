@@ -139,11 +139,18 @@ func (p *Processor) Discard(id domain.JobID) {
 	}
 }
 
-// giveBack returns the file of a job started from the unassigned section,
-// wherever it is now (its source folder, or staging if it was not an
-// archive), to the section.
+// giveBack ends a job started from the unassigned section: an assigned
+// entry's files are freed in place; a file of the previous single-file
+// assignment goes back from wherever it is now (its source folder, or
+// staging if it was not an archive).
 func (p *Processor) giveBack(ctx context.Context, job *domain.UploadJob) {
 	if job.UnassignedOrigin == "" {
+		return
+	}
+	if job.FromEntry() {
+		if err := p.d.Library.ReleaseJob(ctx, string(job.ID)); err != nil {
+			p.d.Log.Error("release unassigned entry", "job", job.ID, "error", err)
+		}
 		return
 	}
 	src := job.StoragePath
@@ -221,6 +228,9 @@ func (p *Processor) process(parent context.Context, req request) {
 }
 
 func (p *Processor) handle(ctx context.Context, job *domain.UploadJob, password string) error {
+	if job.FromEntry() {
+		return p.processEntry(ctx, job, password)
+	}
 	if job.GroupID != "" && !strings.HasPrefix(job.StoragePath, p.d.Staging.VolumeDir(job.GroupID)) {
 		return p.collectPart(ctx, job)
 	}
@@ -410,6 +420,9 @@ func (p *Processor) validate(ctx context.Context, job *domain.UploadJob, warning
 	if err != nil {
 		return fmt.Errorf("list files: %w", err)
 	}
+	if job.Unassigned() {
+		return p.toUnassigned(ctx, job, files, warning)
+	}
 	if err := p.d.Files.Replace(ctx, job.ID, files); err != nil {
 		return err
 	}
@@ -417,12 +430,162 @@ func (p *Processor) validate(ctx context.Context, job *domain.UploadJob, warning
 	if err != nil {
 		return err
 	}
-	_, reason := domain.Validate(rules[job.Console], files, known)
+	_, reason := domain.ValidateFor(job, rules[job.Console], files, known)
 	if err := job.Validated(job.Console, reason, p.d.Now()); err != nil {
 		return err
 	}
 	job.Warning = warning
 	return p.save(ctx, job)
+}
+
+// toUnassigned moves every file of an upload without console to the entry
+// named after its title in the unassigned section, junk included: without a
+// console nothing tells a game file from the rest (RF-07b).
+func (p *Processor) toUnassigned(ctx context.Context, job *domain.UploadJob, files []domain.StagedFile, warning string) error {
+	if len(files) > 0 {
+		paths := make([]string, len(files))
+		for i, f := range files {
+			paths[i] = f.Path
+		}
+		if err := p.d.Library.PutAside(ctx, SetAsideRequest{
+			Source: string(job.ID), Root: p.d.Staging.Dir(job.ID), Files: paths, Folder: job.Title,
+			Origin: job.FileName, Reason: "upload", IGDBID: job.IGDBID,
+		}); err != nil {
+			return err
+		}
+	}
+	if err := job.SetAside(false, p.d.Now()); err != nil {
+		return err
+	}
+	job.Progress, job.Warning = 100, warning
+	if err := p.save(ctx, job); err != nil {
+		return err
+	}
+	if err := p.d.Staging.Remove(job.ID); err != nil {
+		p.d.Log.Warn("remove staging", "job", job.ID, "error", err)
+	}
+	return nil
+}
+
+// processEntry prepares an assigned unassigned entry (RF-27a): its archives
+// are extracted into staging (and kept until the job is stored, in case it
+// is cancelled); its other files stay where they are, in the section.
+func (p *Processor) processEntry(ctx context.Context, job *domain.UploadJob, password string) error {
+	sources, err := p.d.Library.JobFiles(ctx, string(job.ID))
+	if err != nil {
+		return err
+	}
+	if len(sources) == 0 {
+		return errEntryGone
+	}
+	var archives []UnassignedSource
+	var inPlace []domain.StagedFile
+	for _, s := range sources {
+		if v, ok := domain.ParseVolume(s.Name); ok && v.Index > 1 {
+			continue // extracted from its first volume
+		}
+		header, err := p.d.Staging.ReadHeader(s.Abs, 8)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", s.Path, err)
+		}
+		if _, isArchive := domain.DetectArchive(header); isArchive {
+			archives = append(archives, s)
+			continue
+		}
+		id := s.ID
+		inPlace = append(inPlace, domain.StagedFile{JobID: job.ID, Path: s.Path, Size: s.Size, Unassigned: &id})
+	}
+	if err := p.d.Staging.Reset(job.ID); err != nil {
+		return err
+	}
+	var warning string
+	if len(archives) > 0 {
+		if warning, err = p.extractEntry(ctx, job, archives, password); err != nil {
+			return err
+		}
+		if job.Status == domain.StatusNeedsPassword {
+			return nil
+		}
+	}
+	files, err := listFiles(p.d.Staging.FS(job.ID), job.ID)
+	if err != nil {
+		return fmt.Errorf("list files: %w", err)
+	}
+	files = append(files, inPlace...)
+	if err := p.d.Files.Replace(ctx, job.ID, files); err != nil {
+		return err
+	}
+	rules, known, err := p.d.Consoles.Rules(ctx)
+	if err != nil {
+		return err
+	}
+	_, reason := domain.ValidateFor(job, rules[job.Console], files, known)
+	if err := job.Validated(job.Console, reason, p.d.Now()); err != nil {
+		return err
+	}
+	job.Warning = warning
+	return p.save(ctx, job)
+}
+
+// extractEntry extracts an entry's archives into staging, each under its
+// folder inside the entry; one password opens them all. A password problem
+// pauses the job (its status says so) without an error.
+func (p *Processor) extractEntry(ctx context.Context, job *domain.UploadJob, archives []UnassignedSource, password string) (string, error) {
+	if err := job.StartExtraction(p.d.Now()); err != nil {
+		return "", err
+	}
+	if err := p.save(ctx, job); err != nil {
+		return "", err
+	}
+	listings := make([]Listing, len(archives))
+	var need uint64 = ExtractionMargin
+	for i, a := range archives {
+		listing, err := p.d.Extractor.List(ctx, a.Abs, password)
+		if err == nil && listing.Encrypted() && password == "" {
+			err = ErrPasswordRequired
+		}
+		if handled, perr := p.passwordProblem(ctx, job, err); handled {
+			return "", perr
+		}
+		if err != nil {
+			return "", fmt.Errorf("%s: %w", a.Name, err)
+		}
+		if bad := unsafeEntry(listing); bad != "" {
+			return "", fmt.Errorf("%w: %q", errUnsafePath, bad)
+		}
+		listings[i] = listing
+		need += uint64(listing.TotalSize()) //nolint:gosec // sizes are non-negative
+	}
+	if free, err := p.d.Staging.FreeSpace(); err == nil && need > free {
+		return "", fmt.Errorf("%w: se necesitan %s y hay %s libres", errNoSpace, gib(need), gib(free))
+	}
+	var warning string
+	last := time.Time{}
+	for i, a := range archives {
+		dest := filepath.Join(p.d.Staging.Dir(job.ID), filepath.FromSlash(path.Dir(a.Path)))
+		w, err := p.d.Extractor.Extract(ctx, a.Abs, dest, password, listings[i], func(pct int) {
+			if now := p.d.Now(); now.Sub(last) >= progressInterval {
+				last = now
+				job.RecordExtractionProgress((i*100+pct)/len(archives), now)
+				_ = p.save(ctx, job)
+			}
+		})
+		if err != nil {
+			_ = p.d.Staging.Remove(job.ID)
+			if handled, perr := p.passwordProblem(ctx, job, err); handled {
+				return "", perr
+			}
+			return "", fmt.Errorf("%s: %w", a.Name, err)
+		}
+		if w != "" {
+			warning = w
+		}
+	}
+	if err := p.d.Staging.CheckTree(job.ID); err != nil {
+		_ = p.d.Staging.Remove(job.ID)
+		return "", err
+	}
+	return warning, nil
 }
 
 // listFiles returns every regular file of an upload, skipping the hidden
@@ -491,6 +654,7 @@ var (
 	errNoSpace      = errors.New("not enough free space")
 	errLegacyVolume = errors.New("legacy rar volume")
 	errNotAGroup    = errors.New("group part is not an archive")
+	errEntryGone    = errors.New("unassigned entry is gone")
 )
 
 // failureMessage turns an error into the text shown to the user.
@@ -504,6 +668,8 @@ func failureMessage(err error) string {
 		return "El comprimido está dañado, falta alguna parte o un archivo no pasó la verificación de integridad."
 	case errors.Is(err, errLegacyVolume):
 		return "Volúmenes RAR en formato antiguo (.r00, .r01…) no soportados; usa un comprimido de una parte o volúmenes .part1.rar."
+	case errors.Is(err, errEntryGone):
+		return "Los archivos ya no están en No asignados."
 	case errors.Is(err, errNotAGroup):
 		return "Los archivos no son las partes de un mismo comprimido."
 	case errors.Is(err, ErrUnsafeEntry):

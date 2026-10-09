@@ -39,7 +39,12 @@ func (h *Handler) ListJobFiles(ctx context.Context, req httpapi.ListJobFilesRequ
 	}
 	out := make(httpapi.ListJobFiles200JSONResponse, 0, len(files))
 	for _, f := range files {
-		out = append(out, httpapi.StagedFile{Path: f.Path, Size: f.Size, Valid: f.Valid, Consoles: f.Consoles})
+		sf := httpapi.StagedFile{Path: f.Path, Size: f.Size, Valid: f.Valid, Consoles: f.Consoles}
+		if f.Unassigned != nil {
+			inPlace := true
+			sf.InPlace = &inPlace
+		}
+		out = append(out, sf)
 	}
 	return out, nil
 }
@@ -187,6 +192,9 @@ func commitFiles(b httpapi.CommitRequest) []application.CommitFile {
 		}
 		if f.OnDuplicate != nil {
 			cf.OnDuplicate = string(*f.OnDuplicate)
+		}
+		if f.Skip != nil {
+			cf.Skip = *f.Skip
 		}
 		out = append(out, cf)
 	}

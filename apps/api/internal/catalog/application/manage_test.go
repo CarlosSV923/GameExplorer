@@ -136,3 +136,42 @@ func TestPutAsideSanitizesTheFolder(t *testing.T) {
 		t.Fatalf("set aside: %v", err)
 	}
 }
+
+func TestFlattenConsoleFoldersOfTheUnassignedSection(t *testing.T) {
+	t.Parallel()
+	fx := newFixture(t)
+	svc := fx.service(t, fx.files)
+	// What earlier scans left: the console folder kept inside _unassigned/.
+	legacy := filepath.Join(fx.root, "_unassigned", "switch", "Zelda", "z.nsp")
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, []byte("z"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.repo.Apply(t.Context(), "", func(tx domain.LibraryTx) error {
+		_, err := tx.InsertUnassigned(t.Context(), domain.UnassignedFile{
+			Path: "switch/Zelda/z.nsp", Origin: "switch/Zelda/z.nsp", Reason: domain.UnassignedSamba, Size: 1, ArrivedAt: time.Now(),
+		})
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if n, err := svc.FlattenConsoleFolders(t.Context()); n != 1 || err != nil {
+		t.Fatalf("flatten = %d, %v", n, err)
+	}
+	files, err := fx.repo.UnassignedFiles(t.Context())
+	if err != nil || len(files) != 1 || files[0].Path != "Zelda/z.nsp" || files[0].Console != "switch" {
+		t.Fatalf("files = %+v, %v", files, err)
+	}
+	if _, err := os.Stat(filepath.Join(fx.root, "_unassigned", "Zelda", "z.nsp")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(fx.root, "_unassigned", "switch")); !os.IsNotExist(err) {
+		t.Fatalf("the empty console folder must go: %v", err)
+	}
+	if n, _ := svc.FlattenConsoleFolders(t.Context()); n != 0 {
+		t.Fatalf("second run = %d", n)
+	}
+}
