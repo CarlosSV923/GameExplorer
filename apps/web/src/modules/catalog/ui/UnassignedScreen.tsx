@@ -139,8 +139,9 @@ export function UnassignedScreen() {
     content = (
       <>
         <TableBox>
-          <table className="w-full min-w-[900px] border-collapse">
-            <thead>
+          {/* Below md each row stacks like a card: no sideways scrolling on a phone. */}
+          <table className="w-full border-collapse md:min-w-[900px]">
+            <thead className="hidden md:table-header-group">
               <tr className="text-left text-caption font-bold tracking-[0.06em] text-ink-3 uppercase">
                 <th className="px-5 py-3.5">{t('unassigned.file')}</th>
                 <th className="px-5 py-3.5">{t('unassigned.arrived')}</th>
@@ -161,8 +162,11 @@ export function UnassignedScreen() {
                 else if (e.folder) state = t('unassigned.files', { count: e.files.length })
                 else state = t(`unassigned.reason.${e.files[0]?.reason ?? 'samba'}`)
                 return [
-                  <tr key={`e${e.name}`} className="border-t border-line">
-                    <td className="px-5 py-3.5">
+                  <tr
+                    key={`e${e.name}`}
+                    className="flex flex-wrap items-center border-t border-line md:table-row"
+                  >
+                    <td className="w-full px-5 pt-3.5 pb-1 md:w-auto md:py-3.5">
                       <div className="flex flex-col gap-1">
                         <span className="flex items-center gap-2 font-mono text-caption font-medium [overflow-wrap:anywhere] text-ink-1">
                           {e.folder ? (
@@ -188,7 +192,7 @@ export function UnassignedScreen() {
                         {fits && <FitNote text={fits.text} tone={fits.tone} />}
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap">
+                    <td className="px-5 py-1 whitespace-nowrap md:py-3.5">
                       <div className="flex flex-col gap-1">
                         <span className="text-ink-1">{format.date(e.arrivedAt)}</span>
                         <span
@@ -201,10 +205,10 @@ export function UnassignedScreen() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-right whitespace-nowrap text-ink-2">
+                    <td className="ml-auto px-5 py-1 text-right whitespace-nowrap text-ink-2 md:ml-0 md:py-3.5">
                       {format.size(e.size)}
                     </td>
-                    <td className="px-4 py-2 text-right whitespace-nowrap">
+                    <td className="w-full px-4 pt-1 pb-3 whitespace-nowrap md:w-auto md:py-2 md:text-right">
                       <span className="inline-flex items-center gap-1">
                         <Button
                           size="sm"
@@ -262,8 +266,11 @@ export function UnassignedScreen() {
                         const note = f.copying ? undefined : fit(f)
                         const rel = f.path.slice(e.name.length + 1)
                         return (
-                          <tr key={`f${f.path}`} className="bg-surface-card/40">
-                            <td className="py-2 pr-5 pl-12">
+                          <tr
+                            key={`f${f.path}`}
+                            className="flex flex-wrap items-center bg-surface-card/40 md:table-row"
+                          >
+                            <td className="w-full py-2 pr-5 pl-12 md:w-auto">
                               <div className="flex flex-col gap-0.5">
                                 <span className="font-mono text-caption [overflow-wrap:anywhere] text-ink-1">
                                   {rel}
@@ -277,11 +284,11 @@ export function UnassignedScreen() {
                                 )}
                               </div>
                             </td>
-                            <td className="px-5 py-2" />
-                            <td className="px-5 py-2 text-right text-caption whitespace-nowrap text-ink-2">
+                            <td className="hidden px-5 py-2 md:table-cell" />
+                            <td className="py-1 pr-5 pl-12 text-caption whitespace-nowrap text-ink-2 md:px-5 md:py-2 md:text-right">
                               {format.size(f.size)}
                             </td>
-                            <td className="px-4 py-1.5 text-right whitespace-nowrap">
+                            <td className="ml-auto px-4 py-1.5 text-right whitespace-nowrap md:ml-0">
                               <span className="inline-flex items-center gap-1">
                                 {fileReady ? (
                                   <IconLink

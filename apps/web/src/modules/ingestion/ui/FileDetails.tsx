@@ -148,7 +148,9 @@ export function FileDetails({
 
   const save = () => {
     setTried(true)
-    if (!request || !current || undecided || count === 0) return
+    // The preview may still be on its way: the server checks the same and
+    // refuses undecided duplicates, which the preview then shows.
+    if (!request || undecided || (current && count === 0)) return
     commit.mutate(request)
   }
 
@@ -314,7 +316,7 @@ export function FileDetails({
             size="lg"
             icon={<CheckIcon />}
             loading={commit.isPending}
-            disabled={tried && missing === 0 && !keepError && (!current || count === 0)}
+            disabled={tried && missing === 0 && !keepError && current !== undefined && count === 0}
             onClick={save}
           >
             {count === 1 || !kinds ? t('details.saveOne') : t('details.save', { count })}

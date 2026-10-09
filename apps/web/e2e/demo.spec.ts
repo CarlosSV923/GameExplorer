@@ -61,11 +61,9 @@ test('uploads without console and assigns the whole entry (RF-07b, RF-27a)', asy
   await base.getByRole('radio', { name: 'Juego base' }).check()
   const update = page.getByRole('article').filter({ hasText: 'Splatoon 3 [v2752512].nsp' })
   await update.getByRole('checkbox', { name: 'Guardar este archivo' }).uncheck()
-  // Saving waits for the preview of the final names (debounced).
-  await expect(async () => {
-    await page.getByRole('button', { name: 'Guardar en la biblioteca' }).click()
-    await expect(page).toHaveURL(/\/consolas\/switch\/\d+/, { timeout: 1000 })
-  }).toPass()
+  // One click saves, even before the preview of the final names arrives.
+  await page.getByRole('button', { name: 'Guardar en la biblioteca' }).click()
+  await expect(page).toHaveURL(/\/consolas\/switch\/\d+/)
 
   await goInApp(page, '/no-asignados')
   await expect(page.getByText('Splatoon 3 [v2752512].nsp')).toBeVisible()
