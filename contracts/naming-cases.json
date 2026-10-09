@@ -1,35 +1,81 @@
 {
-  "description": "Expected folder and file names (spec §5). sanitizedTitle is the game folder; fileName is relative to it. kind is base, update or dlc (Switch) or game (Wii, PSP); label is what the user typed (version or DLC name). extensionCases pick a file's extension: the longest known one it ends with. expected.error names the rejected field.",
+  "description": "Expected folder and file names (spec §5). sanitizedTitle is the game folder; fileName is relative to it. kind is base, update or dlc (Switch), disc (one disc of a several-disc game: GameCube, PS2; label is its number) or game (the only file of a game); label is what the user typed (version or DLC name). extensionCases pick a file's extension: the longest known one it ends with. expected.error names the rejected field.",
   "cases": [
     {
       "name": "base game carries its tag",
-      "input": { "title": "Limbo", "kind": "base", "extension": ".xci" },
-      "expected": { "sanitizedTitle": "Limbo", "fileName": "Limbo [BASE].xci" }
+      "input": {
+        "title": "Limbo",
+        "kind": "base",
+        "extension": ".xci"
+      },
+      "expected": {
+        "sanitizedTitle": "Limbo",
+        "fileName": "Limbo [BASE].xci"
+      }
     },
     {
       "name": "update carries its version with one v",
-      "input": { "title": "Limbo", "kind": "update", "label": "122345", "extension": ".nsp" },
-      "expected": { "sanitizedTitle": "Limbo", "fileName": "Limbo [UPDATE v122345].nsp" }
+      "input": {
+        "title": "Limbo",
+        "kind": "update",
+        "label": "122345",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "sanitizedTitle": "Limbo",
+        "fileName": "Limbo [UPDATE v122345].nsp"
+      }
     },
     {
       "name": "a typed v is not doubled",
-      "input": { "title": "Limbo", "kind": "update", "label": " v1.0.4 ", "extension": ".nsp" },
-      "expected": { "sanitizedTitle": "Limbo", "fileName": "Limbo [UPDATE v1.0.4].nsp" }
+      "input": {
+        "title": "Limbo",
+        "kind": "update",
+        "label": " v1.0.4 ",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "sanitizedTitle": "Limbo",
+        "fileName": "Limbo [UPDATE v1.0.4].nsp"
+      }
     },
     {
       "name": "dlc carries its name",
-      "input": { "title": "Limbo", "kind": "dlc", "label": "Fuga Maestra", "extension": ".nsp" },
-      "expected": { "sanitizedTitle": "Limbo", "fileName": "Limbo [DLC Fuga Maestra].nsp" }
+      "input": {
+        "title": "Limbo",
+        "kind": "dlc",
+        "label": "Fuga Maestra",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "sanitizedTitle": "Limbo",
+        "fileName": "Limbo [DLC Fuga Maestra].nsp"
+      }
     },
     {
       "name": "the dlc name is sanitized too",
-      "input": { "title": "Limbo", "kind": "dlc", "label": "Pack: 1/2", "extension": ".nsp" },
-      "expected": { "sanitizedTitle": "Limbo", "fileName": "Limbo [DLC Pack - 1 2].nsp" }
+      "input": {
+        "title": "Limbo",
+        "kind": "dlc",
+        "label": "Pack: 1/2",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "sanitizedTitle": "Limbo",
+        "fileName": "Limbo [DLC Pack - 1 2].nsp"
+      }
     },
     {
       "name": "wii and psp files are named after the game",
-      "input": { "title": "Ōkami", "kind": "game", "extension": ".nkit.iso" },
-      "expected": { "sanitizedTitle": "Ōkami", "fileName": "Ōkami.nkit.iso" }
+      "input": {
+        "title": "Ōkami",
+        "kind": "game",
+        "extension": ".nkit.iso"
+      },
+      "expected": {
+        "sanitizedTitle": "Ōkami",
+        "fileName": "Ōkami.nkit.iso"
+      }
     },
     {
       "name": "colon becomes space-dash",
@@ -57,7 +103,11 @@
     },
     {
       "name": "trailing dots and spaces are trimmed",
-      "input": { "title": "Shadow of the Colossus... ", "kind": "game", "extension": ".iso" },
+      "input": {
+        "title": "Shadow of the Colossus... ",
+        "kind": "game",
+        "extension": ".iso"
+      },
       "expected": {
         "sanitizedTitle": "Shadow of the Colossus",
         "fileName": "Shadow of the Colossus.iso"
@@ -77,7 +127,11 @@
     },
     {
       "name": "windows colon substitute and trademark",
-      "input": { "title": "Animal Crossing™꞉ New Horizons", "kind": "base", "extension": ".nsp" },
+      "input": {
+        "title": "Animal Crossing™꞉ New Horizons",
+        "kind": "base",
+        "extension": ".nsp"
+      },
       "expected": {
         "sanitizedTitle": "Animal Crossing™ - New Horizons",
         "fileName": "Animal Crossing™ - New Horizons [BASE].nsp"
@@ -85,28 +139,136 @@
     },
     {
       "name": "extension is lower-cased",
-      "input": { "title": "Metroid Prime", "kind": "game", "extension": ".ISO" },
-      "expected": { "sanitizedTitle": "Metroid Prime", "fileName": "Metroid Prime.iso" }
+      "input": {
+        "title": "Metroid Prime",
+        "kind": "game",
+        "extension": ".ISO"
+      },
+      "expected": {
+        "sanitizedTitle": "Metroid Prime",
+        "fileName": "Metroid Prime.iso"
+      }
+    },
+    {
+      "name": "disc of a several-disc game",
+      "input": {
+        "title": "Resident Evil 4",
+        "kind": "disc",
+        "label": "2",
+        "extension": ".iso"
+      },
+      "expected": {
+        "sanitizedTitle": "Resident Evil 4",
+        "fileName": "Resident Evil 4 (Disc 2).iso"
+      }
+    },
+    {
+      "name": "disc number without leading zeros",
+      "input": {
+        "title": "Xenosaga: Episode III",
+        "kind": "disc",
+        "label": " 01 ",
+        "extension": ".ISO"
+      },
+      "expected": {
+        "sanitizedTitle": "Xenosaga - Episode III",
+        "fileName": "Xenosaga - Episode III (Disc 1).iso"
+      }
+    },
+    {
+      "name": "a game of one disc has no tag",
+      "input": {
+        "title": "Metroid Prime",
+        "kind": "game",
+        "extension": ".rvz"
+      },
+      "expected": {
+        "sanitizedTitle": "Metroid Prime",
+        "fileName": "Metroid Prime.rvz"
+      }
     },
     {
       "name": "update without version",
-      "input": { "title": "Limbo", "kind": "update", "label": "  ", "extension": ".nsp" },
-      "expected": { "error": "version" }
+      "input": {
+        "title": "Limbo",
+        "kind": "update",
+        "label": "  ",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "error": "version"
+      }
     },
     {
       "name": "version with letters",
-      "input": { "title": "Limbo", "kind": "update", "label": "1.0 beta", "extension": ".nsp" },
-      "expected": { "error": "version" }
+      "input": {
+        "title": "Limbo",
+        "kind": "update",
+        "label": "1.0 beta",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "error": "version"
+      }
     },
     {
       "name": "dlc without name",
-      "input": { "title": "Limbo", "kind": "dlc", "label": "???", "extension": ".nsp" },
-      "expected": { "error": "label" }
+      "input": {
+        "title": "Limbo",
+        "kind": "dlc",
+        "label": "???",
+        "extension": ".nsp"
+      },
+      "expected": {
+        "error": "label"
+      }
     },
     {
       "name": "title with nothing left",
-      "input": { "title": "???", "kind": "game", "extension": ".iso" },
-      "expected": { "error": "title" }
+      "input": {
+        "title": "???",
+        "kind": "game",
+        "extension": ".iso"
+      },
+      "expected": {
+        "error": "title"
+      }
+    },
+    {
+      "name": "disc without number",
+      "input": {
+        "title": "Resident Evil 4",
+        "kind": "disc",
+        "label": "",
+        "extension": ".iso"
+      },
+      "expected": {
+        "error": "disc"
+      }
+    },
+    {
+      "name": "disc number out of range",
+      "input": {
+        "title": "Resident Evil 4",
+        "kind": "disc",
+        "label": "100",
+        "extension": ".iso"
+      },
+      "expected": {
+        "error": "disc"
+      }
+    },
+    {
+      "name": "disc number zero",
+      "input": {
+        "title": "Resident Evil 4",
+        "kind": "disc",
+        "label": "0",
+        "extension": ".iso"
+      },
+      "expected": {
+        "error": "disc"
+      }
     }
   ],
   "extensionCases": [
@@ -115,8 +277,20 @@
       "known": [".iso", ".nkit.iso", ".cso"],
       "expected": ".nkit.iso"
     },
-    { "name": "Daxter.ISO", "known": [".iso", ".nkit.iso"], "expected": ".iso" },
-    { "name": "Limbo.xci", "known": [".nsp", ".iso"], "expected": "" },
-    { "name": ".iso", "known": [".iso"], "expected": "" }
+    {
+      "name": "Daxter.ISO",
+      "known": [".iso", ".nkit.iso"],
+      "expected": ".iso"
+    },
+    {
+      "name": "Limbo.xci",
+      "known": [".nsp", ".iso"],
+      "expected": ""
+    },
+    {
+      "name": ".iso",
+      "known": [".iso"],
+      "expected": ""
+    }
   ]
 }

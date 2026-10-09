@@ -2,9 +2,10 @@
 
 /**
  * What a file is within its game: base, update and dlc on consoles with
- * add-ons (Switch); game on consoles with one file per game (Wii, PSP).
+ * add-ons (Switch); game for the only file of a game; disc for each disc of
+ * a game of several discs (GameCube, PS2), with its number as label.
  */
-export type ItemKind = 'base' | 'update' | 'dlc' | 'game'
+export type ItemKind = 'base' | 'update' | 'dlc' | 'game' | 'disc'
 
 export interface CustomExtension {
   extension: string
@@ -34,7 +35,7 @@ export interface Console {
 export interface LibraryItem {
   id: number
   kind: ItemKind
-  /** Update version (without the v) or DLC name. */
+  /** Update version (without the v), DLC name or disc number. */
   label?: string | null
   /** Name inside the game folder. */
   file: string

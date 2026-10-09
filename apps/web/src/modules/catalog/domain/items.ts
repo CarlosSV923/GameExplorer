@@ -4,15 +4,19 @@ import type { Console, GameSummary, ItemKind, LibraryItem } from './types'
 /** Slug of the unassigned section in the carousel (never a console). */
 export const unassignedSlug = '_unassigned'
 
-/** The chip of an item: its kind and, for updates, the version. */
+/** The chip of an item: its kind and, for updates and discs, the version or number. */
 export function itemChip(item: Pick<LibraryItem, 'kind' | 'label'>): {
-  kind: ItemKind
+  kind: Exclude<ItemKind, 'disc'>
   key: `kind.${ItemKind}`
   label?: string
 } {
-  return item.kind === 'update' && item.label
-    ? { kind: 'update', key: 'kind.update', label: `v${item.label}` }
-    : { kind: item.kind, key: `kind.${item.kind}` }
+  if (item.kind === 'update' && item.label) {
+    return { kind: 'update', key: 'kind.update', label: `v${item.label}` }
+  }
+  // A disc looks like the game it is part of.
+  if (item.kind === 'disc')
+    return { kind: 'game', key: 'kind.disc', ...(item.label ? { label: item.label } : {}) }
+  return { kind: item.kind, key: `kind.${item.kind}` }
 }
 
 /** Games of a search grouped by console, in carousel order. */

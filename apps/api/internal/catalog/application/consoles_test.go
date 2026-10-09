@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/application"
+	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain/consoles"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/infrastructure/sqlite"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/database"
@@ -46,11 +47,10 @@ func TestSyncPlatformMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 1 || len(dir.gotIDs) != 3 {
+	if n != 1 || len(dir.gotIDs) != len(consoles.All()) {
 		t.Fatalf("updated %d (want 1), asked for %v", n, dir.gotIDs)
 	}
-	list, _ := svc.List(t.Context())
-	sw := list[0]
+	sw, _ := svc.Console(t.Context(), "switch")
 	if sw.LogoImageID == nil || *sw.LogoImageID != "plgu" || sw.Year != 2017 {
 		t.Fatalf("switch after sync = %+v", sw)
 	}
@@ -80,7 +80,7 @@ func TestConsoleSettingsAndCustomExtensions(t *testing.T) {
 	if _, err := svc.Rename(ctx, "wii", "Nintendo Wii"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.Reorder(ctx, []string{"psp", "wii", "switch"}); err != nil {
+	if _, err := svc.Reorder(ctx, []string{"psp", "wii", "switch", "n64", "gc", "ps2"}); err != nil {
 		t.Fatal(err)
 	}
 	list, _ := svc.List(ctx)
@@ -109,7 +109,38 @@ func TestConsoleSettingsAndCustomExtensions(t *testing.T) {
 	if c, err := svc.RemoveExtension(ctx, "psp", ".pbp"); err != nil || len(c.Custom) != 0 {
 		t.Fatalf("remove = %+v, %v", c, err)
 	}
-	if _, err := svc.Console(ctx, "ps2"); !errors.Is(err, application.ErrConsoleNotFound) {
+	if _, err := svc.Console(ctx, "ps3"); !errors.Is(err, application.ErrConsoleNotFound) {
 		t.Fatalf("unknown console err = %v", err)
+	}
+}
+
+func TestNewConsolesGoAfterAStoredOrder(t *testing.T) {
+	t.Parallel()
+	conn, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	repo := sqlite.NewConsoleRepository(conn)
+
+	// An install that stored its order before the code had more consoles.
+	before, err := application.NewConsoleService([]domain.ConsoleDefinition{consoles.Switch(), consoles.Wii(), consoles.PSP()}, repo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := before.Reorder(t.Context(), []string{"psp", "switch", "wii"}); err != nil {
+		t.Fatal(err)
+	}
+	after, err := application.NewConsoleService(consoles.All(), repo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, _ := after.List(t.Context())
+	var got []string
+	for _, c := range list {
+		got = append(got, string(c.Slug))
+	}
+	if want := []string{"psp", "switch", "wii", "n64", "gc", "ps2"}; !slices.Equal(got, want) {
+		t.Fatalf("order = %v, want %v", got, want)
 	}
 }

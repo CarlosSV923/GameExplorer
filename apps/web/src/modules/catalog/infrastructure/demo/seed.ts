@@ -7,12 +7,21 @@ const MB = 1_000_000
 /** The consoles defined in code (spec §6), as the server has them. */
 export const demoConsoles: Omit<DemoConsoleDef, 'logoImageId'>[] = [
   {
-    slug: 'switch',
-    name: 'Nintendo Switch',
-    igdbPlatformId: 130,
-    releaseYear: 2017,
-    extensions: ['.nsp', '.xci'],
-    kinds: ['base', 'update', 'dlc'],
+    slug: 'n64',
+    name: 'Nintendo 64',
+    igdbPlatformId: 4,
+    releaseYear: 1996,
+    extensions: ['.z64', '.n64', '.v64'],
+    kinds: ['game'],
+    multipleFiles: false,
+  },
+  {
+    slug: 'gc',
+    name: 'Nintendo GameCube',
+    igdbPlatformId: 21,
+    releaseYear: 2001,
+    extensions: ['.iso', '.rvz'],
+    kinds: ['game', 'disc'],
     multipleFiles: true,
   },
   {
@@ -23,6 +32,24 @@ export const demoConsoles: Omit<DemoConsoleDef, 'logoImageId'>[] = [
     extensions: ['.iso', '.wbfs', '.rvz', '.nkit.iso'],
     kinds: ['game'],
     multipleFiles: false,
+  },
+  {
+    slug: 'switch',
+    name: 'Nintendo Switch',
+    igdbPlatformId: 130,
+    releaseYear: 2017,
+    extensions: ['.nsp', '.xci'],
+    kinds: ['base', 'update', 'dlc'],
+    multipleFiles: true,
+  },
+  {
+    slug: 'ps2',
+    name: 'PlayStation 2',
+    igdbPlatformId: 8,
+    releaseYear: 2000,
+    extensions: ['.iso'],
+    kinds: ['game', 'disc'],
+    multipleFiles: true,
   },
   {
     slug: 'psp',
@@ -41,6 +68,31 @@ const one = (ext: string, size: number) => [{ kind: 'game' as const, ext, size }
 
 /** The library the demo opens with (RF-60), from the fixed catalog's games. */
 const seeds: Record<string, Seed[]> = {
+  n64: [
+    [1074, one('.z64', 8 * MB)],
+    [1029, one('.z64', 32 * MB)],
+    [1638, one('.n64', 12 * MB)],
+    [2591, one('.v64', 12 * MB)],
+  ],
+  gc: [
+    // A game of two discs (spec §5).
+    [
+      974,
+      [
+        { kind: 'disc', label: '1', ext: '.iso', size: 1.4 * GB },
+        { kind: 'disc', label: '2', ext: '.iso', size: 1.4 * GB },
+      ],
+    ],
+    [1105, one('.rvz', 0.9 * GB)],
+    [1627, one('.iso', 1.4 * GB)],
+    [1033, one('.rvz', 0.8 * GB)],
+  ],
+  ps2: [
+    [2207, one('.iso', 2.7 * GB)],
+    [379, one('.iso', 4.1 * GB)],
+    [418, one('.iso', 3.6 * GB)],
+    [732, one('.iso', 4.4 * GB)],
+  ],
   switch: [
     [
       26764,
@@ -73,7 +125,7 @@ const seeds: Record<string, Seed[]> = {
   wii: [
     [1077, one('.wbfs', 4.3 * GB)],
     [1078, one('.wbfs', 4.1 * GB)],
-    [1090, one('.iso', 0.9 * GB)],
+    [1103, one('.iso', 0.9 * GB)],
     [885, one('.rvz', 0.6 * GB)],
   ],
   psp: [

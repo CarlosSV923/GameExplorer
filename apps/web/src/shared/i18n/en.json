@@ -34,7 +34,9 @@
     "updateLong": "Update",
     "dlcLong": "DLC",
     "gameLong": "Game",
-    "whole": "Whole game"
+    "whole": "Whole game",
+    "disc": "Disc",
+    "discLong": "Disc"
   },
   "glyph": {
     "A": "A button",
@@ -344,7 +346,11 @@
     "keepOne": "{{console}} stores one file per game: leave the others unstored.",
     "notGameFiles": "Not files of the console; they stay in Unassigned:",
     "cancelAssign": "Cancel assignment",
-    "cancelAssignTitle": "Cancel the assignment?"
+    "cancelAssignTitle": "Cancel the assignment?",
+    "disc": "Disc number",
+    "needDisc": "Type a disc number from 1 to 99.",
+    "introDiscs": "It is a game of several discs: give each one its number. That makes the final name.",
+    "storedDisc": "Already in the library"
   },
   "invalid": {
     "noneTitle": "These files are not {{console}} files",

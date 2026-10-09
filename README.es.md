@@ -2,13 +2,13 @@
 
 [English](README.md)
 
-> **Estado:** desarrollo inicial (fases 0–11 de [`docs/tasks.md`](docs/tasks.md) completadas: la app web funciona de punta a punta contra la API para Switch, Wii y PSP, y una demo sin backend corre en el navegador; sigue la publicación para TrueNAS y el pulido de portfolio (fase 12)).
+> **Estado:** desarrollo inicial (fases 0–11.5 de [`docs/tasks.md`](docs/tasks.md) completadas: la app web funciona de punta a punta contra la API para Nintendo 64, GameCube, Wii, Switch, PS2 y PSP, y una demo sin backend corre en el navegador; sigue la publicación para TrueNAS y el pulido de portfolio (fase 12)).
 >
 > **Demo en vivo:** [game-explorer-gold.vercel.app](https://game-explorer-gold.vercel.app/), sin servidor ni login; tus archivos no salen del navegador.
 
 App web autoalojada para un NAS doméstico (TrueNAS SCALE) que permite **subir, descomprimir, clasificar, renombrar, explorar y descargar juegos de emulación** desde cualquier navegador: escritorio, tablet, pantalla táctil o gamepad. La interfaz está inspirada en EmulationStation.
 
-Arrastra un `.rar`, `.zip`, `.7z` o el archivo del juego, indica qué juego y consola es (IGDB sugiere nombres, pero sirve cualquiera) y GameExplorer lo descomprime, comprueba que los archivos valgan para la consola y los guarda como `[consola]/[juego]/[archivo]` con nombres consistentes. En Switch maneja juego base, updates y DLC; Wii y PSP guardan un archivo por juego.
+Arrastra un `.rar`, `.zip`, `.7z` o el archivo del juego, indica qué juego y consola es (IGDB sugiere nombres, pero sirve cualquiera) y GameExplorer lo descomprime, comprueba que los archivos valgan para la consola y los guarda como `[consola]/[juego]/[archivo]` con nombres consistentes. En Switch maneja juego base, updates y DLC; en GameCube y PS2 los juegos de varios discos quedan como `Juego (Disc 1).iso`, `Juego (Disc 2).iso`; Nintendo 64, Wii y PSP guardan un archivo por juego.
 
 ## Características (planeadas)
 - Subidas reanudables de decenas de gigabytes (protocolo tus), escritas a disco en streaming.

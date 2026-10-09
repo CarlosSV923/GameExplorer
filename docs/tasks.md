@@ -158,15 +158,15 @@ Depende de: 10.5 · Cubre: RF-60 a RF-65
 
 ## Fase 11.5 — Nuevas consolas: PlayStation 2, GameCube y Nintendo 64
 Depende de: 11 · Cubre: §5, §6, RF-07, RF-08, RF-08a, RF-24, RF-27a, RF-61 · Versión: `v0.12.0`
-- [ ] Vectores dorados de `contracts/naming-cases.json` para el tipo «Disco N» (`Juego (Disc 2).iso`, un solo disco sin etiqueta, número inválido)
-- [ ] Tipo `disc` con número en el dominio de Go y TS; nombres de §5 en las dos implementaciones
-- [ ] Definir `n64`, `gc` y `ps2` en `catalog/domain/consoles` (variables de entorno de extensiones, IGDB 4, 21 y 8) y el nuevo orden por defecto, siguiendo [`docs/adding-a-console.md`](adding-a-console.md)
-- [ ] Validación: GameCube y PS2 aceptan varios discos (RF-07)
-- [ ] Confirmación con número de disco sugerido y editable; renombrar el disco existente al agregar otro (RF-08, RF-08a)
-- [ ] Editar el número de disco y mover juegos entre consolas con discos (RF-24); asignar entradas con discos (RF-27a)
-- [ ] Contrato OpenAPI, migración si hace falta, i18n ES/EN y tests (Go, web y E2E)
-- [ ] Demo: catálogo fijo con las seis consolas y juegos sembrados de las nuevas, incluido un GameCube de 2 discos (RF-61)
-- [ ] `README`, `.env.example` y guía de TrueNAS con las variables de extensiones nuevas
+- [x] Vectores dorados de `contracts/naming-cases.json` para el tipo «Disco N» (`Juego (Disc 2).iso`, un solo disco sin etiqueta, número inválido)
+- [x] Tipo `disc` con número en el dominio de Go y TS; nombres de §5 en las dos implementaciones
+- [x] Definir `n64`, `gc` y `ps2` en `catalog/domain/consoles` (variables de entorno de extensiones, IGDB 4, 21 y 8) y el nuevo orden por defecto (en una instalación con orden guardado, las nuevas van al final), siguiendo [`docs/adding-a-console.md`](adding-a-console.md)
+- [x] Validación: GameCube y PS2 aceptan varios discos (RF-07)
+- [x] Confirmación con número de disco sugerido y editable; renombrar el disco existente al agregar otro (RF-08, RF-08a). La vista previa muestra los discos guardados para numerarlos; la regla «todos numerados» se comprueba al guardar. Hallazgo corregido: «Guardar» miraba una vista previa de datos anteriores (el debounce) y no hacía nada; ahora solo cuenta la vista previa de los datos actuales.
+- [x] Editar el número de disco y mover juegos entre consolas con discos (RF-24); asignar entradas con discos (RF-27a)
+- [x] Contrato OpenAPI, migración si hace falta, i18n ES/EN y tests (Go, web y E2E)
+- [x] Demo: catálogo fijo con las seis consolas y juegos sembrados de las nuevas, incluido un GameCube de 2 discos (RF-61)
+- [x] `README`, `.env.example` y guía de TrueNAS con las variables de extensiones nuevas
 - [ ] Prueba real en el NAS: subir un juego de cada consola nueva y uno de GameCube de 2 discos
 
 ## Fase 12 — Producción y portfolio

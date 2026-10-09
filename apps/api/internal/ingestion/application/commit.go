@@ -40,13 +40,33 @@ type LibraryFile struct {
 	Unassigned int64
 }
 
+// Renumbering gives a file already in the game a disc number (RF-08a).
+type Renumbering struct {
+	Item  int64
+	Label string
+}
+
+// CommitInput is the user's data for a commit: one entry per valid file,
+// and the disc numbers of files already in the game.
+type CommitInput struct {
+	Files    []CommitFile
+	Renumber []Renumbering
+}
+
 // LibraryRequest is a commit as the library sees it.
 type LibraryRequest struct {
-	Source  string
-	Console string
-	Title   string
-	IGDBID  *int64
-	Files   []LibraryFile
+	Source   string
+	Console  string
+	Title    string
+	IGDBID   *int64
+	Files    []LibraryFile
+	Renumber []Renumbering
+}
+
+// RenamedItem is a file already in the game that the commit renumbers.
+type RenamedItem struct {
+	Item ExistingItem
+	File string
 }
 
 // ExistingItem is a file already in the game's folder.
@@ -76,6 +96,7 @@ type CommitPlan struct {
 	GameID    int64 // 0 when the game is new
 	Existing  []ExistingItem
 	Files     []PlannedFile
+	Renamed   []RenamedItem
 	Discarded []string
 }
 
@@ -249,7 +270,7 @@ func (c *Committer) Files(ctx context.Context, id domain.JobID) ([]FileView, err
 }
 
 // Plan previews the commit of a job waiting for confirmation.
-func (c *Committer) Plan(ctx context.Context, id domain.JobID, req []CommitFile) (CommitPlan, error) {
+func (c *Committer) Plan(ctx context.Context, id domain.JobID, req CommitInput) (CommitPlan, error) {
 	job, err := c.jobs.Get(ctx, id)
 	if err != nil {
 		return CommitPlan{}, err
@@ -269,7 +290,7 @@ func (c *Committer) Plan(ctx context.Context, id domain.JobID, req []CommitFile)
 // Commit stores a job waiting for confirmation. On failure the job returns
 // to confirmation with its files back in staging (or fails, if the change
 // could not be undone).
-func (c *Committer) Commit(ctx context.Context, id domain.JobID, req []CommitFile) (*domain.UploadJob, CommitResult, error) {
+func (c *Committer) Commit(ctx context.Context, id domain.JobID, req CommitInput) (*domain.UploadJob, CommitResult, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -473,7 +494,8 @@ func (c *Committer) Recover(ctx context.Context) error {
 // libraryRequest checks the request against the staged files: every valid
 // file is described exactly once, and only those. It also returns the
 // files that will be discarded.
-func (c *Committer) libraryRequest(ctx context.Context, job *domain.UploadJob, req []CommitFile) (LibraryRequest, []string, error) {
+func (c *Committer) libraryRequest(ctx context.Context, job *domain.UploadJob, input CommitInput) (LibraryRequest, []string, error) {
+	req := input.Files
 	files, err := c.files.List(ctx, job.ID)
 	if err != nil {
 		return LibraryRequest{}, nil, err
@@ -497,7 +519,9 @@ func (c *Committer) libraryRequest(ctx context.Context, job *domain.UploadJob, r
 		}
 	}
 
-	out := LibraryRequest{Source: string(job.ID), Console: job.Console, Title: job.Title, IGDBID: job.IGDBID}
+	out := LibraryRequest{
+		Source: string(job.ID), Console: job.Console, Title: job.Title, IGDBID: job.IGDBID, Renumber: input.Renumber,
+	}
 	seen := map[string]bool{}
 	kept := 0
 	for _, f := range req {

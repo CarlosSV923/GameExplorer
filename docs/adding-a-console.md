@@ -14,27 +14,27 @@ Todo está en un solo valor, `domain.ConsoleDefinition` ([`apps/api/internal/cat
 | `ReleaseYear` | Año que se muestra hasta que IGDB responde. | `2004` |
 | `ExtensionsEnv` | Variable de entorno que reemplaza las extensiones por defecto. | `PSP_EXTENSIONS` |
 | `DefaultExtensions` | Extensiones aceptadas, en minúsculas y con punto. Pueden tener varios puntos (`.nkit.iso`). | `.iso`, `.cso` |
-| `Kinds` | Tipos que puede tener un archivo. `KindGame` solo: un archivo por juego, sin más datos. `KindBase` + `KindUpdate` + `KindDLC`: juego base con updates y DLC. | `KindGame` |
-| `MultipleFiles` | Si una subida puede traer varios archivos válidos (solo tiene sentido con base/update/DLC). | `false` |
+| `Kinds` | Tipos que puede tener un archivo. `KindGame` solo: un archivo por juego, sin más datos. `KindGame` + `KindDisc`: el juego, o sus discos numerados si tiene varios (GameCube, PS2). `KindBase` + `KindUpdate` + `KindDLC`: juego base con updates y DLC. | `KindGame` |
+| `MultipleFiles` | Si una subida puede traer varios archivos válidos (con base/update/DLC o con discos). | `false` |
 
 ## Pasos
 
-1. **Crea el archivo de la consola** en [`apps/api/internal/catalog/domain/consoles/`](../apps/api/internal/catalog/domain/consoles/), copiando el más parecido (`wii.go` o `psp.go` para un archivo por juego; `switch.go` para base/update/DLC):
+1. **Crea el archivo de la consola** en [`apps/api/internal/catalog/domain/consoles/`](../apps/api/internal/catalog/domain/consoles/), copiando el más parecido (`wii.go`, `psp.go` o `n64.go` para un archivo por juego; `gc.go` o `ps2.go` para juegos de varios discos; `switch.go` para base/update/DLC):
 
    ```go
    package consoles
 
    import "github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
 
-   // GameCube stores one file per game, named after the game.
-   func GameCube() domain.ConsoleDefinition {
+   // Dreamcast stores one file per game, named after the game.
+   func Dreamcast() domain.ConsoleDefinition {
    	return domain.ConsoleDefinition{
-   		Slug:              "gc",
-   		Name:              "Nintendo GameCube",
-   		IGDBPlatformID:    21,
-   		ReleaseYear:       2001,
-   		ExtensionsEnv:     "GC_EXTENSIONS",
-   		DefaultExtensions: []string{".iso", ".rvz", ".nkit.iso"},
+   		Slug:              "dreamcast",
+   		Name:              "Dreamcast",
+   		IGDBPlatformID:    23,
+   		ReleaseYear:       1998,
+   		ExtensionsEnv:     "DREAMCAST_EXTENSIONS",
+   		DefaultExtensions: []string{".chd", ".gdi"},
    		Kinds:             []domain.ItemKind{domain.KindGame},
    	}
    }
@@ -50,6 +50,6 @@ Todo está en un solo valor, `domain.ConsoleDefinition` ([`apps/api/internal/cat
 
 ## Cuándo no alcanza con esto
 
-- **Un tipo de archivo nuevo** (por ejemplo, discos numerados): agrega el tipo en [`naming.go`](../apps/api/internal/catalog/domain/naming.go) (`ItemKind`, `Stem` y `CleanLabel`), el valor en el enum `ItemKind` de [`api/openapi.yaml`](../api/openapi.yaml) y casos en [`contracts/naming-cases.json`](../contracts/naming-cases.json). Luego `task gen` y adapta los campos del formulario de datos en la web.
+- **Un tipo de archivo nuevo** (como lo fueron los discos numerados de la Fase 11.5): agrega el tipo en [`naming.go`](../apps/api/internal/catalog/domain/naming.go) (`ItemKind`, `Stem` y `CleanLabel`), el valor en el enum `ItemKind` de [`api/openapi.yaml`](../api/openapi.yaml) y casos en [`contracts/naming-cases.json`](../contracts/naming-cases.json). Luego `task gen` y adapta los campos del formulario de datos en la web.
 - **Una regla de validación distinta** a «uno o varios archivos con estas extensiones»: hoy la validación es genérica ([`ingestion/domain/item.go`](../apps/api/internal/ingestion/domain/item.go), `Validate`). Una regla nueva va ahí, como un campo más de `ConsoleRule` que la definición llena.
 - **Quitar una consola** con juegos: no hay migración automática. Mueve antes sus juegos a No asignados desde la app.

@@ -99,6 +99,7 @@ func (e InvalidReason) Valid() bool {
 // Defines values for ItemKind.
 const (
 	ItemKindBase   ItemKind = "base"
+	ItemKindDisc   ItemKind = "disc"
 	ItemKindDlc    ItemKind = "dlc"
 	ItemKindGame   ItemKind = "game"
 	ItemKindUpdate ItemKind = "update"
@@ -108,6 +109,8 @@ const (
 func (e ItemKind) Valid() bool {
 	switch e {
 	case ItemKindBase:
+		return true
+	case ItemKindDisc:
 		return true
 	case ItemKindDlc:
 		return true
@@ -303,7 +306,7 @@ type CommitFile struct {
 	// Kind Required on consoles with several kinds; omitted means game.
 	Kind *ItemKind `json:"kind,omitempty"`
 
-	// Label Update version (digits and dots) or DLC name.
+	// Label Update version (digits and dots), DLC name or disc number.
 	Label *string `json:"label,omitempty"`
 
 	// OnDuplicate replace sends the existing file to the trash; skip keeps it and drops the new one.
@@ -334,13 +337,20 @@ type CommitPlan struct {
 
 	// GameId Set when the game is already in the library.
 	GameId *int64 `json:"gameId,omitempty"`
-	Title  string `json:"title"`
+
+	// Renamed Files already in the game that the commit renumbers (RF-08a).
+	Renamed *[]RenamedItem `json:"renamed,omitempty"`
+	Title   string         `json:"title"`
 }
 
 // CommitRequest defines model for CommitRequest.
 type CommitRequest struct {
 	// Files One entry per valid file.
 	Files []CommitFile `json:"files"`
+
+	// Renumber Disc numbers for files already in the game (RF-08a): a game stored
+	// with one disc that gets more has that disc numbered too.
+	Renumber *[]Renumbering `json:"renumber,omitempty"`
 }
 
 // CommitResult defines model for CommitResult.
@@ -563,7 +573,8 @@ type ItemDecision struct {
 // ItemEdit defines model for ItemEdit.
 type ItemEdit struct {
 	// Kind What a file is within its game: base, update and dlc for consoles with
-	// add-ons (Switch); game for consoles with one file per game (Wii, PSP).
+	// add-ons (Switch); game for the only file of a game; disc for each disc
+	// of a game of several discs (GameCube, PS2), with its number as label.
 	Kind  ItemKind `json:"kind"`
 	Label *string  `json:"label,omitempty"`
 
@@ -572,7 +583,8 @@ type ItemEdit struct {
 }
 
 // ItemKind What a file is within its game: base, update and dlc for consoles with
-// add-ons (Switch); game for consoles with one file per game (Wii, PSP).
+// add-ons (Switch); game for the only file of a game; disc for each disc
+// of a game of several discs (GameCube, PS2), with its number as label.
 type ItemKind string
 
 // JobStatus uploading → uploaded → (extracting ⇄ needs_password) → confirm | invalid
@@ -592,10 +604,11 @@ type LibraryItem struct {
 	Id   int64  `json:"id"`
 
 	// Kind What a file is within its game: base, update and dlc for consoles with
-	// add-ons (Switch); game for consoles with one file per game (Wii, PSP).
+	// add-ons (Switch); game for the only file of a game; disc for each disc
+	// of a game of several discs (GameCube, PS2), with its number as label.
 	Kind ItemKind `json:"kind"`
 
-	// Label Update version (without the v) or DLC name.
+	// Label Update version (without the v), DLC name or disc number.
 	Label *string `json:"label,omitempty"`
 	Size  int64   `json:"size"`
 }
@@ -650,6 +663,21 @@ type Problem struct {
 	Status int     `json:"status"`
 	Title  string  `json:"title"`
 	Type   *string `json:"type,omitempty"`
+}
+
+// RenamedItem defines model for RenamedItem.
+type RenamedItem struct {
+	// File Its new name inside the game folder.
+	File string      `json:"file"`
+	Item LibraryItem `json:"item"`
+}
+
+// Renumbering defines model for Renumbering.
+type Renumbering struct {
+	ItemId int64 `json:"itemId"`
+
+	// Label The disc number (1 to 99).
+	Label string `json:"label"`
 }
 
 // ResolveRequest defines model for ResolveRequest.

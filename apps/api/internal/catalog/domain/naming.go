@@ -14,18 +14,20 @@ import (
 type ItemKind string
 
 // Item kinds. Consoles with add-ons (Switch) use base, update and DLC;
-// consoles with one file per game (Wii, PSP) use game.
+// a game of one file uses game, and each disc of a game of several discs
+// (GameCube, PS2) is a disc with its number as label.
 const (
 	KindBase   ItemKind = "base"
 	KindUpdate ItemKind = "update"
 	KindDLC    ItemKind = "dlc"
 	KindGame   ItemKind = "game"
+	KindDisc   ItemKind = "disc"
 )
 
 // Valid reports whether k is a known kind.
 func (k ItemKind) Valid() bool {
 	switch k {
-	case KindBase, KindUpdate, KindDLC, KindGame:
+	case KindBase, KindUpdate, KindDLC, KindGame, KindDisc:
 		return true
 	}
 	return false
@@ -39,7 +41,7 @@ var (
 
 // NameError is a rejected naming input.
 type NameError struct {
-	Field string // title | label | version | kind | extension
+	Field string // title | label | version | disc | kind | extension
 	Err   error
 }
 
@@ -83,12 +85,28 @@ func NormalizeVersion(s string) (string, error) {
 	return v, nil
 }
 
+var discPattern = regexp.MustCompile(`^[0-9]{1,3}$`)
+
+// NormalizeDisc turns a typed disc number (" 01 ") into the stored one
+// ("1"): 1 to 99, without leading zeros (spec §5).
+func NormalizeDisc(s string) (string, error) {
+	d := strings.TrimSpace(s)
+	if !discPattern.MatchString(d) {
+		return "", &NameError{Field: "disc", Err: ErrInvalidName}
+	}
+	d = strings.TrimLeft(d, "0")
+	if d == "" || len(d) > 2 {
+		return "", &NameError{Field: "disc", Err: ErrInvalidName}
+	}
+	return d, nil
+}
+
 // ItemName describes one file to name.
 type ItemName struct {
 	Title string
 	Kind  ItemKind
-	// Label is the update version (as NormalizeVersion returns it) or the
-	// DLC name; empty for base and game.
+	// Label is the update version (as NormalizeVersion returns it), the
+	// DLC name or the disc number; empty for base and game.
 	Label string
 }
 
@@ -115,6 +133,12 @@ func (n ItemName) Stem() (string, error) {
 			return "", &NameError{Field: "label", Err: ErrInvalidName}
 		}
 		return title + " [DLC " + name + "]", nil
+	case KindDisc:
+		d, err := NormalizeDisc(n.Label)
+		if err != nil {
+			return "", err
+		}
+		return title + " (Disc " + d + ")", nil
 	}
 	return "", &NameError{Field: "kind", Err: ErrInvalidName}
 }
@@ -155,6 +179,8 @@ func CleanLabel(kind ItemKind, label string) (string, error) {
 	switch kind {
 	case KindUpdate:
 		return NormalizeVersion(label)
+	case KindDisc:
+		return NormalizeDisc(label)
 	case KindDLC:
 		name := strings.Join(strings.Fields(label), " ")
 		if SanitizeTitle(name) == "" {

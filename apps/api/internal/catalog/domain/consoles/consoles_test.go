@@ -36,7 +36,9 @@ func TestRegistryIsConsistent(t *testing.T) {
 			t.Errorf("%s: no kinds", d.Slug)
 		case d.SingleKind() == domain.KindGame && d.MultipleFiles:
 			t.Errorf("%s: one file per game cannot take several files per upload", d.Slug)
-		case d.SingleKind() == "" && !d.Allows(domain.KindBase):
+		case d.Allows(domain.KindDisc) && (!d.Allows(domain.KindGame) || !d.MultipleFiles || len(d.Kinds) != 2):
+			t.Errorf("%s: a console with discs takes the game or its discs, several per upload", d.Slug)
+		case d.SingleKind() == "" && !d.Allows(domain.KindDisc) && !d.Allows(domain.KindBase):
 			t.Errorf("%s: a console with add-ons needs a base", d.Slug)
 		}
 	}

@@ -22,6 +22,9 @@ services:
       # SWITCH_EXTENSIONS: .nsp,.xci
       # WII_EXTENSIONS: .iso,.wbfs,.rvz,.nkit.iso
       # PSP_EXTENSIONS: .iso,.cso
+      # PS2_EXTENSIONS: .iso
+      # GC_EXTENSIONS: .iso,.rvz
+      # N64_EXTENSIONS: .z64,.n64,.v64
     volumes:
       - /mnt/CHANGE-pool/games:/library # the SMB dataset
       - /mnt/CHANGE-pool/apps/gameexplorer:/data # SQLite + image cache

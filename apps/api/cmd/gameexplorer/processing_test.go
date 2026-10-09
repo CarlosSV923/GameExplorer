@@ -72,7 +72,7 @@ func TestChangeConsoleKeepsTheExtractedFiles(t *testing.T) {
 
 	id := upload(t, srv, cookie, "Ookami.zip", "switch", "Ōkami", zipOf(t, map[string]string{"Ookami (USA).nkit.iso": "wii"}))
 	waitStatus(t, srv, cookie, id, "invalid")
-	if res := post(t, srv, cookie, "/api/jobs/"+id+"/console", `{"console":"ps2"}`); res.StatusCode != http.StatusBadRequest {
+	if res := post(t, srv, cookie, "/api/jobs/"+id+"/console", `{"console":"ps3"}`); res.StatusCode != http.StatusBadRequest {
 		t.Fatalf("unknown console = %d, want 400", res.StatusCode)
 	}
 	// A .nkit.iso is not an .iso: PSP does not take it (RF-41).

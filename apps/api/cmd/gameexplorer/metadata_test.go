@@ -145,11 +145,11 @@ func TestConsoleSyncFromIGDB(t *testing.T) {
 
 	a.syncConsoles(t.Context(), log)
 
-	consoles, err := a.consoles.List(t.Context())
+	sw, err := a.consoles.Console(t.Context(), "switch")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if consoles[0].LogoImageID == nil || *consoles[0].LogoImageID != "plgu" {
-		t.Fatalf("switch logo after sync = %v", consoles[0].LogoImageID)
+	if sw.LogoImageID == nil || *sw.LogoImageID != "plgu" {
+		t.Fatalf("switch logo after sync = %v", sw.LogoImageID)
 	}
 }

@@ -33,6 +33,27 @@ async function uploadSample(demo: Demo, id: SampleFile['id'], console?: string) 
   return demo.ingestion.job(jobId)
 }
 
+/** Uploads a file of the visitor's own (RF-63): only its name and size count. */
+async function uploadOwn(demo: Demo, name: string, console: string, title: string) {
+  let jobId = ''
+  demo.ingestion.upload(
+    new File(['x'], name),
+    { spec: { console, title } },
+    {
+      onJobId: (j) => {
+        jobId = j
+      },
+      onProgress: () => undefined,
+      onSuccess: () => undefined,
+      onError: (e) => {
+        throw e
+      },
+    },
+  )
+  await vi.runAllTimersAsync()
+  return demo.ingestion.job(jobId)
+}
+
 async function settle(demo: Demo, job: UploadJob) {
   await vi.runAllTimersAsync()
   return demo.ingestion.job(job.id)
@@ -51,8 +72,11 @@ describe('demo', () => {
     await expect(demo.identity.session()).resolves.toBeDefined()
     const consoles = await demo.catalog.consoles.list()
     expect(consoles.map((c) => [c.slug, c.gameCount])).toEqual([
-      ['switch', 7],
+      ['n64', 4],
+      ['gc', 4],
       ['wii', 4],
+      ['switch', 7],
+      ['ps2', 4],
       ['psp', 5],
     ])
     const entries = await demo.catalog.unassigned.list()
@@ -146,5 +170,27 @@ describe('demo', () => {
         files: files.filter((f) => f.valid).map((f) => ({ path: f.path, skip: true })),
       }),
     ).rejects.toMatchObject({ kind: 'invalid' })
+  })
+
+  it('numbers the stored disc when another one arrives (RF-08a)', async () => {
+    const demo = createDemoServices()
+    const job = await uploadOwn(demo, 'sotc-2.iso', 'ps2', 'Shadow of the Colossus')
+    expect(job.status).toBe('confirm')
+    const disc2 = { path: 'sotc-2.iso', kind: 'disc' as const, label: '2' }
+    await expect(demo.ingestion.commit(job.id, { files: [disc2] })).rejects.toMatchObject({
+      kind: 'invalid',
+    })
+    const plan = await demo.ingestion.plan(job.id, { files: [disc2] })
+    const stored = plan.existing[0]
+    if (!stored) throw new Error('no stored disc')
+    const result = await demo.ingestion.commit(job.id, {
+      files: [disc2],
+      renumber: [{ itemId: stored.id, label: '1' }],
+    })
+    const game = await demo.catalog.library.game(result.gameId)
+    expect(game.items.map((i) => i.file)).toEqual([
+      'Shadow of the Colossus (Disc 1).iso',
+      'Shadow of the Colossus (Disc 2).iso',
+    ])
   })
 })

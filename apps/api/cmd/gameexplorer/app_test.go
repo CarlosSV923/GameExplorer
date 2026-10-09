@@ -177,7 +177,7 @@ func TestLoginFlow(t *testing.T) {
 		Slug        string `json:"slug"`
 		DisplayName string `json:"displayName"`
 	}](t, do(t, http.MethodGet, srv.URL+"/api/consoles", "", cookie))
-	if len(consoles) != 3 || consoles[0].Slug != "switch" || consoles[0].DisplayName != "Nintendo Switch" {
+	if len(consoles) != 6 || consoles[0].Slug != "n64" || consoles[3].DisplayName != "Nintendo Switch" {
 		t.Fatalf("consoles = %+v", consoles)
 	}
 

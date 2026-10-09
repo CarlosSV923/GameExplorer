@@ -269,6 +269,7 @@ export function EditItemDialog({
     kind: item.kind,
     version: item.kind === 'update' ? (item.label ?? '') : '',
     dlcName: item.kind === 'dlc' ? (item.label ?? '') : '',
+    disc: item.kind === 'disc' ? (item.label ?? '') : '1',
   })
   const [tried, setTried] = useState(false)
   const error = kindDraftError(draft)

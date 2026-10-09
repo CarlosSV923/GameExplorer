@@ -2,7 +2,7 @@ import { consoles } from '@/test/fakeServices'
 
 import { cleanVersion, kindDraftError, previewFileName } from '@/modules/catalog/domain/naming'
 
-import { initialDraft, initialSkips, toCommitFile } from './details'
+import { discFromName, initialDraft, initialSkips, suggestDiscs, toCommitFile } from './details'
 import { checkFile, defaultMode, specsFor } from './uploadForm'
 
 const [switchConsole, wii] = consoles
@@ -84,5 +84,19 @@ describe('file details', () => {
         onDuplicate: 'replace',
       }),
     ).toEqual({ path: 'a.nsp', kind: 'dlc', label: 'Fuga Maestra', onDuplicate: 'replace' })
+  })
+})
+
+describe('disc numbers', () => {
+  it('takes the number of the name, then the free ones in name order', () => {
+    expect(discFromName('RE4 (Disc 2).iso')).toBe(2)
+    expect(discFromName('xenosaga_disk1.iso')).toBe(1)
+    expect(discFromName('Metroid Prime.iso')).toBeUndefined()
+    expect(suggestDiscs(['b.iso', 'a (Disc 2).iso', 'c.iso'])).toEqual({
+      'a (Disc 2).iso': '2',
+      'b.iso': '1',
+      'c.iso': '3',
+    })
+    expect(suggestDiscs(['new.iso'], [1])).toEqual({ 'new.iso': '2' })
   })
 })

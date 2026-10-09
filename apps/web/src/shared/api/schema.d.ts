@@ -889,10 +889,11 @@ export interface components {
         };
         /**
          * @description What a file is within its game: base, update and dlc for consoles with
-         *     add-ons (Switch); game for consoles with one file per game (Wii, PSP).
+         *     add-ons (Switch); game for the only file of a game; disc for each disc
+         *     of a game of several discs (GameCube, PS2), with its number as label.
          * @enum {string}
          */
-        ItemKind: "base" | "update" | "dlc" | "game";
+        ItemKind: "base" | "update" | "dlc" | "game" | "disc";
         Console: {
             /**
              * @description Folder name in the library; fixed.
@@ -1045,13 +1046,24 @@ export interface components {
         CommitRequest: {
             /** @description One entry per valid file. */
             files: components["schemas"]["CommitFile"][];
+            /**
+             * @description Disc numbers for files already in the game (RF-08a): a game stored
+             *     with one disc that gets more has that disc numbered too.
+             */
+            renumber?: components["schemas"]["Renumbering"][];
+        };
+        Renumbering: {
+            /** Format: int64 */
+            itemId: number;
+            /** @description The disc number (1 to 99). */
+            label: string;
         };
         CommitFile: {
             /** @description StagedFile.path. */
             path: string;
             /** @description Required on consoles with several kinds; omitted means game. */
             kind?: components["schemas"]["ItemKind"];
-            /** @description Update version (digits and dots) or DLC name. */
+            /** @description Update version (digits and dots), DLC name or disc number. */
             label?: string;
             onDuplicate?: components["schemas"]["DuplicateAction"];
             /**
@@ -1088,8 +1100,15 @@ export interface components {
             /** @description The game's current files. */
             existing: components["schemas"]["LibraryItem"][];
             files: components["schemas"]["PlannedFile"][];
+            /** @description Files already in the game that the commit renumbers (RF-08a). */
+            renamed?: components["schemas"]["RenamedItem"][];
             /** @description Files that are not game files for the console. */
             discarded: string[];
+        };
+        RenamedItem: {
+            item: components["schemas"]["LibraryItem"];
+            /** @description Its new name inside the game folder. */
+            file: string;
         };
         CommitResult: {
             job: components["schemas"]["UploadJob"];
@@ -1108,7 +1127,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             kind: components["schemas"]["ItemKind"];
-            /** @description Update version (without the v) or DLC name. */
+            /** @description Update version (without the v), DLC name or disc number. */
             label?: string | null;
             /** @description Name inside the game folder. */
             file: string;

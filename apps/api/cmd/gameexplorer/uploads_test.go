@@ -20,7 +20,7 @@ func TestUploadNeedsItsForm(t *testing.T) {
 
 	cases := map[string]form{
 		"no title":           {"filename": "a.nsp", "consoleSlug": "switch"},
-		"unknown console":    {"filename": "a.nsp", "consoleSlug": "ps2", "title": "A"},
+		"unknown console":    {"filename": "a.nsp", "consoleSlug": "ps3", "title": "A"},
 		"bad igdb id":        {"filename": "a.nsp", "consoleSlug": "switch", "title": "A", "igdbId": "x"},
 		"group without size": {"filename": "a.part1.rar", "consoleSlug": "switch", "title": "A", "group": "g1"},
 	}
@@ -114,7 +114,7 @@ func TestRawFileOfAnotherConsoleIsInvalid(t *testing.T) {
 		t.Fatalf("job = %+v", job)
 	}
 	files := jobFiles(t, srv, cookie, id)
-	if len(files) != 1 || files[0].Valid || strings.Join(files[0].Consoles, ",") != "psp,wii" {
-		t.Fatalf("files = %+v (an .iso fits Wii and PSP)", files)
+	if len(files) != 1 || files[0].Valid || strings.Join(files[0].Consoles, ",") != "gc,ps2,psp,wii" {
+		t.Fatalf("files = %+v (an .iso fits GameCube, PS2, PSP and Wii)", files)
 	}
 }

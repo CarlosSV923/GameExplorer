@@ -7,7 +7,7 @@ import type { ItemKind } from './types'
  */
 
 /** The field a name was rejected for. */
-export type NameField = 'title' | 'label' | 'version' | 'kind' | 'extension'
+export type NameField = 'title' | 'label' | 'version' | 'disc' | 'kind' | 'extension'
 
 export type NameResult = { ok: true; name: string } | { ok: false; field: NameField }
 
@@ -45,6 +45,14 @@ export function sanitizeTitle(raw: string): string {
 export function normalizeVersion(raw: string): string | null {
   const v = raw.trim().replace(/^v/, '').replace(/^V/, '')
   return v.length <= 32 && versionPattern.test(v) ? v : null
+}
+
+/** " 01 " → "1": a disc number from 1 to 99, without leading zeros; null if invalid. */
+export function normalizeDisc(raw: string): string | null {
+  const d = raw.trim()
+  if (!/^[0-9]{1,3}$/.test(d)) return null
+  const n = d.replace(/^0+/, '')
+  return n && n.length <= 2 ? n : null
 }
 
 /** ".Z64", "z64" → ".z64"; null when it is not an extension. Several dots are fine. */
@@ -100,6 +108,10 @@ export function itemStem({ title, kind, label = '' }: ItemName): NameResult {
       const name = sanitizeTitle(label)
       return name ? { ok: true, name: `${clean} [DLC ${name}]` } : { ok: false, field: 'label' }
     }
+    case 'disc': {
+      const d = normalizeDisc(label)
+      return d === null ? { ok: false, field: 'disc' } : { ok: true, name: `${clean} (Disc ${d})` }
+    }
     default:
       return { ok: false, field: 'kind' }
   }
@@ -121,9 +133,11 @@ export interface KindDraft {
   /** Update version as typed: digits and dots. */
   version: string
   dlcName: string
+  /** Disc number as typed (GameCube, PS2). */
+  disc?: string
 }
 
-export type KindDraftError = 'kind' | 'version' | 'dlcName'
+export type KindDraftError = 'kind' | 'version' | 'dlcName' | 'disc'
 
 /** What is missing for the file to be named. */
 export function kindDraftError(d: KindDraft): KindDraftError | null {
@@ -134,6 +148,8 @@ export function kindDraftError(d: KindDraft): KindDraftError | null {
       return normalizeVersion(d.version) === null ? 'version' : null
     case 'dlc':
       return sanitizeTitle(d.dlcName) ? null : 'dlcName'
+    case 'disc':
+      return normalizeDisc(d.disc ?? '') === null ? 'disc' : null
     default:
       return null
   }
@@ -143,6 +159,7 @@ export function kindDraftError(d: KindDraft): KindDraftError | null {
 export function kindDraftLabel(d: KindDraft): string | undefined {
   if (d.kind === 'update') return normalizeVersion(d.version) ?? undefined
   if (d.kind === 'dlc') return d.dlcName.trim().replace(/\s+/g, ' ') || undefined
+  if (d.kind === 'disc') return normalizeDisc(d.disc ?? '') ?? undefined
   return undefined
 }
 
@@ -156,6 +173,14 @@ const kindTags: Record<ItemKind, string> = {
   update: ' [UPDATE v…]',
   dlc: ' [DLC …]',
   game: '',
+  disc: ' (Disc …)',
+}
+
+/** What the user typed for the draft's kind. */
+function draftText(d: KindDraft): string {
+  if (d.kind === 'update') return d.version
+  if (d.kind === 'disc') return d.disc ?? ''
+  return d.dlcName
 }
 
 /**
@@ -168,10 +193,7 @@ export function previewFileName(
   extension: string,
 ): { name: string; complete: boolean } {
   if (d.kind) {
-    const result = itemFileName(
-      { title, kind: d.kind, label: d.kind === 'update' ? d.version : d.dlcName },
-      extension,
-    )
+    const result = itemFileName({ title, kind: d.kind, label: draftText(d) }, extension)
     if (result.ok) return { name: result.name, complete: true }
   }
   const tag = d.kind ? kindTags[d.kind] : ' […]'

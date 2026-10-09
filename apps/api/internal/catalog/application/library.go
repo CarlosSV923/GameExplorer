@@ -259,6 +259,9 @@ func itemFor(c domain.Console, kind domain.ItemKind, label, ref string) (domain.
 	if kind == "" {
 		kind = c.SingleKind()
 	}
+	if kind == "" && c.Allows(domain.KindGame) {
+		kind = domain.KindGame // one disc: the game itself (spec §5)
+	}
 	if kind == "" {
 		return "", "", reject(RejectInvalid, "%q: indica si es el juego base, un update o un DLC.", ref)
 	}

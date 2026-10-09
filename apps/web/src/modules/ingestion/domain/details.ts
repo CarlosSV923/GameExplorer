@@ -52,3 +52,38 @@ export function toCommitFile(path: string, d: FileDraft): CommitFile {
 export function storedCount(paths: readonly string[], plan: CommitPlan | undefined): number {
   return paths.filter((path) => plan?.files.find((p) => p.path === path)?.action !== 'skip').length
 }
+
+/** The disc number a file's name says ("RE4 (Disc 2).iso", "disc2"), if any. */
+export function discFromName(name: string): number | undefined {
+  const m = /dis[ck]\s*[-_]?\s*(\d{1,2})(?!\d)/i.exec(name)
+  const n = m ? Number(m[1]) : NaN
+  return n >= 1 && n <= 99 ? n : undefined
+}
+
+/**
+ * The disc numbers a form starts with (RF-08): the one each name says, then
+ * 1, 2, 3… by name for the rest; numbers already taken are skipped.
+ */
+export function suggestDiscs(
+  paths: readonly string[],
+  taken: Iterable<number> = [],
+): Record<string, string> {
+  const used = new Set(taken)
+  const out: Record<string, string> = {}
+  const sorted = [...paths].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  for (const p of sorted) {
+    const n = discFromName(p.slice(p.lastIndexOf('/') + 1))
+    if (n !== undefined && !used.has(n)) {
+      out[p] = String(n)
+      used.add(n)
+    }
+  }
+  let next = 1
+  for (const p of sorted) {
+    if (out[p] !== undefined) continue
+    while (used.has(next)) next++
+    out[p] = String(next)
+    used.add(next)
+  }
+  return out
+}

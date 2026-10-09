@@ -14,8 +14,9 @@ async function goInApp(page: Page, path: string) {
 test('opens on the seeded library, without login', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('note')).toContainText('Modo demo')
-  await expect(page.getByRole('heading', { level: 1, name: 'Nintendo Switch' })).toBeVisible()
-  await expect(page.getByText('7 juegos')).toBeVisible()
+  // The first console by maker and year (spec §6).
+  await expect(page.getByRole('heading', { level: 1, name: 'Nintendo 64' })).toBeVisible()
+  await expect(page.getByText('4 juegos')).toBeVisible()
 })
 
 test('stores the Wii sample after its password', async ({ page }) => {
@@ -67,4 +68,34 @@ test('uploads without console and assigns the whole entry (RF-07b, RF-27a)', asy
 
   await goInApp(page, '/no-asignados')
   await expect(page.getByText('Splatoon 3 [v2752512].nsp')).toBeVisible()
+})
+
+test('adds a second disc and numbers the stored one (RF-08a)', async ({ page }) => {
+  await page.goto('/subidas')
+  // A file of the visitor's own: only its name and size are used (RF-63).
+  await page
+    .locator('input[type="file"]')
+    .first()
+    .setInputFiles({
+      name: 'sotc-2.iso',
+      mimeType: 'application/octet-stream',
+      buffer: Buffer.from('x'),
+    })
+  const form = page.getByRole('dialog')
+  await form.getByText('PlayStation 2', { exact: true }).click()
+  await form.getByLabel('Nombre del juego').fill('Shadow of the Colossus')
+  await form.getByRole('button', { name: 'Subir', exact: true }).click()
+
+  await page.getByRole('link', { name: 'Completar' }).click({ timeout: 15_000 })
+  // The stored disc becomes Disc 1 and the new one is suggested as Disc 2.
+  await expect(page.getByText('Shadow of the Colossus.iso', { exact: true })).toBeVisible()
+  await expect(
+    page.getByText('ps2/Shadow of the Colossus/Shadow of the Colossus (Disc 1).iso'),
+  ).toBeVisible()
+  await expect(
+    page.getByText('ps2/Shadow of the Colossus/Shadow of the Colossus (Disc 2).iso'),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Guardar en la biblioteca' }).click()
+  await expect(page).toHaveURL(/\/consolas\/ps2\/\d+/)
+  await expect(page.getByText('Shadow of the Colossus (Disc 2).iso')).toBeVisible()
 })

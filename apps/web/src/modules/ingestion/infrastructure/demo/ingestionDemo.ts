@@ -33,6 +33,7 @@ export interface DemoLibraryPort {
     gameId: number | null
     existing: LibraryItem[]
     files: CommitPlan['files']
+    renamed: { item: LibraryItem; file: string }[]
   }
   store(req: DemoStoreRequest): {
     gameId: number
@@ -66,6 +67,7 @@ export interface DemoStoreRequest {
   console: string
   title: string
   igdbId?: number | null
+  renumber?: { itemId: number; label: string }[]
   files: {
     ref: string
     name: string
@@ -309,6 +311,7 @@ export function createIngestionDemo(library: DemoLibraryPort): IngestionPorts {
       console: s.job.console,
       title: s.job.title,
       igdbId: s.job.igdbId ?? null,
+      ...(req.renumber ? { renumber: req.renumber } : {}),
       files: kept.map((c) => {
         const f = byPath.get(c.path)
         if (!f || !valid.some((v) => v.path === c.path))

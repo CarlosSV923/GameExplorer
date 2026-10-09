@@ -234,7 +234,7 @@ func TestConsoleSettings(t *testing.T) {
 	if c := decode[consoleJSON](t, res); c.DisplayName != "Switch" || c.DefaultName != "Nintendo Switch" {
 		t.Fatalf("console = %+v", c)
 	}
-	res = call(t, srv, cookie, http.MethodPut, "/api/consoles/order", `{"slugs":["psp","switch","wii"]}`)
+	res = call(t, srv, cookie, http.MethodPut, "/api/consoles/order", `{"slugs":["psp","switch","wii","n64","gc","ps2"]}`)
 	wantStatus(t, res, http.StatusOK, "reorder")
 	if list := decode[[]consoleJSON](t, res); list[0].Slug != "psp" || list[1].DisplayName != "Switch" {
 		t.Fatalf("consoles = %+v", list)

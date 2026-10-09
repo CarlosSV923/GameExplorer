@@ -54,7 +54,7 @@ func TestNamingGoldenVectors(t *testing.T) {
 			t.Parallel()
 			label := c.Input.Label
 			kind := domain.ItemKind(c.Input.Kind)
-			if c.Expected.Error == "" || c.Expected.Error == "label" || c.Expected.Error == "version" {
+			if c.Expected.Error == "" || c.Expected.Error == "label" || c.Expected.Error == "version" || c.Expected.Error == "disc" {
 				clean, err := domain.CleanLabel(kind, label)
 				var ne *domain.NameError
 				if c.Expected.Error != "" && c.Expected.Error != "title" {

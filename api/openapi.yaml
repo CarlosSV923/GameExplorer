@@ -1344,8 +1344,9 @@ components:
       type: string
       description: |
         What a file is within its game: base, update and dlc for consoles with
-        add-ons (Switch); game for consoles with one file per game (Wii, PSP).
-      enum: [base, update, dlc, game]
+        add-ons (Switch); game for the only file of a game; disc for each disc
+        of a game of several discs (GameCube, PS2), with its number as label.
+      enum: [base, update, dlc, game, disc]
 
     Console:
       type: object
@@ -1644,6 +1645,24 @@ components:
           description: One entry per valid file.
           items:
             $ref: '#/components/schemas/CommitFile'
+        renumber:
+          type: array
+          description: |
+            Disc numbers for files already in the game (RF-08a): a game stored
+            with one disc that gets more has that disc numbered too.
+          items:
+            $ref: '#/components/schemas/Renumbering'
+
+    Renumbering:
+      type: object
+      required: [itemId, label]
+      properties:
+        itemId:
+          type: integer
+          format: int64
+        label:
+          type: string
+          description: The disc number (1 to 99).
 
     CommitFile:
       type: object
@@ -1658,7 +1677,7 @@ components:
           description: Required on consoles with several kinds; omitted means game.
         label:
           type: string
-          description: Update version (digits and dots) or DLC name.
+          description: Update version (digits and dots), DLC name or disc number.
         onDuplicate:
           $ref: '#/components/schemas/DuplicateAction'
         skip:
@@ -1718,11 +1737,26 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PlannedFile'
+        renamed:
+          type: array
+          description: Files already in the game that the commit renumbers (RF-08a).
+          items:
+            $ref: '#/components/schemas/RenamedItem'
         discarded:
           type: array
           description: Files that are not game files for the console.
           items:
             type: string
+
+    RenamedItem:
+      type: object
+      required: [item, file]
+      properties:
+        item:
+          $ref: '#/components/schemas/LibraryItem'
+        file:
+          type: string
+          description: Its new name inside the game folder.
 
     CommitResult:
       type: object
@@ -1756,7 +1790,7 @@ components:
         label:
           type: string
           nullable: true
-          description: Update version (without the v) or DLC name.
+          description: Update version (without the v), DLC name or disc number.
         file:
           type: string
           description: Name inside the game folder.

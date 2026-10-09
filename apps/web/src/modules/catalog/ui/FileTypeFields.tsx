@@ -12,6 +12,7 @@ const kindColors: Record<ItemKind, string> = {
   update: 'bg-kind-update text-on-kind-update',
   dlc: 'bg-kind-dlc text-on-accent',
   game: 'bg-kind-game text-on-accent',
+  disc: 'bg-kind-game text-on-accent',
 }
 
 function FieldError({ id, children }: { id: string; children: ReactNode }) {
@@ -54,7 +55,8 @@ export function FileTypeFields({
   const set = (patch: Partial<KindDraft>) => {
     onChange({ ...value, ...patch })
   }
-  const choices = kinds.filter((k) => k !== 'game')
+  // A console with discs chooses between the whole game and one of its discs.
+  const choices = kinds.filter((k) => k !== 'game' || kinds.includes('disc'))
 
   return (
     <>
@@ -140,8 +142,61 @@ export function FileTypeFields({
             )}
           </div>
         )}
+        {value.kind === 'disc' && (
+          <DiscField
+            value={value.disc ?? ''}
+            onChange={(disc) => {
+              set({ disc })
+            }}
+            error={error === 'disc'}
+          />
+        )}
         <div className="min-w-0 flex-[1_1_280px]">{preview}</div>
       </div>
     </>
+  )
+}
+
+/** A disc's number, 1 to 99 (GameCube, PS2; spec §5). */
+export function DiscField({
+  value,
+  onChange,
+  error,
+  label,
+}: {
+  value: string
+  onChange: (next: string) => void
+  /** Shown once the user tried to save. */
+  error: boolean
+  /** Overrides "Número de disco" (e.g. for the disc already stored). */
+  label?: string
+}) {
+  const { t } = useTranslation()
+  const id = useId()
+  return (
+    <div className="flex flex-[0_1_180px] flex-col gap-1.5">
+      <label htmlFor={`${id}-disc`} className="text-caption font-bold text-ink-2">
+        {label ?? t('details.disc')}{' '}
+        <span className="font-semibold text-ink-3">{t('details.required')}</span>
+      </label>
+      <input
+        id={`${id}-disc`}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={2}
+        value={value}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-disc-error` : undefined}
+        onChange={(e) => {
+          onChange(e.target.value.replace(/[^0-9]/g, ''))
+        }}
+        className={cx(
+          'box-border h-control-sm w-24 rounded-md border bg-surface-input px-3.5 font-mono text-body text-ink-1',
+          error ? 'border-danger' : 'border-control',
+        )}
+      />
+      {error && <FieldError id={`${id}-disc-error`}>{t('details.needDisc')}</FieldError>}
+    </div>
   )
 }

@@ -14,8 +14,8 @@ import (
 // by application.Committer).
 type CommitService interface {
 	Files(ctx context.Context, id domain.JobID) ([]application.FileView, error)
-	Plan(ctx context.Context, id domain.JobID, req []application.CommitFile) (application.CommitPlan, error)
-	Commit(ctx context.Context, id domain.JobID, req []application.CommitFile) (*domain.UploadJob, application.CommitResult, error)
+	Plan(ctx context.Context, id domain.JobID, req application.CommitInput) (application.CommitPlan, error)
+	Commit(ctx context.Context, id domain.JobID, req application.CommitInput) (*domain.UploadJob, application.CommitResult, error)
 	ChangeConsole(ctx context.Context, id domain.JobID, console string) (*domain.UploadJob, error)
 	Resolve(ctx context.Context, id domain.JobID, r application.Resolution) (*domain.UploadJob, error)
 }
@@ -180,8 +180,13 @@ func commitProblem(err error) (int, httpapi.Problem) {
 	return http.StatusInternalServerError, problem(http.StatusInternalServerError, "Internal Server Error", "")
 }
 
-func commitFiles(b httpapi.CommitRequest) []application.CommitFile {
-	out := make([]application.CommitFile, 0, len(b.Files))
+func commitFiles(b httpapi.CommitRequest) application.CommitInput {
+	in := application.CommitInput{Files: make([]application.CommitFile, 0, len(b.Files))}
+	if b.Renumber != nil {
+		for _, r := range *b.Renumber {
+			in.Renumber = append(in.Renumber, application.Renumbering{Item: r.ItemId, Label: r.Label})
+		}
+	}
 	for _, f := range b.Files {
 		cf := application.CommitFile{Path: f.Path}
 		if f.Kind != nil {
@@ -196,9 +201,9 @@ func commitFiles(b httpapi.CommitRequest) []application.CommitFile {
 		if f.Skip != nil {
 			cf.Skip = *f.Skip
 		}
-		out = append(out, cf)
+		in.Files = append(in.Files, cf)
 	}
-	return out
+	return in
 }
 
 func planToAPI(p application.CommitPlan) httpapi.CommitPlan {
@@ -222,6 +227,13 @@ func planToAPI(p application.CommitPlan) httpapi.CommitPlan {
 			pf.Duplicate = &d
 		}
 		out.Files = append(out.Files, pf)
+	}
+	if len(p.Renamed) > 0 {
+		renamed := make([]httpapi.RenamedItem, 0, len(p.Renamed))
+		for _, r := range p.Renamed {
+			renamed = append(renamed, httpapi.RenamedItem{Item: libraryItemToAPI(r.Item), File: r.File})
+		}
+		out.Renamed = &renamed
 	}
 	return out
 }

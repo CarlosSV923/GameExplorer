@@ -90,10 +90,15 @@ func (s *ConsoleService) List(ctx context.Context) ([]domain.Console, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list consoles: %w", err)
 	}
+	// Consoles added to the code after an order was stored go after it (spec §6).
+	after := 0
+	for _, st := range settings {
+		after = max(after, st.SortOrder)
+	}
 	out := make([]domain.Console, 0, len(s.defs))
 	for i, d := range s.defs {
 		c := domain.Console{
-			ConsoleDefinition: d, DisplayName: d.Name, SortOrder: (i + 1) * 10, Year: d.ReleaseYear,
+			ConsoleDefinition: d, DisplayName: d.Name, SortOrder: after + (i+1)*10, Year: d.ReleaseYear,
 			Extensions: s.fixed[d.Slug], GameCount: counts[d.Slug],
 		}
 		for _, ext := range custom[d.Slug] {

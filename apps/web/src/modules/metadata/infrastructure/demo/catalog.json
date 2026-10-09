@@ -1,13 +1,34 @@
 {
-  "generatedAt": "2026-10-09T07:16:16Z",
+  "generatedAt": "2026-10-09T18:34:51Z",
   "source": "IGDB (https://www.igdb.com)",
   "platforms": [
+    {
+      "id": 8,
+      "name": "PlayStation 2",
+      "abbreviation": "PS2",
+      "logoImageId": "pl71",
+      "releaseYear": 2000
+    },
+    {
+      "id": 21,
+      "name": "Nintendo GameCube",
+      "abbreviation": "NGC",
+      "logoImageId": "pl7a",
+      "releaseYear": 2001
+    },
     {
       "id": 38,
       "name": "PlayStation Portable",
       "abbreviation": "PSP",
       "logoImageId": "pl6q",
       "releaseYear": 2004
+    },
+    {
+      "id": 4,
+      "name": "Nintendo 64",
+      "abbreviation": "N64",
+      "logoImageId": "pl77",
+      "releaseYear": 1996
     },
     {
       "id": 5,
@@ -31,8 +52,14 @@
       "releaseYear": 2017,
       "coverImageId": "co213p",
       "summary": "Hit the road with the definitive version of Mario Kart 8 and play anytime, anywhere! Race your friends or battle them in a revised battle mode on new and returning battle courses. Play locally in up to 4-player multiplayer in 1080p while playing in TV Mode. Every track from the Wii U version, including DLC, makes a glorious return. Plus, the Inklings appear as all-new guest characters, along with returning favorites, such as King Boo, Dry Bones, and Bowser Jr.!",
-      "genres": ["Racing", "Arcade"],
-      "platformIds": [508, 130]
+      "genres": [
+        "Racing",
+        "Arcade"
+      ],
+      "platformIds": [
+        508,
+        130
+      ]
     },
     {
       "id": 7342,
@@ -40,8 +67,20 @@
       "releaseYear": 2016,
       "coverImageId": "co2fca",
       "summary": "Inside is a puzzle-platformer developed by Playdead, presented in a 2.5D side-scrolling format with a dark, predominantly monochromatic visual style. The player controls an unnamed boy navigating a dystopian environment, solving environmental puzzles, avoiding hostile guards and creatures, and using a mind-control device to manipulate bodies in order to progress. The game features no dialogue or HUD, relying on visual and audio cues to guide the player through its increasingly surreal and dangerous settings.",
-      "genres": ["Platform", "Puzzle", "Adventure", "Indie"],
-      "platformIds": [48, 6, 39, 14, 49, 130]
+      "genres": [
+        "Platform",
+        "Puzzle",
+        "Adventure",
+        "Indie"
+      ],
+      "platformIds": [
+        48,
+        6,
+        39,
+        14,
+        49,
+        130
+      ]
     },
     {
       "id": 296843,
@@ -49,8 +88,18 @@
       "releaseYear": 2025,
       "coverImageId": "coab8v",
       "summary": "The Rogue Prince of Persia is a 2D action-platformer developed by Evil Empire in collaboration with Ubisoft. The game combines fast-paced parkour movement with roguelite combat and progression systems. Players control the Prince as he battles enemies and explores procedurally generated levels filled with traps and hazards.\nEach run offers new weapons, upgrades, and choices that influence gameplay and replayability.",
-      "genres": ["Platform", "Hack and slash/Beat 'em up", "Adventure"],
-      "platformIds": [169, 508, 6, 167, 130]
+      "genres": [
+        "Platform",
+        "Hack and slash/Beat 'em up",
+        "Adventure"
+      ],
+      "platformIds": [
+        169,
+        508,
+        6,
+        167,
+        130
+      ]
     },
     {
       "id": 109462,
@@ -58,8 +107,12 @@
       "releaseYear": 2020,
       "coverImageId": "co3wls",
       "summary": "Escape to a deserted island and create your own paradise as you explore, create, and customize in Animal Crossing: New Horizons. Your island getaway has a wealth of natural resources that can be used to craft everything from tools to creature comforts. You can hunt down insects at the crack of dawn, decorate your paradise throughout the day, or enjoy sunset on the beach while fishing in the ocean. The time of day and season match real life, so each day on your island is a chance to check in and find new surprises all year round.",
-      "genres": ["Simulator"],
-      "platformIds": [130]
+      "genres": [
+        "Simulator"
+      ],
+      "platformIds": [
+        130
+      ]
     },
     {
       "id": 143613,
@@ -67,8 +120,14 @@
       "releaseYear": 2022,
       "coverImageId": "co59x3",
       "summary": "Enter the Splatlands, a sun-scorched desert inhabited by battle-hardened Inklings and Octolings. Splatsville, the city of chaos, is the adrenaline-fueled heart of this dusty wasteland. Even in this desolate environment, Turf War reigns supreme and battles rage in new stages located in the surrounding wilds. Dynamic new moves help these fighters dodge attacks and cover more ground, along with a new bow-shaped weapon to sling ink.",
-      "genres": ["Shooter", "Platform"],
-      "platformIds": [508, 130]
+      "genres": [
+        "Shooter",
+        "Platform"
+      ],
+      "platformIds": [
+        508,
+        130
+      ]
     },
     {
       "id": 134014,
@@ -76,8 +135,13 @@
       "releaseYear": 2006,
       "coverImageId": "co3w1h",
       "summary": "The Legend of Zelda: Twilight Princess was initially developed with the Nintendo GameCube in mind, but ended up receiving a Wii port when it was released to promote the new console. This version has motion control compatibility for the sword and pointer controls for the menus, the bow and the boomerang. This version of the game has a completely inverted map and locations when comparing with the GameCube release. The change in layout was meant to adapt Link's usually left-handed design to right-handed people, given the motion controls.",
-      "genres": ["Puzzle", "Adventure"],
-      "platformIds": [5]
+      "genres": [
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        5
+      ]
     },
     {
       "id": 1533,
@@ -85,161 +149,69 @@
       "releaseYear": 2006,
       "coverImageId": "co1pn3",
       "summary": "Daxter is a platformer developed by Ready at Dawn and published by Sony Computer Entertainment. Released in 2006 for the PlayStation Portable (PSP), it serves as a midquel set between Jak II and Jak 3 from the Jak and Daxter series.\n\nThe game follows Daxter, a comical ottsel, as he works as a pest exterminator in Haven City while searching for his captured friend, Jak. Gameplay focuses on platforming, combat, and gadget-based puzzles, with Daxter using unique tools like a bug swatter and spray gun to defeat enemies. It features detailed environments, engaging minigames, and the series' signature humor.",
-      "genres": ["Platform", "Adventure"],
-      "platformIds": [38]
+      "genres": [
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        38
+      ]
     },
     {
-      "id": 1942,
-      "name": "The Witcher 3: Wild Hunt",
-      "releaseYear": 2015,
-      "coverImageId": "coaarl",
-      "summary": "The Witcher 3: Wild Hunt is an open-world action role-playing game developed by CD Projekt Red.\n\nSet in a dark fantasy world, the game follows Geralt of Rivia, a monster hunter searching for his adopted daughter, Ciri, while navigating political conflicts and supernatural threats. Gameplay features exploration, combat, character progression, and branching narratives shaped by player choices. Widely acclaimed for its writing, world-building, and depth, it is considered one of the most influential RPGs of its generation.",
-      "genres": ["Role-playing (RPG)", "Adventure"],
-      "platformIds": [169, 48, 508, 6, 167, 49, 130]
+      "id": 175964,
+      "name": "Super Mario 64 2",
+      "summary": "Super Mario 64 2 was the tentative title for a Mario game in development that served as the direct sequel to Super Mario 64, intended for release in 1999. It was going to be for the Nintendo 64DD, but was canceled early in production due to lack of progress and the commercial failure of the 64DD add-on. Only one demo level was ever made but was never publicly revealed. It is also possible that Super Mario Sunshine, Super Mario Galaxy, or Super Mario Galaxy 2 could have elements salvaged from the development of Super Mario 64 2, according to Nintendo during an E3 event. Luigi was also set to appear in this game, as was a rideable Yoshi. It can be assumed that Luigi would have been playable, as Shigeru Miyamoto had planned to make Super Mario 64 2 multiplayer – in fact, the first playable demo level was multiplayer.",
+      "genres": [
+        "Platform"
+      ],
+      "platformIds": [
+        4,
+        416
+      ]
     },
     {
-      "id": 72,
-      "name": "Portal 2",
-      "releaseYear": 2011,
-      "coverImageId": "co1rs4",
-      "summary": "Sequel to the acclaimed Portal (2007), Portal 2 pits the protagonist of the original game, Chell, and her new robot friend, Wheatley, against more puzzles conceived by GLaDOS, an A.I. with the sole purpose of testing the Portal Gun's mechanics and taking revenge on Chell for the events of Portal. As a result of several interactions and revelations, Chell once again pushes to escape Aperture Science Labs.",
-      "genres": ["Platform", "Puzzle", "Adventure"],
-      "platformIds": [9, 3, 6, 14, 12, 130]
+      "id": 974,
+      "name": "Resident Evil 4",
+      "releaseYear": 2005,
+      "coverImageId": "co2wk8",
+      "summary": "Resident Evil 4 is the sixth installment in the Resident Evil series and is often noted for its departure from the fixed camera angles of earlier titles. It introduced an over-the-shoulder third-person perspective, faster-paced gunplay, and more dynamic controls. The game features larger, more open environments and a new AI system that enables enemies to coordinate attacks and attempt to corner the player. Enemies exhibit more human-like behavior, such as climbing ladders, opening doors, and using weapons.",
+      "genres": [
+        "Shooter",
+        "Adventure"
+      ],
+      "platformIds": [
+        21
+      ]
     },
     {
-      "id": 71,
-      "name": "Portal",
-      "releaseYear": 2007,
-      "coverImageId": "coay61",
-      "summary": "Waking up in a seemingly empty laboratory, the player is made to complete various physics-based puzzle challenges through numerous test chambers in order to test out the new Aperture Science Handheld Portal Device, without an explanation as to how, why or by whom.",
-      "genres": ["Platform", "Puzzle", "Adventure"],
-      "platformIds": [9, 3, 34, 6, 14, 12, 130]
+      "id": 1105,
+      "name": "Metroid Prime",
+      "releaseYear": 2002,
+      "coverImageId": "co3w4w",
+      "summary": "A 3D exploration-focused metroidvania with first-person shooting mechanics and the first 3D entry in the Metroid series, Metroid Prime follows Samus Aran after the events of Metroid (1986) as she boards a Space Pirate frigate, then chases her escaping archrival Ridley into the intricately structured Tallon IV, a planet full of deadly wildlife and former home to the advanced and ancient Chozo race.",
+      "genres": [
+        "Shooter",
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        21
+      ]
     },
     {
-      "id": 7346,
-      "name": "The Legend of Zelda: Breath of the Wild",
-      "releaseYear": 2017,
-      "coverImageId": "co3p2d",
-      "summary": "The Legend of Zelda: Breath of the Wild is the first 3D open-world game in the Zelda series. Link can travel anywhere and be equipped with weapons and armor found throughout the world to grant him various bonuses. Unlike many games in the series, Breath of the Wild does not impose a specific order in which quests or dungeons must be completed. While the game still has environmental obstacles such as weather effects, inhospitable lands, or powerful enemies, many of them can be overcome using the right method. A lot of critics ranked Breath of the Wild as one of the best video games of all time.",
-      "genres": ["Puzzle", "Adventure"],
-      "platformIds": [41, 130]
-    },
-    {
-      "id": 501,
-      "name": "Batman: Arkham City",
-      "releaseYear": 2011,
-      "coverImageId": "co1voh",
-      "summary": "Batman: Arkham City builds upon the intense, atmospheric foundation of Batman: Arkham Asylum, sending players soaring into Arkham City, the new maximum security \"home\" for all of Gotham City's thugs, gangsters and insane criminal masterminds.\n\nSet inside the heavily fortified walls of a sprawling district in the heart of Gotham City, this highly anticipated sequel introduces a brand-new story that draws together a new all-star cast of classic characters and murderous villains from the Batman universe, as well as a vast range of new and enhanced gameplay features to deliver the ultimate experience as the Dark Knight.",
-      "genres": ["Hack and slash/Beat 'em up", "Adventure"],
-      "platformIds": [113, 9, 6, 12, 130]
-    },
-    {
-      "id": 500,
-      "name": "Batman: Arkham Asylum",
-      "releaseYear": 2009,
-      "coverImageId": "co1voj",
-      "summary": "Batman: Arkham Asylum is an action-adventure game developed by Rocksteady Studios and published by Warner Bros. Interactive Entertainment. Released in 2009, it follows Batman as he battles the Joker, who seizes control of Arkham Asylum and frees its inmates. The game features stealth, combat, and detective elements, with players using Batman's gadgets and skills to subdue enemies and solve puzzles.\n\nSet in a dark, immersive version of Gotham, the story explores Batman’s psychological battle with his foes, including Harley Quinn, Bane, and Scarecrow. The game received critical acclaim for its gameplay, atmosphere, and storytelling, becoming a defining title in superhero video games.",
-      "genres": ["Hack and slash/Beat 'em up", "Adventure"],
-      "platformIds": [9, 72, 6, 14, 12, 130]
-    },
-    {
-      "id": 14593,
-      "name": "Hollow Knight",
-      "releaseYear": 2017,
-      "coverImageId": "cobfzp",
-      "summary": "A 2D metroidvania with an emphasis on close combat and exploration in which the player enters the once-prosperous now-bleak insect kingdom of Hallownest, travels through its various districts, meets friendly inhabitants, fights hostile ones and uncovers the kingdom's history while improving their combat abilities and movement arsenal by fighting bosses and accessing out-of-the-way areas.",
-      "genres": ["Platform", "Adventure", "Indie"],
-      "platformIds": [169, 48, 3, 508, 6, 167, 14, 41, 49, 130]
-    },
-    {
-      "id": 12517,
-      "name": "Undertale",
-      "releaseYear": 2015,
-      "coverImageId": "cob1t2",
-      "summary": "A small child falls into the Underground, where monsters have long been banished by humans and are hunting every human that they find. The player controls the child as they try to make it back to the Surface through hostile environments, all the while engaging with a turn-based combat system with puzzle-solving and bullet hell elements, as well as other unconventional game mechanics.",
-      "genres": ["Puzzle", "Role-playing (RPG)", "Adventure", "Indie"],
-      "platformIds": [48, 3, 6, 14, 46, 49, 130]
-    },
-    {
-      "id": 26758,
-      "name": "Super Mario Odyssey",
-      "releaseYear": 2017,
-      "coverImageId": "co1mxf",
-      "summary": "Explore incredible places far from the Mushroom Kingdom as you join Mario and his new ally Cappy on a massive, globe-trotting 3D adventure. Use amazing new abilities, like the power to capture and control objects, animals, and enemies to collect Power Moons so you can power up the Odyssey airship and save Princess Peach from Bowser’s wedding plans!",
-      "genres": ["Platform", "Adventure"],
-      "platformIds": [508, 130]
-    },
-    {
-      "id": 1011,
-      "name": "Borderlands 2",
-      "releaseYear": 2012,
-      "coverImageId": "co9ba3",
-      "summary": "A new era of shoot and loot is about to begin. Play as one of four new vault hunters facing off against a massive new world of creatures, psychos and the evil mastermind, Handsome Jack. Make new friends, arm them with a bazillion weapons and fight alongside them in 4 player co-op on a relentless quest for revenge and redemption across the undiscovered and unpredictable living planet.",
-      "genres": ["Shooter", "Role-playing (RPG)"],
-      "platformIds": [9, 48, 3, 34, 6, 14, 46, 12, 49, 130]
-    },
-    {
-      "id": 17000,
-      "name": "Stardew Valley",
-      "releaseYear": 2016,
-      "coverImageId": "coa93h",
-      "summary": "Stardew Valley is an open-ended country-life RPG! You’ve inherited your grandfather’s old farm plot in Stardew Valley. Armed with hand-me-down tools and a few coins, you set out to begin your new life. Can you learn to live off the land and turn these overgrown fields into a thriving home? It won’t be easy. Ever since Joja Corporation came to town, the old ways of life have all but disappeared. The community center, once the town’s most vibrant hub of activity, now lies in shambles. But the valley seems full of opportunity. With a little dedication, you might just be the one to restore Stardew Valley to greatness!",
-      "genres": ["Role-playing (RPG)", "Simulator", "Strategy", "Adventure", "Indie"],
-      "platformIds": [48, 3, 508, 34, 6, 39, 14, 41, 46, 49, 130]
-    },
-    {
-      "id": 1970,
-      "name": "Assassin's Creed IV Black Flag",
-      "releaseYear": 2013,
-      "coverImageId": "co4qfn",
-      "summary": "Assassin’s Creed IV Black Flag begins in 1715, when pirates established a lawless republic in the Caribbean and ruled the land and seas. These outlaws paralyzed navies, halted international trade, and plundered vast fortunes. They threatened the power structures that ruled Europe, inspired the imaginations of millions, and left a legacy that still endures.",
-      "genres": ["Adventure"],
-      "platformIds": [170, 9, 48, 6, 41, 12, 49, 130]
-    },
-    {
-      "id": 113112,
-      "name": "Hades",
-      "releaseYear": 2020,
-      "coverImageId": "cob9kr",
-      "summary": "A rogue-lite hack and slash dungeon crawler in which Zagreus, son of Hades the Greek god of the dead, attempts to escape his home and his oppressive father by fighting the souls of the dead through the various layers of the ever-shifting underworld, while getting to know and forging relationships with its inhabitants.",
-      "genres": ["Role-playing (RPG)", "Hack and slash/Beat 'em up", "Adventure", "Indie"],
-      "platformIds": [169, 48, 6, 39, 167, 14, 49, 130]
-    },
-    {
-      "id": 1871,
-      "name": "The Walking Dead",
-      "releaseYear": 2012,
-      "coverImageId": "co2j1g",
-      "summary": "The Walking Dead: Season One (also known as The Walking Dead: The Game) is an episodic interactive drama graphic adventure video game developed and published by Telltale Games. Based on Robert Kirkman's The Walking Dead comic book series, the game consists of five episodes, released between April and November 2012. It is available for Android, iOS, Kindle Fire HDX, Microsoft Windows, Mac OS X, PlayStation 3, PlayStation Vita, Xbox 360, PlayStation 4 and Xbox One. The game is the first of The Walking Dead video game series published by Telltale.",
-      "genres": ["Point-and-click", "Puzzle", "Adventure"],
-      "platformIds": [9, 48, 3, 34, 6, 39, 14, 46, 12, 49, 130]
-    },
-    {
-      "id": 2155,
-      "name": "Dark Souls",
-      "releaseYear": 2011,
-      "coverImageId": "co1x78",
-      "summary": "Dark Souls is an action role-playing game developed by FromSoftware and published by Bandai Namco Entertainment. Released in September 2011 as a spiritual sequel to Demon's Souls, it is set in a dark, medieval fantasy world. It is renowned for its challenging gameplay, intricate level design, and deep lore. Players control a customizable character known as the Chosen Undead, embarking on a perilous journey to uncover the secrets of the cursed land of Lordran.\n\nDark Souls is known for its punishing difficulty, requiring players to carefully manage combat, stamina, and resources while navigating hostile environments filled with dangerous enemies and formidable bosses. The game features a unique multiplayer component, allowing players to leave messages for others, summon allies for cooperative play, or invade other players' worlds for PvP combat.\n\nThe original release of Dark Souls received critical acclaim for its atmospheric world, innovative mechanics, and rewarding gameplay, solidifying its place as a seminal title in the action RPG genre.",
-      "genres": ["Role-playing (RPG)", "Adventure"],
-      "platformIds": [9, 48, 6, 12, 49, 130]
-    },
-    {
-      "id": 1331,
-      "name": "Limbo",
-      "releaseYear": 2010,
-      "coverImageId": "co1qrs",
-      "summary": "Limbo is a black and white puzzle-platforming adventure. Players take the role of a young boy traveling through an eerie and treacherous world in an attempt to discover the fate of his sister.",
-      "genres": ["Platform", "Puzzle", "Adventure", "Indie"],
-      "platformIds": [9, 48, 3, 34, 6, 39, 14, 46, 12, 49, 130]
-    },
-    {
-      "id": 7344,
-      "name": "Ori and the Blind Forest",
-      "releaseYear": 2015,
-      "coverImageId": "co1y41",
-      "summary": "The forest of Nibel is dying. After a powerful storm sets a series of devastating events in motion, an unlikely hero must journey to find his courage and confront a dark nemesis to save his home. Ori and the Blind Forest tells the tale of a young orphan destined for heroics, through a visually stunning action-platformer crafted by Moon Studios for Xbox One and PC. Featuring hand-painted artwork, meticulously animated character performance, and a fully orchestrated score, Ori and the Blind Forest explores a deeply emotional story about love and sacrifice, and the hope that exists in us all.",
-      "genres": ["Platform", "Puzzle", "Adventure"],
-      "platformIds": [6, 49, 130]
+      "id": 2207,
+      "name": "Shadow of the Colossus",
+      "releaseYear": 2005,
+      "coverImageId": "co1ozz",
+      "summary": "An open-world action/adventure game in which a young wanderer, along with a stolen magical sword and his steed companion, trespasses a cursed land, makes a deal with an ancient being to bring a sacrificial victim back to life, and sets off to fulfill his end of the bargain, which involves tracking down and infiltrating the abodes of sixteen colossi and sacrificing them to achieve his goal.",
+      "genres": [
+        "Platform",
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        8
+      ]
     },
     {
       "id": 1029,
@@ -247,8 +219,16 @@
       "releaseYear": 1998,
       "coverImageId": "co3nnx",
       "summary": "The Legend of Zelda: Ocarina of Time is the fifth main installment of The Legend of Zelda series and the first to be released for the Nintendo 64. It was one of the most highly anticipated games of its age, and is listed among the greatest video games ever created by numerous websites and magazines. The gameplay of Ocarina of Time was revolutionary for its time, it has arguably made more of an impact on later games in the series than any of its predecessors even though they had the same cores of exploration, dungeons, puzzles and item usage. Among the gameplay mechanics, one of the most noteworthy is the time-traveling system. The game begins with the player controlling the child Link, but later on an adult Link becomes a playable character as well and each of them has certain unique abilities. Ocarina of Time also introduces the use of music to solve puzzles: as new songs are learned, they can be used to solve puzzles, gain access to new areas and warp to different locations. Dungeon exploration is somewhat more puzzle-oriented than in earlier games but they are not too complex.",
-      "genres": ["Puzzle", "Adventure"],
-      "platformIds": [5, 4, 416, 41]
+      "genres": [
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        5,
+        4,
+        416,
+        41
+      ]
     },
     {
       "id": 1074,
@@ -256,80 +236,15 @@
       "releaseYear": 1996,
       "coverImageId": "co721v",
       "summary": "Mario is super in a whole new way! Combining the finest 3-D graphics ever developed for a video game and an explosive soundtrack, Super Mario 64 becomes a new standard for video games. It's packed with bruising battles, daunting obstacle courses, and underwater adventures. Retrieve the Power Stars from their hidden locations and confront your arch-nemesis— Bowser, King of the Koopas!\n\n• Run freely in a grassy meadow, tip-toe through a gloomy dungeon, climb to the top of a mountain, or take a swim in the moat!\n• Leap headfirst into a watery painting and soon you'll be searching for the surface in an underwater realm!\n• On-the-fly, 3-D rendered gameplay delivers the action of ruthless enemy attacks from every angle!\n• Find the Caps that give Mario super powers and ponder the mysteries of the pyramid; you can even race Koopas for fabulous prizes!\n• With the Nintendo 64 Controller and its analog\nControl Stick, Mario can crawl, kick down obstacles, swim, do reverse flips, and even stick the landing on his backwards somersault!\n• Saved game information is stored for up to four players in memory.",
-      "genres": ["Platform", "Adventure"],
-      "platformIds": [5, 4, 41]
-    },
-    {
-      "id": 1070,
-      "name": "Super Mario World",
-      "releaseYear": 1990,
-      "coverImageId": "co8lo8",
-      "summary": "A 2D platformer and first entry on the SNES in the Super Mario franchise, Super Mario World follows Mario as he attempts to defeat Bowser's underlings and rescue Princess Peach from his clutches. The game features a save system, a less linear world map, an expanded movement arsenal and numerous new items for Mario, alongside new approaches to level design and art direction.",
-      "genres": ["Platform", "Adventure"],
-      "platformIds": [52, 19, 5, 41, 137, 58]
-    },
-    {
-      "id": 1068,
-      "name": "Super Mario Bros. 3",
-      "releaseYear": 1988,
-      "coverImageId": "co7ozx",
-      "summary": "Super Mario Bros. 3, the third entry in the Super Mario Bros. series and Super Mario franchise, sees Mario or Luigi navigate a nonlinear world map containing platforming levels and optional minigames and challenges. The game features more diverse movement options and new items alongside more complex level designs and boss battles.",
-      "genres": ["Platform", "Adventure"],
-      "platformIds": [52, 37, 5, 99, 41, 18]
-    },
-    {
-      "id": 1026,
-      "name": "The Legend of Zelda: A Link to the Past",
-      "releaseYear": 1991,
-      "coverImageId": "co3vzn",
-      "summary": "Venture back to Hyrule and an age of magic and heroes. The predecessors of Link and Zelda face monsters on the march when a menacing magician takes over the kingdom. Only you can prevent his evil plot from shattering the land of Hyrule.\n\nIn your quest, you'll venture into twisting mazes, dungeons, palaces and shadowy forests. Test your mettle with mighty swords and magical weapons. Or heft a boulder and hurl it at your enemies. If the going gets tough, dive into a river - you can swim to escape! Learn powerful spells, locate magical artifacts and solve the mysteries of the evil magician and the hidden realm of Hyrule.",
-      "genres": ["Puzzle", "Adventure"],
-      "platformIds": [306, 19, 5, 41, 137, 58]
-    },
-    {
-      "id": 1802,
-      "name": "Chrono Trigger",
-      "releaseYear": 1995,
-      "coverImageId": "co3plw",
-      "summary": "In this turn-based Japanese RPG, young Crono must travel through time through a misfunctioning teleporter to rescue his misfortunate companion and take part in an intricate web of past and present perils. The adventure that ensues soon unveils an evil force set to destroy the world, triggering Crono's race against time to change the course of history and bring about a brighter future.",
-      "genres": ["Role-playing (RPG)"],
-      "platformIds": [306, 19, 5, 58]
-    },
-    {
-      "id": 358,
-      "name": "Super Mario Bros.",
-      "releaseYear": 1985,
-      "coverImageId": "co6pib",
-      "summary": "A side scrolling 2D platformer and first entry in the Super Mario franchise, Super Mario Bros. follows Italian plumber Mario as he treks across many levels of platforming challenges featuring hostile enemies to rescue Princess Peach from the evil king Bowser.",
-      "genres": ["Platform", "Adventure"],
-      "platformIds": [51, 52, 37, 5, 99, 41, 18]
-    },
-    {
-      "id": 1077,
-      "name": "Super Mario Galaxy",
-      "releaseYear": 2007,
-      "coverImageId": "co21ro",
-      "summary": "A 3D platformer and first Wii entry in the Super Mario franchise, Super Mario Galaxy sees Mario jump across planets and galaxies with varying items, enemies, geographies and gravity mechanics in order to reach his enemy Bowser, who has attacked the Mushroom Kingdom and hijacked Princess Peach's castle with her inside.",
-      "genres": ["Platform", "Adventure"],
-      "platformIds": [5, 41]
-    },
-    {
-      "id": 1103,
-      "name": "Super Metroid",
-      "releaseYear": 1994,
-      "coverImageId": "co5osy",
-      "summary": "The Space Pirates, merciless agents of the evil Mother Brain, have stolen the last Metroid from a research station, and once again Mother Brain threatens the safety of the galaxy! Samus Aran must don her awesome array of high-tech weaponry to retrieve the deadly Metroid hidden deep within the cave-riddled planet Zebes. Super Metroid features excellent graphics, with a huge variety of enemies and worlds to explore. The side-view action will be familiar to many players, only now there are new weapons and items, including the Grappling Beam, which allows Samus to swing across large chasms, and the X-Ray Scope, which reveals secret passages.",
-      "genres": ["Shooter", "Platform", "Adventure"],
-      "platformIds": [19, 5, 41, 137, 58]
-    },
-    {
-      "id": 1078,
-      "name": "Super Mario Galaxy 2",
-      "releaseYear": 2010,
-      "coverImageId": "co21tl",
-      "summary": "Super Mario Galaxy 2 is the sequel to Super Mario Galaxy and the fourth 3D platformer entry in the Mario franchise. The sequel retains many elements from its predecessor, such as the adventure being in outer space, the element of gravity, and recurring objects such as Launch Stars and Sling Stars. Returning items include the Bee Mushroom and the Fire Flower. However, the game introduces new elements as well, such as the utilization of Yoshi, new power-ups like the Cloud Flower, and the use of a guide within the game for beginner players.",
-      "genres": ["Platform", "Adventure"],
-      "platformIds": [5, 41]
+      "genres": [
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        5,
+        4,
+        41
+      ]
     },
     {
       "id": 1030,
@@ -337,53 +252,16 @@
       "releaseYear": 2000,
       "coverImageId": "co3pah",
       "summary": "The Legend of Zelda: Majora's Mask is a direct sequel to Ocarina of Time, it utilizes the same engine and visual style as its predecessor. The game retains the traditional elements of Zelda games as well as those introduced in Ocarina of Time, such as active blocking with a shield, various throwing items, and the usage of melodies played on the ocarina to solve puzzles. Compared to the previous Zelda games, this installment is more oriented towards interaction with NPCs and has a larger variety of items, optional quests, and mini-games. It also includes a time system that spans three days, and this cycle must be reset periodically to progress through the game.",
-      "genres": ["Puzzle", "Adventure"],
-      "platformIds": [5, 4, 416, 41]
-    },
-    {
-      "id": 885,
-      "name": "Super Meat Boy",
-      "releaseYear": 2010,
-      "coverImageId": "co276m",
-      "summary": "Super Meat Boy is a platform game in which players control Meat Boy, a small, dark red, cube-shaped character who must rescue his girlfriend Bandage Girl from the scientist Dr. Fetus. The game is divided into chapters containing over 300 levels, each requiring players to reach the end while avoiding saw blades, crumbling blocks, and other hazards. Players can jump, run on platforms, and slide down walls. Deaths are instant and levels restart immediately with unlimited attempts. Completing levels quickly unlocks harder alternate \"dark world\" versions, and hidden warp zones contain bonus stages. Additional playable characters with unique abilities can be unlocked through collectibles.",
-      "genres": ["Platform", "Adventure", "Indie"],
-      "platformIds": [48, 3, 5, 6, 14, 41, 46, 12, 130]
-    },
-    {
-      "id": 426,
-      "name": "Final Fantasy III",
-      "releaseYear": 1994,
-      "coverImageId": "coaq5k",
-      "summary": "Final Fantasy VI is the sixth main installment in the Final Fantasy series, developed and published by Square. It was the final title in the series to feature two-dimensional graphics, and the first story that did not revolve around crystals.\n\nThe game gives players up to fourteen playable characters, the largest cast in the series, and features the Active Time Battle pseudo-turn based menu command system. A party can consist of up to four characters, though some events require the player to assemble three different parties of up to four and switch between them.\n\nEach character has a unique command ability, such as Terra's Trance, Locke's Steal, Edgar's Tools or Sabin's Blitz, and can also learn Magic spells from earning AP from battles with magicite equipped. Each character's rare Desperation Attack will randomly activate after using the Attack command when at critical health.",
-      "genres": ["Role-playing (RPG)", "Adventure"],
-      "platformIds": [19, 5, 41, 137, 58]
-    },
-    {
-      "id": 1022,
-      "name": "The Legend of Zelda",
-      "releaseYear": 1986,
-      "coverImageId": "co1uii",
-      "summary": "The Legend of Zelda is the first title in the Zelda series, it has marked the history of video games particularly for it's game mechanics and universe. The player controls Link and must make his way through the forests, graveyards, plains and deserts of the Otherworld to find the secret entrances to the eight dungeons and try to restore the broken Triforce. Among the game's mechanics, it was the first time we saw a continuous world that could be freely explored, power-ups that permanently enhanced the main character's abilities and a battery save feature that allowed players to keep their progress instead of having to start over. The gameplay balanced action sequences with discovery, secrets and exploration.",
-      "genres": ["Adventure"],
-      "platformIds": [51, 37, 5, 99, 41, 18]
-    },
-    {
-      "id": 3192,
-      "name": "Sonic the Hedgehog",
-      "releaseYear": 1991,
-      "coverImageId": "coanlj",
-      "summary": "Sonic the Hedgehog is a 2D side-scrolling platformer developed by Sonic Team and published by Sega for the Genesis/Mega Drive. Players control Sonic the Hedgehog, who can run at near supersonic speeds and sets out on a quest to defeat Dr. Robotnik, a scientist who has imprisoned animals in robots and seeks the powerful Chaos Emeralds.",
-      "genres": ["Platform"],
-      "platformIds": [52, 9, 5, 29, 6, 39, 12]
-    },
-    {
-      "id": 4438,
-      "name": "Sonic the Hedgehog 2",
-      "releaseYear": 1992,
-      "coverImageId": "co5kkj",
-      "summary": "Sonic the Hedgehog 2 is a side-scrolling platform game and the sequel to the original Sonic the Hedgehog. Players control Sonic as he traverses larger, faster-paced levels across West Side Island, collecting rings, defeating robot enemies, and pursuing Doctor Robotnik. The game introduces Sonic's sidekick Miles \"Tails\" Prower, a two-tailed fox who can be controlled by a second player. It also adds the spin dash move, a competitive split-screen multiplayer mode, and pseudo-3D special stages in which players collect rings to earn Chaos Emeralds.",
-      "genres": ["Platform"],
-      "platformIds": [9, 37, 5, 29, 6, 41, 12]
+      "genres": [
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        5,
+        4,
+        416,
+        41
+      ]
     },
     {
       "id": 2342,
@@ -391,116 +269,15 @@
       "releaseYear": 1996,
       "coverImageId": "co67hm",
       "summary": "Mario Kart 64 is the second main installment of the Mario Kart series. It is the first game in the series to use three-dimensional graphics, however, the characters and items in this game are still two-dimensional, pre-rendered sprites. The game offers two camera angles and three engine sizes: 50cc, 100cc and 150cc. Each kart has distinctive handling, acceleration and top speed capabilities. Shells that you fire at rival racers, Bananas that make them skid out and Lightning Bolts that make them small and very slow are just a few of the game's unique power-ups.",
-      "genres": ["Racing", "Arcade"],
-      "platformIds": [5, 4, 41]
-    },
-    {
-      "id": 1090,
-      "name": "Donkey Kong Country",
-      "releaseYear": 1994,
-      "coverImageId": "co70qn",
-      "summary": "Donkey Kong Country is a side scrolling platformer by British developers Rare in 1994. It featured revolutionary pre-rendered 3D graphics that give the game a very unique look compared to most other games on consoles at the time. The two playable characters featured in the game are the titular character, Donkey Kong and his nephew, Diddy Kong. Together the two swing, climb, jump, swim, cartwheel, ride animals, and blast out of barrels on their way to recover their stolen bannanas from the evil King K. Rool and his Kremling army. The adventure takes you through a variety of different environments and levels that continually change up gameplay. Donkey Kong Country also provides plenty of opportunities for exploration with almost every level having a multitude of collectible, shortcuts, and hidden bonus areas.",
-      "genres": ["Platform"],
-      "platformIds": [19, 5, 41, 137, 58]
-    },
-    {
-      "id": 375,
-      "name": "Metal Gear Solid",
-      "releaseYear": 1998,
-      "coverImageId": "cobpak",
-      "summary": "Metal Gear Solid is a stealth game created by Hideo Kojima which follows the MSX2 video games Metal Gear and Metal Gear 2: Solid Snake. Despite a transition to 3D, Metal Gear Solid's gameplay remains similar to his predecessors. The game utilizes a traditional top-down view and the player must navigate the protagonist Solid Snake through the game's areas without being detected. Detection will set off an alarm which draws armed enemies to his location. Conversations with Snake's allies and cutscenes are used extensively to advance the plot and gain more insight into it. Metal Gear Solid is regarded as one of the greatest and most important video games of all time, and helped popularize the stealth genre and in-engine cinematic cutscenes.",
-      "genres": ["Shooter", "Tactical", "Adventure"],
-      "platformIds": [9, 7, 38]
-    },
-    {
-      "id": 427,
-      "name": "Final Fantasy VII",
-      "releaseYear": 1997,
-      "coverImageId": "co2kx2",
-      "summary": "The Western release of Final Fantasy VII (released as Final Fantasy VII International in Japan) included additional elements and alterations, such as streamlining of the menu and Materia system, reducing the health of enemies, new visual cues to help with navigation across the world map, and additional cutscenes relating to Cloud's past.",
-      "genres": ["Role-playing (RPG)", "Adventure"],
-      "platformIds": [9, 7, 38]
-    },
-    {
-      "id": 421,
-      "name": "Final Fantasy IX",
-      "releaseYear": 2000,
-      "coverImageId": "co2unc",
-      "summary": "Final Fantasy IX is the ninth main installment in the FF series. The title is a return to the series's roots, with gameplay features and references to the past games featuring throughout, as well as a medieval fantasy setting and cartoonish art style as a break from the sci-fi slant style of Final Fantasy VII and Final Fantasy VIII.",
-      "genres": ["Role-playing (RPG)", "Adventure"],
-      "platformIds": [9, 7, 38]
-    },
-    {
-      "id": 1128,
-      "name": "Castlevania: Symphony of the Night",
-      "releaseYear": 1997,
-      "coverImageId": "co53m8",
-      "summary": "Having been awoken from his eternal slumber by the reappearance of Castlevania, Alucard must once again face the evil minions of darkness. Use your vampiric powers, along with weapons, potions, and other magical relics to change the tide of battle.\n\nA mixture of platform and role-playing action with many hidden areas and secrets. Can you discover them all?",
-      "genres": ["Platform", "Role-playing (RPG)", "Adventure"],
-      "platformIds": [9, 32, 7, 38, 12]
-    },
-    {
-      "id": 142,
-      "name": "Star Wars: Battlefront II",
-      "releaseYear": 2005,
-      "coverImageId": "cob1g4",
-      "summary": "Star Wars: Battlefront II is the sequel to Star Wars: Battlefront. It is a high-selling Star Wars video game following the many adventures of several characters. The two games are very similar, as both revolve around troopers from various factions fighting in different locales. Battlefront II, however, includes elements and missions from Star Wars: Episode III Revenge of the Sith, as well as enhanced aspects of gameplay including space combat and the ability to play as Jedi characters or other heroes.\n\nWith brand new space combat, playable Jedi characters, and over 16 all new battlefronts, Star Wars Battlefront II gives you more ways than ever before to play the classic Star Wars battles any way you want.",
-      "genres": ["Shooter"],
-      "platformIds": [11, 6, 38, 8]
-    },
-    {
-      "id": 1185,
-      "name": "Crash Bandicoot",
-      "releaseYear": 1996,
-      "coverImageId": "co555l",
-      "summary": "Crash Bandicoot is the first installment in the Crash Bandicoot series that established Naughty Dog's reputation in the video game industry. Its premises chronicle the creation of the titular Crash, a bandicoot who has been uplifted by the mad scientist Doctor Neo Cortex. The goal of Crash Bandicoot is to traverse several levels in sequence in order to progress. The game is played from a third-person perspective in which the camera trails behind Crash, though some levels showcase forward-scrolling and side-scrolling perspectives. Crash is able to defeat enemies by either jumping on them or using a spinning attack that launches them.",
-      "genres": ["Platform"],
-      "platformIds": [9, 34, 7, 38]
-    },
-    {
-      "id": 880,
-      "name": "Resident Evil 2",
-      "releaseYear": 1998,
-      "coverImageId": "co2vz0",
-      "summary": "Resident Evil 2 is a sequel to the first Resident Evil title. Like the previous game in the series, Resident Evil 2 is a 3D action-adventure using three-dimensional polygon characters over two-dimensional pre-rendered backgrounds, with the action viewed through a variety of cinematic fixed camera angles in each room. Players can choose to play as one of two possible characters; each goes through the same initial scenario but with differences in the type of weaponry they find and the people they meet along the way.",
-      "genres": ["Shooter", "Puzzle", "Adventure"],
-      "platformIds": [9, 21, 6, 7, 38, 23]
-    },
-    {
-      "id": 480,
-      "name": "Silent Hill",
-      "releaseYear": 1999,
-      "coverImageId": "co2vye",
-      "summary": "Silent Hill is the first installment in the Silent Hill series of psychological survival horror video games. Unlike earlier survival horror games that focused on protagonists with combat training, the main character Harry Mason is an average man. The gameplay consists of combat, exploration, and puzzle-solving. The controller vibration is used to indicate Harry's heartbeat and will vibrate on low health. The player must regularly enter an inventory screen to check Harry's health, use items, and equip different weapons.",
-      "genres": ["Puzzle", "Adventure"],
-      "platformIds": [9, 7, 38]
-    },
-    {
-      "id": 1187,
-      "name": "Crash Bandicoot: Warped",
-      "releaseYear": 1998,
-      "coverImageId": "co873w",
-      "summary": "Crash Bandicoot: Warped is the third game in the Crash Bandicoot series and the first to feature Coco as a playable character. The player takes control of Crash and Coco Bandicoot, who must travel back and forward in time and gather 25 crystals before Uka Uka and Doctor Neo Cortex can do so. Much of the game takes place in the Time Twister which acts as the hub area of the game. The Time-Twister is split up into five chambers, each chamber has five buttons that open portals to different levels. The goal in each level is to find and obtain the crystal hidden in the level. Crash Bandicoot: Warped was lauded by critics in many areas, and the game has been considered one of the best video games of all time.",
-      "genres": ["Platform", "Adventure"],
-      "platformIds": [9, 7, 38]
-    },
-    {
-      "id": 1186,
-      "name": "Crash Bandicoot 2: Cortex Strikes Back",
-      "releaseYear": 1997,
-      "coverImageId": "co82vt",
-      "summary": "Crash Bandicoot 2: Cortex Strikes Back is the second game in the Crash Bandicoot series, and the sequel to the original game. The gameplay is largely similar to that of the original, as players make their way through a limited environment whilst breaking crates that contains bonuses. The goal of the game is to gather 25 crystals for Crash's nemesis, Doctor Neo Cortex. The crystals are scattered between 25 different levels accessible via Warp Rooms, which are hub areas of the game. A level is cleared by collecting its respective crystal and reaching the end of its path, which returns Crash to the Warp Room.",
-      "genres": ["Platform", "Adventure"],
-      "platformIds": [9, 34, 7, 38]
-    },
-    {
-      "id": 425,
-      "name": "Final Fantasy VIII",
-      "releaseYear": 1999,
-      "coverImageId": "co2z7d",
-      "summary": "Final Fantasy VIII is the eighth main installment in the Final Fantasy series. The gameplay makes a departure from many series standards. While it still uses the Active Time Battle system, it deviates from the series' traditional means of boosting a character's power via leveling, although levels are not completely abandoned as they were in Final Fantasy II. In addition, it does not have a Magic Point-based system for spell-casting. Instead, magic is collected, drawn, and created from items, and is used to power up the characters via the junction system.",
-      "genres": ["Role-playing (RPG)", "Adventure", "Card \u0026 Board Game"],
-      "platformIds": [9, 7, 38]
+      "genres": [
+        "Racing",
+        "Arcade"
+      ],
+      "platformIds": [
+        5,
+        4,
+        41
+      ]
     },
     {
       "id": 980,
@@ -508,8 +285,19 @@
       "releaseYear": 1997,
       "coverImageId": "co2lb0",
       "summary": "Grand Theft Auto is the first game in the Grand Theft Auto series and a sandbox-crime game published by Rockstar Games.\n\nThe original Grand Theft Auto is made up of a series of levels each set in one of the three cities in the game. In each level, the player has a target number of points to achieve, and five lives to attain the score.\n\nThe score counter doubles as a money meter; the player can spend this money on paint jobs and various other things. However, any money spent is of course taken away from the score, making the goal that little bit further away.\n\nOn obtaining the target number of points, the player must then drive to a certain location to complete the level, which allows progress to the next one.",
-      "genres": ["Shooter", "Racing", "Adventure"],
-      "platformIds": [9, 4, 6, 13, 7, 38]
+      "genres": [
+        "Shooter",
+        "Racing",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        4,
+        6,
+        13,
+        7,
+        38
+      ]
     },
     {
       "id": 912,
@@ -517,44 +305,65 @@
       "releaseYear": 1996,
       "coverImageId": "co3hfx",
       "summary": "Tomb Raider is a 3D action game developed by Core Design and published by Eidos Interactive. The game follows the exploits of Lara Croft, a British female archaeologist in search of ancient treasures.\n\nThe objective of Tomb Raider is to guide Lara through a series of tombs and other locations in search of treasures and artifacts. On the way, she must kill dangerous animals and other creatures, while collecting objects and solving puzzles to gain access to an ultimate prize, usually a powerful artifact.\n\nThe game was critically acclaimed and widely influential, it spawned a number of sequels and a franchise of related media.",
-      "genres": ["Shooter", "Platform", "Puzzle", "Adventure"],
-      "platformIds": [405, 9, 4, 6, 13, 32, 7, 38]
+      "genres": [
+        "Shooter",
+        "Platform",
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        405,
+        9,
+        4,
+        6,
+        13,
+        32,
+        7,
+        38
+      ]
     },
     {
-      "id": 966,
-      "name": "Resident Evil 3: Nemesis",
+      "id": 1626,
+      "name": "Super Smash Bros.",
       "releaseYear": 1999,
-      "coverImageId": "co2vvb",
-      "summary": "Resident Evil 3: Nemesis is a survival horror video game and the third instalment in the Resident Evil series. Like its two predecessors, it is a third-person action-adventure game with polygonal characters on pre-rendered backgrounds with cinematic camera angles. Although the game uses the same basic engine and gameplay as the previous games, the gameplay is improved by features such as auto-targeting, a 180-degree spin, and a new dodge move that allows Jill to avoid enemy attacks. The PC and Dreamcast versions include all eight of Jill's possible costumes, as well as the mercenary mini-game Operation Mad Jackal, which allows players to play as one of the three Umbrella soldiers. On the PlayStation version, these special features must be unlocked by beating the game with a high score.",
-      "genres": ["Shooter", "Puzzle", "Adventure"],
-      "platformIds": [9, 21, 6, 7, 38, 23]
+      "coverImageId": "co2tso",
+      "summary": "Super Smash Bros. is a crossover fighting video game between several different Nintendo franchises, and the first installment in the Super Smash Bros. series. Players must defeat their opponents multiple times in a fighting frenzy of items and power-ups. Super Smash Bros. is a departure from the general genre of fighting games: instead of depleting an opponent's life bar, the players seek to knock opposing characters off a stage. Each player has a damage total, represented by a percentage, which rises as the damage is taken.",
+      "genres": [
+        "Fighting",
+        "Platform"
+      ],
+      "platformIds": [
+        5,
+        4
+      ]
     },
     {
-      "id": 1192,
-      "name": "Crash Team Racing",
-      "releaseYear": 1999,
-      "coverImageId": "co7r52",
-      "summary": "Crash Team Racing is a kart racing game featuring popular characters from the Crash Bandicoot series. The gameplay is very similar to other kart racing video games like Mario Kart: players have to choose a character and compete against the other racers on various racetracks. The story mode allows you to choose any one of the characters to complete all the main races and beat the ultimate boss Nitrous Oxide. Each of the main races are against 7 other AI competitors with 5 boss races. There are also a few arcade modes up to 4 players.",
-      "genres": ["Racing"],
-      "platformIds": [9, 7, 38]
+      "id": 1638,
+      "name": "GoldenEye 007",
+      "releaseYear": 1997,
+      "coverImageId": "cocckw",
+      "summary": "GoldenEye 007 is a first-person shooter based on the 1995 James Bond film. The game features a single-player campaign with 20 missions across multiple difficulty levels, emphasizing stealth, varied objectives and mission-based progression. Players can use a range of weapons and gadgets while navigating diverse environments inspired by the movie.\n\nThe local split-screen multiplayer mode supports up to four players and offers competitive scenarios such as deathmatch, team modes and character selection from the James Bond universe. The multiplayer component became widely recognized for its influence on console FPS design and is considered a landmark feature of the game.",
+      "genres": [
+        "Shooter"
+      ],
+      "platformIds": [
+        4
+      ]
     },
     {
-      "id": 295,
-      "name": "Command \u0026 Conquer: Red Alert",
-      "releaseYear": 1996,
-      "coverImageId": "cocp4c",
-      "summary": "Travel to an alternate universe where dark experiments have permanently altered time. Or have they? Soviet tanks crush city after city while Allied cruisers shell bases. Spies lurk, landmines await, and strange new technologies aid both sides in the struggle for ultimate control. In this parallel reality, the mighty Soviet Empire has begun to “liberate” all of Europe. Cities fall and countries collapse before the overwhelming might of the Red Storm. The Allies are scrambling to meet the onslaught, but they have been caught by surprise. Red Alert puts the fate of the world in your hands!",
-      "genres": ["Real Time Strategy (RTS)", "Strategy"],
-      "platformIds": [9, 6, 13, 7, 38]
-    },
-    {
-      "id": 7842,
-      "name": "Danganronpa: Trigger Happy Havoc",
-      "releaseYear": 2010,
-      "coverImageId": "co1n1w",
-      "summary": "In Danganronpa, players dive into a series of class trials and expose the lies and contradictions of their classmates to find out who's behind each grisly murder. In each trial, players must use the evidence and testimony collected during their investigation to shoot down their opponent's assertions literally.",
-      "genres": ["Point-and-click", "Adventure", "Visual Novel"],
-      "platformIds": [3, 34, 6, 39, 14, 46, 38]
+      "id": 2148,
+      "name": "Banjo-Kazooie",
+      "releaseYear": 1998,
+      "coverImageId": "cobbr5",
+      "summary": "Trouble brews when Gruntilda the witch captures the unbearably beautiful cub, Tooty. But before the grisly hag can steal the bear's good looks, big brother Banjo and his fine-feathered friend, Kazooie, join forces to stop her. Combining their 24 moves and special powers, Banjo and Kazooie will fend off armies of beasts. Bear and bird must hunt down the 100 puzzle pieces and 900 musical notes that will ultimately lead them to Gruntilda. However. miles of swamp, desert, and snow and one bear of an adventure stand in their way.",
+      "genres": [
+        "Platform",
+        "Quiz/Trivia",
+        "Adventure"
+      ],
+      "platformIds": [
+        4
+      ]
     },
     {
       "id": 948,
@@ -562,8 +371,1258 @@
       "releaseYear": 1999,
       "coverImageId": "co1rkc",
       "summary": "Those intrepid invertebrates return with a vengeance in the much-loved Worms Armageddon. It’s a whole new can of worms! It’s hilarious fun that you can enjoy on your own or with all your friends.\n\nWorms Armageddon was originally developed as an expansion pack to Worms 2 and initially titled Wormageddon before it was released as a standalone game. Worms Armageddon was acclaimed by critics, who praised the refined gameplay and stylized graphics, and it has been featured in a number of \"greatest games of all time\" lists. Worms Armageddon is still updated periodically as of 2020, and was released on the Steam platform in 2013.",
-      "genres": ["Shooter", "Platform", "Strategy"],
-      "platformIds": [9, 4, 6, 7, 38, 23]
+      "genres": [
+        "Shooter",
+        "Platform",
+        "Strategy"
+      ],
+      "platformIds": [
+        9,
+        4,
+        6,
+        7,
+        38,
+        23
+      ]
+    },
+    {
+      "id": 647,
+      "name": "Command \u0026 Conquer",
+      "releaseYear": 1995,
+      "coverImageId": "co88m7",
+      "summary": "Experience the game that started it all! Enter a gritty, high-tech world and take advantage of electronic intelligence and covert surveillance to determine who reigns supreme. Join either the forces of the Global Defense Initiative (GDI) or the Brotherhood of Nod as you build bases, muster forces and dominate your enemies. All for the love of power. Play as the Brotherhood and obey the charismatic Kane’s every command or take control of GDI forces as they seek to save the world from Kane’s ambition. Gather Tiberium to produce tanks, infantry and more to decide the fate of the world.",
+      "genres": [
+        "Real Time Strategy (RTS)",
+        "Strategy"
+      ],
+      "platformIds": [
+        9,
+        4,
+        6,
+        14,
+        13,
+        32,
+        7,
+        38
+      ]
+    },
+    {
+      "id": 3603,
+      "name": "Spider-Man",
+      "releaseYear": 2000,
+      "coverImageId": "co2xxq",
+      "summary": "Spider-Man is an action-adventure game developed by Neversoft. Players control Spider-Man as he navigates levels using web-swinging, combat, and stealth mechanics. The story involves a conspiracy featuring villains such as Doctor Octopus and Venom.",
+      "genres": [
+        "Hack and slash/Beat 'em up",
+        "Adventure"
+      ],
+      "platformIds": [
+        4,
+        6,
+        14,
+        7,
+        23
+      ]
+    },
+    {
+      "id": 2289,
+      "name": "Pokémon Stadium",
+      "releaseYear": 1999,
+      "coverImageId": "co1yyd",
+      "summary": "In the game's Stadium Mode, one player competes in 80 different battles, divided into four tournaments. Beat the Stadium Mode and you're in for a bonus battle against the ultimate Pokémon warrior, Mewtwo, as well as a secret mode that gives you 80 brand-new, and devilishly tough battles. There is virtually no way you can beat the secret mode without having trained your own, elite Pokémon. One to four players compete against each other or the computer in a no-holds-barred battle with customizable rules. You can select rental Pokémon for these battles -- but that makes them much too predictable since their selection of techniques isn't determined by the trainer. You can also select quick and easy versus and random battles.",
+      "genres": [
+        "Role-playing (RPG)",
+        "Turn-based strategy (TBS)"
+      ],
+      "platformIds": [
+        4
+      ]
+    },
+    {
+      "id": 2591,
+      "name": "Star Fox 64",
+      "releaseYear": 1997,
+      "coverImageId": "cob8pu",
+      "summary": "The update to the 16-bit Super NES title continues the original's on-rails 3D shooting action on the Nintendo 64. Starring Fox McCloud, Peppy Hare, Falco Lombardi, and Slippy Toad, this new 64-bit version contains 15 plus levels, easy, medium, and difficult paths, forward-scrolling levels as well as full 3D realms, and a three-part multiplayer mode using a four-player split screen. In addition to plenty of Arwing action, the game introduces a new hover tank and even features a submarine level. The 8-megabyte cartridge also boasts voice samples from 23 different characters instead of the original's animal noises. Star Fox 64 was the first game to feature Rumble Pak support. A Rumble Pak bundle and standalone version of the game were sold. Released in Europe under the name Lylat Wars.",
+      "genres": [
+        "Shooter"
+      ],
+      "platformIds": [
+        5,
+        4,
+        41
+      ]
+    },
+    {
+      "id": 3340,
+      "name": "Paper Mario",
+      "releaseYear": 2000,
+      "coverImageId": "co1qda",
+      "summary": "Paper Mario, a turn-based JRPG entry in the Mario franchise with a paper-based aesthetic and platforming elements, sees the titular character working his way through the Mushroom Kingdom's diverse locales and biomes, meeting its inhabitants, fighthing unruly enemies and recruiting an array of companions in order to once again save Princess Peach from the clutches of the evil Koopa King Bowser.",
+      "genres": [
+        "Role-playing (RPG)",
+        "Adventure"
+      ],
+      "platformIds": [
+        5,
+        4,
+        41
+      ]
+    },
+    {
+      "id": 1627,
+      "name": "Super Smash Bros. Melee",
+      "releaseYear": 2001,
+      "coverImageId": "co21yv",
+      "summary": "A crossover platform fighting game featuring characters from Nintendo franchises including Mario, The Legend of Zelda, Star Fox, Pokémon, and Fire Emblem. Unlike traditional fighters, the goal is to knock opponents off the stage rather than deplete a health bar. Damage accumulates as a percentage, increasing the distance a character is launched when hit. Players use simple one-button inputs combined with joystick directions to execute moves. The game supports up to four players simultaneously and includes various single-player modes alongside its multiplayer focus. Its fast-paced, aggressive gameplay fostered a long-running competitive esports scene that persisted well beyond the game's original lifespan.",
+      "genres": [
+        "Fighting",
+        "Platform"
+      ],
+      "platformIds": [
+        21
+      ]
+    },
+    {
+      "id": 1033,
+      "name": "The Legend of Zelda: The Wind Waker",
+      "releaseYear": 2002,
+      "coverImageId": "co3ohz",
+      "summary": "The Legend of Zelda: The Wind Waker is the first Zelda game for the Nintendo GameCube and also the first in the series to employ cel-shading, a lighting and texturing technique that results in the game having a cartoon-like appearance. Like its predecessors, The Wind Waker is an action game with puzzle-solving and light role-playing elements. Basic gameplay mechanics are similar to those found in Ocarina of Time, but it differentiates itself with its massive Great Sea which must be explored using a boat named King of Red Lions.",
+      "genres": [
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        21
+      ]
+    },
+    {
+      "id": 97,
+      "name": "Need for Speed: Underground 2",
+      "releaseYear": 2004,
+      "coverImageId": "co209h",
+      "summary": "Need for Speed: Underground 2 is a street racing game and the first entry in the series to feature an open world environment. Set in the fictional city of Bayview, players drive freely between events while building their reputation through circuit, sprint, drift, drag, and Street X races, as well as outrun challenges and Underground Racing League tournaments. The game expands on its predecessor with broader vehicle customization options, a sponsorship system, and new race types. SUVs appear alongside the returning roster of tuner cars.",
+      "genres": [
+        "Racing"
+      ],
+      "platformIds": [
+        11,
+        21,
+        6,
+        8
+      ]
+    },
+    {
+      "id": 96,
+      "name": "Need for Speed: Underground",
+      "releaseYear": 2003,
+      "coverImageId": "co209g",
+      "summary": "Need for Speed: Underground is a 2003 racing video game and the seventh installment in the Need for Speed series. It rebooted the franchise, ignoring previous Need for Speed games that featured sports cars and exotics. Underground is the first game in the series to offer a career mode that features a comprehensive storyline, as well as a garage mode that allows players to fully customize their cars with a large variety of brand-name performance and visual upgrades.",
+      "genres": [
+        "Racing"
+      ],
+      "platformIds": [
+        11,
+        21,
+        6,
+        8
+      ]
+    },
+    {
+      "id": 836,
+      "name": "Prince of Persia: The Sands of Time",
+      "releaseYear": 2003,
+      "coverImageId": "co4t8l",
+      "summary": "Deceived by the treacherous Vizier, I was led to unleash the Sands of Time curse upon the Sultan's kingdom. With little but an ancient dagger and a devious princess to aid me, I must undo my fatal mistake. Mine is a fight for survival… not glory.\n\n• Reverse, accelerate, and slow time itself with the almighty Sands of Time.\n• Master the Prince's speed, agility, and ferocious fighting skills.\n• Explore and survive the vast kingdoms of medieval Persia.",
+      "genres": [
+        "Platform",
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        11,
+        21,
+        6,
+        8
+      ]
+    },
+    {
+      "id": 1036,
+      "name": "The Legend of Zelda: Twilight Princess",
+      "releaseYear": 2006,
+      "coverImageId": "co3mtv",
+      "summary": "The Legend of Zelda: Twilight Princess is the last Zelda game for GameCube, it was highly anticipated by many members of the gaming community and was regarded as finally fulfilling the dreams of those who wanted a much more realistic and mature game than the ones before. The art is similar to the naturalistic style of Ocarina of Time, rather than the cel-shaded look of The Wind Waker. The main adventure takes place in several provinces with dungeons and temples. New to this game is the ability for Link to transform into a Wolf when entering the Twilight. As a wolf, Link can use his senses to solve puzzles and get past obstacles, he can also dig holes to find hearts and rupees. Twilight Princess has received universal acclaim from reviewers and journalists, who cited it as the greatest Zelda game of all time.",
+      "genres": [
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        21
+      ]
+    },
+    {
+      "id": 880,
+      "name": "Resident Evil 2",
+      "releaseYear": 1998,
+      "coverImageId": "co2vz0",
+      "summary": "Resident Evil 2 is a sequel to the first Resident Evil title. Like the previous game in the series, Resident Evil 2 is a 3D action-adventure using three-dimensional polygon characters over two-dimensional pre-rendered backgrounds, with the action viewed through a variety of cinematic fixed camera angles in each room. Players can choose to play as one of two possible characters; each goes through the same initial scenario but with differences in the type of weaponry they find and the people they meet along the way.",
+      "genres": [
+        "Shooter",
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        21,
+        6,
+        7,
+        38,
+        23
+      ]
+    },
+    {
+      "id": 3349,
+      "name": "Paper Mario: The Thousand-Year Door",
+      "releaseYear": 2004,
+      "coverImageId": "co25us",
+      "summary": "Paper Mario: The Thousand-Year Door is a turn-based role-playing game and the second entry in the Paper Mario series, set in a world styled to look like paper. Players guide Mario through themed locations, solving puzzles and battling enemies in a timing-based combat system where well-timed button presses strengthen attacks and defense. Battles play out on a stage before an audience whose reactions can help or hinder the player, and Mario recruits a party of companions with unique skills while equipping badges that grant new abilities. Brief segments also let the player control Princess Peach and Bowser between chapters.",
+      "genres": [
+        "Role-playing (RPG)",
+        "Adventure"
+      ],
+      "platformIds": [
+        21
+      ]
+    },
+    {
+      "id": 837,
+      "name": "Prince of Persia: Warrior Within",
+      "releaseYear": 2004,
+      "coverImageId": "co9x1a",
+      "summary": "Prince of Persia: Warrior Within is a video game and sequel to Prince of Persia: The Sands of Time. It picks up where The Sands of Time left off, adding new features, specifically, options in combat. The Prince now has the ability to wield two weapons at a time as well as the ability to steal his enemies' weapons and throw them. The Prince's repertoire of combat moves has been expanded into varying strings that allow players to attack enemies with more complexity than was possible in the previous game. Warrior Within has a darker tone than its predecessor adding in the ability for the Prince to dispatch his enemies with various finishing moves. In addition to the rewind, slow-down, and speed-up powers from The Sands of Time, the Prince also has a new sand power: a circular \"wave\" of sand that knocks down all surrounding enemies as well as damaging them.",
+      "genres": [
+        "Platform",
+        "Hack and slash/Beat 'em up",
+        "Adventure"
+      ],
+      "platformIds": [
+        11,
+        21,
+        6,
+        39,
+        8
+      ]
+    },
+    {
+      "id": 1075,
+      "name": "Super Mario Sunshine",
+      "releaseYear": 2002,
+      "coverImageId": "cob8q1",
+      "summary": "Super Mario Sunshine is a Mario action-adventure 3D platformer. It follows Super Mario 64, and is the second 3D Mario platformer. Gameplay features a combination of action and puzzle solving, with numerous stages and multiple episodes to each stage, and plenty of hidden secrets and surprises. This game introduced many recurring characters and bosses in the Mario series, including Toadsworth, Bowser Jr., Petey Piranha, Gooper Blooper, Piantas, Nokis, Shadow Mario, and F.L.U.D.D. Super Mario Sunshine pays homage to Mario's Italian heritage and upbringing, with many of the locations in the game having Italian names and sometimes referencing Italian culture.",
+      "genres": [
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        21
+      ]
+    },
+    {
+      "id": 2437,
+      "name": "Prince of Persia: The Two Thrones",
+      "releaseYear": 2005,
+      "coverImageId": "co4ta0",
+      "summary": "Prince of Persia: The Two Thrones is an action-adventure game blending acrobatic platforming, puzzle-solving, and hack and slash combat, and the final chapter of the Sands of Time trilogy. Players guide the Prince through the city of Babylon, running along walls, leaping between platforms, avoiding traps, and using the time-controlling Dagger of Time in combat and to recover from mistakes. A new Speed Kill system rewards well-timed stealth strikes to take down enemies quickly, and the Prince can wield secondary weapons taken from foes. At points he transforms into the Dark Prince, an alter ego that fights with a bladed whip called the Daggertail while steadily draining health. It was later ported to PlayStation Portable and Wii under the title Prince of Persia: Rival Swords.",
+      "genres": [
+        "Platform",
+        "Hack and slash/Beat 'em up",
+        "Adventure"
+      ],
+      "platformIds": [
+        11,
+        21,
+        6,
+        14,
+        8
+      ]
+    },
+    {
+      "id": 966,
+      "name": "Resident Evil 3: Nemesis",
+      "releaseYear": 1999,
+      "coverImageId": "co2vvb",
+      "summary": "Resident Evil 3: Nemesis is a survival horror video game and the third instalment in the Resident Evil series. Like its two predecessors, it is a third-person action-adventure game with polygonal characters on pre-rendered backgrounds with cinematic camera angles. Although the game uses the same basic engine and gameplay as the previous games, the gameplay is improved by features such as auto-targeting, a 180-degree spin, and a new dodge move that allows Jill to avoid enemy attacks. The PC and Dreamcast versions include all eight of Jill's possible costumes, as well as the mercenary mini-game Operation Mad Jackal, which allows players to play as one of the three Umbrella soldiers. On the PlayStation version, these special features must be unlocked by beating the game with a high score.",
+      "genres": [
+        "Shooter",
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        21,
+        6,
+        7,
+        38,
+        23
+      ]
+    },
+    {
+      "id": 748,
+      "name": "Hitman 2: Silent Assassin",
+      "releaseYear": 2002,
+      "coverImageId": "co1pdt",
+      "summary": "Enter the realm of a retired assassin, forced back into action by treason. You may be a hired killer but you still have a sense of loyalty and justice. Visit the dark recesses of a world corrupted by crime, greed, degradation and dishonor. And a past that catches up with you.\n\nTrust no one - if the price is right, the finger of your most trusted ally will be on the trigger. Your targets may hide in the most remote areas of the planet, but their destruction is never prevented - only postponed.\n\nLearn your trade - master your tools - overcome your obstacles - outsmart your enemies - eliminate your targets. Remember: rash decisions bleed consequences. Know when to strike instantly, know when to take your time. Chance favors the prepared. Failure is not an option.",
+      "genres": [
+        "Shooter",
+        "Tactical"
+      ],
+      "platformIds": [
+        11,
+        21,
+        6,
+        8
+      ]
+    },
+    {
+      "id": 1070,
+      "name": "Super Mario World",
+      "releaseYear": 1990,
+      "coverImageId": "co8lo8",
+      "summary": "A 2D platformer and first entry on the SNES in the Super Mario franchise, Super Mario World follows Mario as he attempts to defeat Bowser's underlings and rescue Princess Peach from his clutches. The game features a save system, a less linear world map, an expanded movement arsenal and numerous new items for Mario, alongside new approaches to level design and art direction.",
+      "genres": [
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        52,
+        19,
+        5,
+        41,
+        137,
+        58
+      ]
+    },
+    {
+      "id": 1068,
+      "name": "Super Mario Bros. 3",
+      "releaseYear": 1988,
+      "coverImageId": "co7ozx",
+      "summary": "Super Mario Bros. 3, the third entry in the Super Mario Bros. series and Super Mario franchise, sees Mario or Luigi navigate a nonlinear world map containing platforming levels and optional minigames and challenges. The game features more diverse movement options and new items alongside more complex level designs and boss battles.",
+      "genres": [
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        52,
+        37,
+        5,
+        99,
+        41,
+        18
+      ]
+    },
+    {
+      "id": 1026,
+      "name": "The Legend of Zelda: A Link to the Past",
+      "releaseYear": 1991,
+      "coverImageId": "co3vzn",
+      "summary": "Venture back to Hyrule and an age of magic and heroes. The predecessors of Link and Zelda face monsters on the march when a menacing magician takes over the kingdom. Only you can prevent his evil plot from shattering the land of Hyrule.\n\nIn your quest, you'll venture into twisting mazes, dungeons, palaces and shadowy forests. Test your mettle with mighty swords and magical weapons. Or heft a boulder and hurl it at your enemies. If the going gets tough, dive into a river - you can swim to escape! Learn powerful spells, locate magical artifacts and solve the mysteries of the evil magician and the hidden realm of Hyrule.",
+      "genres": [
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        306,
+        19,
+        5,
+        41,
+        137,
+        58
+      ]
+    },
+    {
+      "id": 1802,
+      "name": "Chrono Trigger",
+      "releaseYear": 1995,
+      "coverImageId": "co3plw",
+      "summary": "In this turn-based Japanese RPG, young Crono must travel through time through a misfunctioning teleporter to rescue his misfortunate companion and take part in an intricate web of past and present perils. The adventure that ensues soon unveils an evil force set to destroy the world, triggering Crono's race against time to change the course of history and bring about a brighter future.",
+      "genres": [
+        "Role-playing (RPG)"
+      ],
+      "platformIds": [
+        306,
+        19,
+        5,
+        58
+      ]
+    },
+    {
+      "id": 358,
+      "name": "Super Mario Bros.",
+      "releaseYear": 1985,
+      "coverImageId": "co6pib",
+      "summary": "A side scrolling 2D platformer and first entry in the Super Mario franchise, Super Mario Bros. follows Italian plumber Mario as he treks across many levels of platforming challenges featuring hostile enemies to rescue Princess Peach from the evil king Bowser.",
+      "genres": [
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        51,
+        52,
+        37,
+        5,
+        99,
+        41,
+        18
+      ]
+    },
+    {
+      "id": 1077,
+      "name": "Super Mario Galaxy",
+      "releaseYear": 2007,
+      "coverImageId": "co21ro",
+      "summary": "A 3D platformer and first Wii entry in the Super Mario franchise, Super Mario Galaxy sees Mario jump across planets and galaxies with varying items, enemies, geographies and gravity mechanics in order to reach his enemy Bowser, who has attacked the Mushroom Kingdom and hijacked Princess Peach's castle with her inside.",
+      "genres": [
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        5,
+        41
+      ]
+    },
+    {
+      "id": 1103,
+      "name": "Super Metroid",
+      "releaseYear": 1994,
+      "coverImageId": "co5osy",
+      "summary": "The Space Pirates, merciless agents of the evil Mother Brain, have stolen the last Metroid from a research station, and once again Mother Brain threatens the safety of the galaxy! Samus Aran must don her awesome array of high-tech weaponry to retrieve the deadly Metroid hidden deep within the cave-riddled planet Zebes. Super Metroid features excellent graphics, with a huge variety of enemies and worlds to explore. The side-view action will be familiar to many players, only now there are new weapons and items, including the Grappling Beam, which allows Samus to swing across large chasms, and the X-Ray Scope, which reveals secret passages.",
+      "genres": [
+        "Shooter",
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        19,
+        5,
+        41,
+        137,
+        58
+      ]
+    },
+    {
+      "id": 1078,
+      "name": "Super Mario Galaxy 2",
+      "releaseYear": 2010,
+      "coverImageId": "co21tl",
+      "summary": "Super Mario Galaxy 2 is the sequel to Super Mario Galaxy and the fourth 3D platformer entry in the Mario franchise. The sequel retains many elements from its predecessor, such as the adventure being in outer space, the element of gravity, and recurring objects such as Launch Stars and Sling Stars. Returning items include the Bee Mushroom and the Fire Flower. However, the game introduces new elements as well, such as the utilization of Yoshi, new power-ups like the Cloud Flower, and the use of a guide within the game for beginner players.",
+      "genres": [
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        5,
+        41
+      ]
+    },
+    {
+      "id": 885,
+      "name": "Super Meat Boy",
+      "releaseYear": 2010,
+      "coverImageId": "co276m",
+      "summary": "Super Meat Boy is a platform game in which players control Meat Boy, a small, dark red, cube-shaped character who must rescue his girlfriend Bandage Girl from the scientist Dr. Fetus. The game is divided into chapters containing over 300 levels, each requiring players to reach the end while avoiding saw blades, crumbling blocks, and other hazards. Players can jump, run on platforms, and slide down walls. Deaths are instant and levels restart immediately with unlimited attempts. Completing levels quickly unlocks harder alternate \"dark world\" versions, and hidden warp zones contain bonus stages. Additional playable characters with unique abilities can be unlocked through collectibles.",
+      "genres": [
+        "Platform",
+        "Adventure",
+        "Indie"
+      ],
+      "platformIds": [
+        48,
+        3,
+        5,
+        6,
+        14,
+        41,
+        46,
+        12,
+        130
+      ]
+    },
+    {
+      "id": 426,
+      "name": "Final Fantasy III",
+      "releaseYear": 1994,
+      "coverImageId": "coaq5k",
+      "summary": "Final Fantasy VI is the sixth main installment in the Final Fantasy series, developed and published by Square. It was the final title in the series to feature two-dimensional graphics, and the first story that did not revolve around crystals.\n\nThe game gives players up to fourteen playable characters, the largest cast in the series, and features the Active Time Battle pseudo-turn based menu command system. A party can consist of up to four characters, though some events require the player to assemble three different parties of up to four and switch between them.\n\nEach character has a unique command ability, such as Terra's Trance, Locke's Steal, Edgar's Tools or Sabin's Blitz, and can also learn Magic spells from earning AP from battles with magicite equipped. Each character's rare Desperation Attack will randomly activate after using the Attack command when at critical health.",
+      "genres": [
+        "Role-playing (RPG)",
+        "Adventure"
+      ],
+      "platformIds": [
+        19,
+        5,
+        41,
+        137,
+        58
+      ]
+    },
+    {
+      "id": 1022,
+      "name": "The Legend of Zelda",
+      "releaseYear": 1986,
+      "coverImageId": "co1uii",
+      "summary": "The Legend of Zelda is the first title in the Zelda series, it has marked the history of video games particularly for it's game mechanics and universe. The player controls Link and must make his way through the forests, graveyards, plains and deserts of the Otherworld to find the secret entrances to the eight dungeons and try to restore the broken Triforce. Among the game's mechanics, it was the first time we saw a continuous world that could be freely explored, power-ups that permanently enhanced the main character's abilities and a battery save feature that allowed players to keep their progress instead of having to start over. The gameplay balanced action sequences with discovery, secrets and exploration.",
+      "genres": [
+        "Adventure"
+      ],
+      "platformIds": [
+        51,
+        37,
+        5,
+        99,
+        41,
+        18
+      ]
+    },
+    {
+      "id": 3192,
+      "name": "Sonic the Hedgehog",
+      "releaseYear": 1991,
+      "coverImageId": "coanlj",
+      "summary": "Sonic the Hedgehog is a 2D side-scrolling platformer developed by Sonic Team and published by Sega for the Genesis/Mega Drive. Players control Sonic the Hedgehog, who can run at near supersonic speeds and sets out on a quest to defeat Dr. Robotnik, a scientist who has imprisoned animals in robots and seeks the powerful Chaos Emeralds.",
+      "genres": [
+        "Platform"
+      ],
+      "platformIds": [
+        52,
+        9,
+        5,
+        29,
+        6,
+        39,
+        12
+      ]
+    },
+    {
+      "id": 1942,
+      "name": "The Witcher 3: Wild Hunt",
+      "releaseYear": 2015,
+      "coverImageId": "coaarl",
+      "summary": "The Witcher 3: Wild Hunt is an open-world action role-playing game developed by CD Projekt Red.\n\nSet in a dark fantasy world, the game follows Geralt of Rivia, a monster hunter searching for his adopted daughter, Ciri, while navigating political conflicts and supernatural threats. Gameplay features exploration, combat, character progression, and branching narratives shaped by player choices. Widely acclaimed for its writing, world-building, and depth, it is considered one of the most influential RPGs of its generation.",
+      "genres": [
+        "Role-playing (RPG)",
+        "Adventure"
+      ],
+      "platformIds": [
+        169,
+        48,
+        508,
+        6,
+        167,
+        49,
+        130
+      ]
+    },
+    {
+      "id": 72,
+      "name": "Portal 2",
+      "releaseYear": 2011,
+      "coverImageId": "co1rs4",
+      "summary": "Sequel to the acclaimed Portal (2007), Portal 2 pits the protagonist of the original game, Chell, and her new robot friend, Wheatley, against more puzzles conceived by GLaDOS, an A.I. with the sole purpose of testing the Portal Gun's mechanics and taking revenge on Chell for the events of Portal. As a result of several interactions and revelations, Chell once again pushes to escape Aperture Science Labs.",
+      "genres": [
+        "Platform",
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        3,
+        6,
+        14,
+        12,
+        130
+      ]
+    },
+    {
+      "id": 71,
+      "name": "Portal",
+      "releaseYear": 2007,
+      "coverImageId": "coay61",
+      "summary": "Waking up in a seemingly empty laboratory, the player is made to complete various physics-based puzzle challenges through numerous test chambers in order to test out the new Aperture Science Handheld Portal Device, without an explanation as to how, why or by whom.",
+      "genres": [
+        "Platform",
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        3,
+        34,
+        6,
+        14,
+        12,
+        130
+      ]
+    },
+    {
+      "id": 7346,
+      "name": "The Legend of Zelda: Breath of the Wild",
+      "releaseYear": 2017,
+      "coverImageId": "co3p2d",
+      "summary": "The Legend of Zelda: Breath of the Wild is the first 3D open-world game in the Zelda series. Link can travel anywhere and be equipped with weapons and armor found throughout the world to grant him various bonuses. Unlike many games in the series, Breath of the Wild does not impose a specific order in which quests or dungeons must be completed. While the game still has environmental obstacles such as weather effects, inhospitable lands, or powerful enemies, many of them can be overcome using the right method. A lot of critics ranked Breath of the Wild as one of the best video games of all time.",
+      "genres": [
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        41,
+        130
+      ]
+    },
+    {
+      "id": 501,
+      "name": "Batman: Arkham City",
+      "releaseYear": 2011,
+      "coverImageId": "co1voh",
+      "summary": "Batman: Arkham City builds upon the intense, atmospheric foundation of Batman: Arkham Asylum, sending players soaring into Arkham City, the new maximum security \"home\" for all of Gotham City's thugs, gangsters and insane criminal masterminds.\n\nSet inside the heavily fortified walls of a sprawling district in the heart of Gotham City, this highly anticipated sequel introduces a brand-new story that draws together a new all-star cast of classic characters and murderous villains from the Batman universe, as well as a vast range of new and enhanced gameplay features to deliver the ultimate experience as the Dark Knight.",
+      "genres": [
+        "Hack and slash/Beat 'em up",
+        "Adventure"
+      ],
+      "platformIds": [
+        113,
+        9,
+        6,
+        12,
+        130
+      ]
+    },
+    {
+      "id": 500,
+      "name": "Batman: Arkham Asylum",
+      "releaseYear": 2009,
+      "coverImageId": "co1voj",
+      "summary": "Batman: Arkham Asylum is an action-adventure game developed by Rocksteady Studios and published by Warner Bros. Interactive Entertainment. Released in 2009, it follows Batman as he battles the Joker, who seizes control of Arkham Asylum and frees its inmates. The game features stealth, combat, and detective elements, with players using Batman's gadgets and skills to subdue enemies and solve puzzles.\n\nSet in a dark, immersive version of Gotham, the story explores Batman’s psychological battle with his foes, including Harley Quinn, Bane, and Scarecrow. The game received critical acclaim for its gameplay, atmosphere, and storytelling, becoming a defining title in superhero video games.",
+      "genres": [
+        "Hack and slash/Beat 'em up",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        72,
+        6,
+        14,
+        12,
+        130
+      ]
+    },
+    {
+      "id": 14593,
+      "name": "Hollow Knight",
+      "releaseYear": 2017,
+      "coverImageId": "cobfzp",
+      "summary": "A 2D metroidvania with an emphasis on close combat and exploration in which the player enters the once-prosperous now-bleak insect kingdom of Hallownest, travels through its various districts, meets friendly inhabitants, fights hostile ones and uncovers the kingdom's history while improving their combat abilities and movement arsenal by fighting bosses and accessing out-of-the-way areas.",
+      "genres": [
+        "Platform",
+        "Adventure",
+        "Indie"
+      ],
+      "platformIds": [
+        169,
+        48,
+        3,
+        508,
+        6,
+        167,
+        14,
+        41,
+        49,
+        130
+      ]
+    },
+    {
+      "id": 12517,
+      "name": "Undertale",
+      "releaseYear": 2015,
+      "coverImageId": "cob1t2",
+      "summary": "A small child falls into the Underground, where monsters have long been banished by humans and are hunting every human that they find. The player controls the child as they try to make it back to the Surface through hostile environments, all the while engaging with a turn-based combat system with puzzle-solving and bullet hell elements, as well as other unconventional game mechanics.",
+      "genres": [
+        "Puzzle",
+        "Role-playing (RPG)",
+        "Adventure",
+        "Indie"
+      ],
+      "platformIds": [
+        48,
+        3,
+        6,
+        14,
+        46,
+        49,
+        130
+      ]
+    },
+    {
+      "id": 26758,
+      "name": "Super Mario Odyssey",
+      "releaseYear": 2017,
+      "coverImageId": "co1mxf",
+      "summary": "Explore incredible places far from the Mushroom Kingdom as you join Mario and his new ally Cappy on a massive, globe-trotting 3D adventure. Use amazing new abilities, like the power to capture and control objects, animals, and enemies to collect Power Moons so you can power up the Odyssey airship and save Princess Peach from Bowser’s wedding plans!",
+      "genres": [
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        508,
+        130
+      ]
+    },
+    {
+      "id": 1011,
+      "name": "Borderlands 2",
+      "releaseYear": 2012,
+      "coverImageId": "co9ba3",
+      "summary": "A new era of shoot and loot is about to begin. Play as one of four new vault hunters facing off against a massive new world of creatures, psychos and the evil mastermind, Handsome Jack. Make new friends, arm them with a bazillion weapons and fight alongside them in 4 player co-op on a relentless quest for revenge and redemption across the undiscovered and unpredictable living planet.",
+      "genres": [
+        "Shooter",
+        "Role-playing (RPG)"
+      ],
+      "platformIds": [
+        9,
+        48,
+        3,
+        34,
+        6,
+        14,
+        46,
+        12,
+        49,
+        130
+      ]
+    },
+    {
+      "id": 17000,
+      "name": "Stardew Valley",
+      "releaseYear": 2016,
+      "coverImageId": "coa93h",
+      "summary": "Stardew Valley is an open-ended country-life RPG! You’ve inherited your grandfather’s old farm plot in Stardew Valley. Armed with hand-me-down tools and a few coins, you set out to begin your new life. Can you learn to live off the land and turn these overgrown fields into a thriving home? It won’t be easy. Ever since Joja Corporation came to town, the old ways of life have all but disappeared. The community center, once the town’s most vibrant hub of activity, now lies in shambles. But the valley seems full of opportunity. With a little dedication, you might just be the one to restore Stardew Valley to greatness!",
+      "genres": [
+        "Role-playing (RPG)",
+        "Simulator",
+        "Strategy",
+        "Adventure",
+        "Indie"
+      ],
+      "platformIds": [
+        48,
+        3,
+        508,
+        34,
+        6,
+        39,
+        14,
+        41,
+        46,
+        49,
+        130
+      ]
+    },
+    {
+      "id": 1970,
+      "name": "Assassin's Creed IV Black Flag",
+      "releaseYear": 2013,
+      "coverImageId": "co4qfn",
+      "summary": "Assassin’s Creed IV Black Flag begins in 1715, when pirates established a lawless republic in the Caribbean and ruled the land and seas. These outlaws paralyzed navies, halted international trade, and plundered vast fortunes. They threatened the power structures that ruled Europe, inspired the imaginations of millions, and left a legacy that still endures.",
+      "genres": [
+        "Adventure"
+      ],
+      "platformIds": [
+        170,
+        9,
+        48,
+        6,
+        41,
+        12,
+        49,
+        130
+      ]
+    },
+    {
+      "id": 113112,
+      "name": "Hades",
+      "releaseYear": 2020,
+      "coverImageId": "cob9kr",
+      "summary": "A rogue-lite hack and slash dungeon crawler in which Zagreus, son of Hades the Greek god of the dead, attempts to escape his home and his oppressive father by fighting the souls of the dead through the various layers of the ever-shifting underworld, while getting to know and forging relationships with its inhabitants.",
+      "genres": [
+        "Role-playing (RPG)",
+        "Hack and slash/Beat 'em up",
+        "Adventure",
+        "Indie"
+      ],
+      "platformIds": [
+        169,
+        48,
+        6,
+        39,
+        167,
+        14,
+        49,
+        130
+      ]
+    },
+    {
+      "id": 1871,
+      "name": "The Walking Dead",
+      "releaseYear": 2012,
+      "coverImageId": "co2j1g",
+      "summary": "The Walking Dead: Season One (also known as The Walking Dead: The Game) is an episodic interactive drama graphic adventure video game developed and published by Telltale Games. Based on Robert Kirkman's The Walking Dead comic book series, the game consists of five episodes, released between April and November 2012. It is available for Android, iOS, Kindle Fire HDX, Microsoft Windows, Mac OS X, PlayStation 3, PlayStation Vita, Xbox 360, PlayStation 4 and Xbox One. The game is the first of The Walking Dead video game series published by Telltale.",
+      "genres": [
+        "Point-and-click",
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        48,
+        3,
+        34,
+        6,
+        39,
+        14,
+        46,
+        12,
+        49,
+        130
+      ]
+    },
+    {
+      "id": 2155,
+      "name": "Dark Souls",
+      "releaseYear": 2011,
+      "coverImageId": "co1x78",
+      "summary": "Dark Souls is an action role-playing game developed by FromSoftware and published by Bandai Namco Entertainment. Released in September 2011 as a spiritual sequel to Demon's Souls, it is set in a dark, medieval fantasy world. It is renowned for its challenging gameplay, intricate level design, and deep lore. Players control a customizable character known as the Chosen Undead, embarking on a perilous journey to uncover the secrets of the cursed land of Lordran.\n\nDark Souls is known for its punishing difficulty, requiring players to carefully manage combat, stamina, and resources while navigating hostile environments filled with dangerous enemies and formidable bosses. The game features a unique multiplayer component, allowing players to leave messages for others, summon allies for cooperative play, or invade other players' worlds for PvP combat.\n\nThe original release of Dark Souls received critical acclaim for its atmospheric world, innovative mechanics, and rewarding gameplay, solidifying its place as a seminal title in the action RPG genre.",
+      "genres": [
+        "Role-playing (RPG)",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        48,
+        6,
+        12,
+        49,
+        130
+      ]
+    },
+    {
+      "id": 732,
+      "name": "Grand Theft Auto: San Andreas",
+      "releaseYear": 2004,
+      "coverImageId": "co2lb9",
+      "summary": "Returning after his mother's murder to the semi-fictional city of Los Santos (based on Los Angeles), Carl Johnson, a former gang banger, must take back the streets for his family and friends by gaining respect and once again gaining control over the streets. However, a story filled with crime, lies and corruption will lead him to trudge the entire state of San Andreas (based on California and Nevada) to rebuild his life.",
+      "genres": [
+        "Shooter",
+        "Racing",
+        "Adventure"
+      ],
+      "platformIds": [
+        11,
+        9,
+        48,
+        74,
+        34,
+        6,
+        39,
+        14,
+        12,
+        8
+      ]
+    },
+    {
+      "id": 733,
+      "name": "Grand Theft Auto: Vice City",
+      "releaseYear": 2002,
+      "coverImageId": "co2lbb",
+      "summary": "In the year 1986, Tommy Vercetti is heavily indebted to his mafia superiors after a drug deal gone awry, but his dreams of taking over Vice City (based on Miami) push him down a different path. Featuring a wide variety of vehicles and weapons, radio stations playing hit songs from the era and an intense atmosphere, GTA: Vice City is an open-world sandbox satire of '80's Miami.",
+      "genres": [
+        "Shooter",
+        "Racing",
+        "Adventure",
+        "Arcade"
+      ],
+      "platformIds": [
+        11,
+        9,
+        6,
+        14,
+        8
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Max Payne",
+      "releaseYear": 2001,
+      "coverImageId": "co3wb2",
+      "summary": "Max Payne is a man with nothing to lose in the violent, cold urban night. A fugitive undercover cop framed for murder, hunted by cops and the mob, Max is a man with his back against the wall, fighting a battle he cannot hope to win. Max Payne is a relentless story-driven game about a man on the edge, fighting to clear his name while struggling to uncover the truth about his slain family amongst a myriad of plot-twists and twisted thugs in the gritty bowels of New York during the century's worst blizzard.\n\nThe groundbreaking original cinematic action-shooter, Max Payne introduced the concept of Bullet Time in videogames. Through its stylish slow-motion gunplay combined with a dark and twisted story, Max Payne redefined the action-shooter genre.",
+      "genres": [
+        "Shooter"
+      ],
+      "platformIds": [
+        11,
+        9,
+        48,
+        34,
+        6,
+        39,
+        14,
+        12,
+        49,
+        8
+      ]
+    },
+    {
+      "id": 730,
+      "name": "Grand Theft Auto III",
+      "releaseYear": 2001,
+      "coverImageId": "co2lb8",
+      "summary": "Featuring a fully 3-D living city, a combination of narrative driven and non-linear gameplay and a completely open environment, Grand Theft Auto III represents a huge leap forward in interactive entertainment. For the first time, players are put at the heart of their very own gangster movie, and let loose in a fully-realised 3 dimensional city, in which anything can happen and probably will.\n\nWith a cast of hundreds, 50 plus vehicles, ranging from sports cars to ice cream trucks and from boats to buses, 3 hours of music, including opera, reggae, house, drum and bass, pop and disco, a huge array of street ready weapons and some of the seediest characters in video game history, Grand Theft Auto 3 is a sprawling epic which will show you that sometimes, crime can pay and sometimes it can pay you back. Available now for PlayStation2, Xbox, PC and Macintosh.",
+      "genres": [
+        "Shooter",
+        "Racing",
+        "Simulator",
+        "Adventure"
+      ],
+      "platformIds": [
+        11,
+        48,
+        34,
+        6,
+        39,
+        14,
+        8
+      ]
+    },
+    {
+      "id": 39,
+      "name": "Mafia",
+      "releaseYear": 2002,
+      "coverImageId": "co1qrt",
+      "summary": "Mafia is a 3D action crime epic set in the seedy underworld of the 1930's. Rise from the lowly but well-dressed Footsoldier, to an envied and feared Made Man in an era of mob hits, car chases, and bootlegging. Earn a reputation as a tough enforcer, daring getaway driver, and deadly hitman in your quest for respect and power within the Salieri Family.",
+      "genres": [
+        "Fighting",
+        "Shooter",
+        "Racing",
+        "Adventure"
+      ],
+      "platformIds": [
+        11,
+        6,
+        8
+      ]
+    },
+    {
+      "id": 379,
+      "name": "Metal Gear Solid 3: Snake Eater",
+      "releaseYear": 2004,
+      "coverImageId": "co5ei5",
+      "summary": "Metal Gear Solid 3: Snake Eater is the prequel to the entire Metal Gear series. Most of the series' defining gameplay elements have been carried over and as before, Snake must use stealth and wits rather than brute force to infiltrate enemy zones and eliminate his major adversaries. Unlike the previous games, this installment takes place in a large outdoor jungle. Snake is able to use camouflage, climb trees, hide in tall grass or wear clothes that make him less noticeable.",
+      "genres": [
+        "Shooter",
+        "Tactical",
+        "Adventure"
+      ],
+      "platformIds": [
+        8
+      ]
+    },
+    {
+      "id": 481,
+      "name": "Silent Hill 2",
+      "releaseYear": 2001,
+      "coverImageId": "co2vyg",
+      "summary": "The second entry in the Silent Hill franchise, Silent Hill 2 is a narrative-focused third-person psychological survival horror game with emphasis on combat, exploration and puzzle-solving elements which follows James Sunderland, a man who receives a letter, seemingly sent by his three-years-deceased wife Mary, in which he is beckoned to the fog-ridden town of Silent Hill at the same time as numerous other people troubled by their past.",
+      "genres": [
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        8
+      ]
+    },
+    {
+      "id": 418,
+      "name": "Final Fantasy X",
+      "releaseYear": 2001,
+      "coverImageId": "co1tr1",
+      "summary": "Final Fantasy X is the tenth main installment in the FF series and the first title released on sixth-generation consoles. It was also the first game to feature fully three-dimensional areas rather than including pre-rendered backdrops, and the first to include voice acting. Final Fantasy X tells the story of a star blitzball player, Tidus, who journeys with a young and beautiful summoner named Yuna on her quest to save the world of Spira from an endless cycle of destruction wrought by the colossal menace Sin.",
+      "genres": [
+        "Role-playing (RPG)",
+        "Adventure"
+      ],
+      "platformIds": [
+        8
+      ]
+    },
+    {
+      "id": 19,
+      "name": "Max Payne 2: The Fall of Max Payne",
+      "releaseYear": 2003,
+      "coverImageId": "co2lcl",
+      "summary": "Max Payne 2 is a third-person shooter, in which the player assumes the role of Max Payne, but also plays as Mona Sax in a few levels. Initially, the player's weapon is a 9mm pistol. As they progress, players access other weapons including other handguns, shotguns, submachine guns, assault rifles, sniper rifles, and hand-thrown weapons. To move the game along, the player is told what the next objective is through Max's internal monologue, in which Max iterates what his next steps should be.",
+      "genres": [
+        "Shooter"
+      ],
+      "platformIds": [
+        11,
+        9,
+        6,
+        12,
+        8
+      ]
+    },
+    {
+      "id": 549,
+      "name": "God of War",
+      "releaseYear": 2005,
+      "coverImageId": "co3ddc",
+      "summary": "God of War is an action-adventure hack-and-slash video game developed by Santa Monica Studio and published by Sony Computer Entertainment (SCE). Initially launched for the PlayStation 2, the game stands as the first instalment in the God of War series and the third in chronological order. Loosely inspired by Greek mythology, it unfolds in ancient Greece with vengeance as its central theme. The player takes on the role of Kratos, the protagonist, a Spartan warrior devoted to the Olympian gods. Tasked by the goddess Athena, Kratos is assigned to eliminate Ares, the God of War and Kratos' former mentor. Ares had deceitfully manipulated Kratos into killing his wife and daughter. As Ares attacks Athens fueled by hatred for Athena, Kratos embarks on a quest to locate Pandora's Box, the sole object capable of permanently stopping the vengeful god.",
+      "genres": [
+        "Puzzle",
+        "Hack and slash/Beat 'em up",
+        "Adventure"
+      ],
+      "platformIds": [
+        8
+      ]
+    },
+    {
+      "id": 551,
+      "name": "God of War II",
+      "releaseYear": 2007,
+      "coverImageId": "co3dik",
+      "summary": "God of War II, an action-adventure hack-and-slash video game, was developed by Santa Monica Studio and published by Sony Computer Entertainment (SCE). Initially launched for the PlayStation 2, it serves as the second installment in the God of War series, the sixth in chronological order, and a sequel to 2005's God of War. The game is rooted in Greek mythology and unfolds in ancient Greece, revolving around the theme of vengeance. The protagonist, Kratos, is the new God of War, having defeated the former, Ares. However, Kratos is betrayed by Zeus, the King of the Olympian gods, who not only strips him of his godhood but also kills him. Dragged slowly to the Underworld, Kratos is rescued by the Titan Gaia, who guides him to seek out the Sisters of Fate. These entities have the power to enable time travel, allowing Kratos to prevent his betrayal, and ultimately seek revenge on Zeus.",
+      "genres": [
+        "Platform",
+        "Hack and slash/Beat 'em up",
+        "Adventure"
+      ],
+      "platformIds": [
+        8
+      ]
+    },
+    {
+      "id": 376,
+      "name": "Metal Gear Solid 2: Sons of Liberty",
+      "releaseYear": 2001,
+      "coverImageId": "co5e1c",
+      "summary": "Metal Gear Solid 2: Sons of Liberty is the sequel to the espionage action game Metal Gear Solid. Much of the gameplay remains the same, as the game's protagonist has to sneak past guards, outsmart them using various gadgets and defeat the tricky boss enemies. The game expanded its predecessor's cover mechanic, with Solid Snake or Raiden able to take cover behind walls or objects and pop out to shoot at enemies, while the improved enemy AI allowed enemies to also take cover from the player. Metal Gear Solid 2 is considered to be one of the greatest video games of all time, as well as a leading example of artistic expression in video games.",
+      "genres": [
+        "Shooter",
+        "Tactical",
+        "Adventure"
+      ],
+      "platformIds": [
+        8
+      ]
+    },
+    {
+      "id": 327,
+      "name": "Age of Empires II: The Age of Kings",
+      "releaseYear": 1999,
+      "coverImageId": "co55xo",
+      "summary": "Take control of a powerful civilization. Lead them through 1000 years of the Middle Ages to riches and greatness. Will you Intimidate the world into following you by using military force? Rule the world with honor and nobility by using commerce and diplomacy? Or Underhandedly seize power through conspiracy, deception and regicide? There are many paths to power, there can only be one ruler!",
+      "genres": [
+        "Real Time Strategy (RTS)",
+        "Strategy"
+      ],
+      "platformIds": [
+        6,
+        14,
+        23,
+        8
+      ]
+    },
+    {
+      "id": 375,
+      "name": "Metal Gear Solid",
+      "releaseYear": 1998,
+      "coverImageId": "cobpak",
+      "summary": "Metal Gear Solid is a stealth game created by Hideo Kojima which follows the MSX2 video games Metal Gear and Metal Gear 2: Solid Snake. Despite a transition to 3D, Metal Gear Solid's gameplay remains similar to his predecessors. The game utilizes a traditional top-down view and the player must navigate the protagonist Solid Snake through the game's areas without being detected. Detection will set off an alarm which draws armed enemies to his location. Conversations with Snake's allies and cutscenes are used extensively to advance the plot and gain more insight into it. Metal Gear Solid is regarded as one of the greatest and most important video games of all time, and helped popularize the stealth genre and in-engine cinematic cutscenes.",
+      "genres": [
+        "Shooter",
+        "Tactical",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        7,
+        38
+      ]
+    },
+    {
+      "id": 427,
+      "name": "Final Fantasy VII",
+      "releaseYear": 1997,
+      "coverImageId": "co2kx2",
+      "summary": "The Western release of Final Fantasy VII (released as Final Fantasy VII International in Japan) included additional elements and alterations, such as streamlining of the menu and Materia system, reducing the health of enemies, new visual cues to help with navigation across the world map, and additional cutscenes relating to Cloud's past.",
+      "genres": [
+        "Role-playing (RPG)",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        7,
+        38
+      ]
+    },
+    {
+      "id": 421,
+      "name": "Final Fantasy IX",
+      "releaseYear": 2000,
+      "coverImageId": "co2unc",
+      "summary": "Final Fantasy IX is the ninth main installment in the FF series. The title is a return to the series's roots, with gameplay features and references to the past games featuring throughout, as well as a medieval fantasy setting and cartoonish art style as a break from the sci-fi slant style of Final Fantasy VII and Final Fantasy VIII.",
+      "genres": [
+        "Role-playing (RPG)",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        7,
+        38
+      ]
+    },
+    {
+      "id": 1128,
+      "name": "Castlevania: Symphony of the Night",
+      "releaseYear": 1997,
+      "coverImageId": "co53m8",
+      "summary": "Having been awoken from his eternal slumber by the reappearance of Castlevania, Alucard must once again face the evil minions of darkness. Use your vampiric powers, along with weapons, potions, and other magical relics to change the tide of battle.\n\nA mixture of platform and role-playing action with many hidden areas and secrets. Can you discover them all?",
+      "genres": [
+        "Platform",
+        "Role-playing (RPG)",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        32,
+        7,
+        38,
+        12
+      ]
+    },
+    {
+      "id": 142,
+      "name": "Star Wars: Battlefront II",
+      "releaseYear": 2005,
+      "coverImageId": "cob1g4",
+      "summary": "Star Wars: Battlefront II is the sequel to Star Wars: Battlefront. It is a high-selling Star Wars video game following the many adventures of several characters. The two games are very similar, as both revolve around troopers from various factions fighting in different locales. Battlefront II, however, includes elements and missions from Star Wars: Episode III Revenge of the Sith, as well as enhanced aspects of gameplay including space combat and the ability to play as Jedi characters or other heroes.\n\nWith brand new space combat, playable Jedi characters, and over 16 all new battlefronts, Star Wars Battlefront II gives you more ways than ever before to play the classic Star Wars battles any way you want.",
+      "genres": [
+        "Shooter"
+      ],
+      "platformIds": [
+        11,
+        6,
+        38,
+        8
+      ]
+    },
+    {
+      "id": 1185,
+      "name": "Crash Bandicoot",
+      "releaseYear": 1996,
+      "coverImageId": "co555l",
+      "summary": "Crash Bandicoot is the first installment in the Crash Bandicoot series that established Naughty Dog's reputation in the video game industry. Its premises chronicle the creation of the titular Crash, a bandicoot who has been uplifted by the mad scientist Doctor Neo Cortex. The goal of Crash Bandicoot is to traverse several levels in sequence in order to progress. The game is played from a third-person perspective in which the camera trails behind Crash, though some levels showcase forward-scrolling and side-scrolling perspectives. Crash is able to defeat enemies by either jumping on them or using a spinning attack that launches them.",
+      "genres": [
+        "Platform"
+      ],
+      "platformIds": [
+        9,
+        34,
+        7,
+        38
+      ]
+    },
+    {
+      "id": 480,
+      "name": "Silent Hill",
+      "releaseYear": 1999,
+      "coverImageId": "co2vye",
+      "summary": "Silent Hill is the first installment in the Silent Hill series of psychological survival horror video games. Unlike earlier survival horror games that focused on protagonists with combat training, the main character Harry Mason is an average man. The gameplay consists of combat, exploration, and puzzle-solving. The controller vibration is used to indicate Harry's heartbeat and will vibrate on low health. The player must regularly enter an inventory screen to check Harry's health, use items, and equip different weapons.",
+      "genres": [
+        "Puzzle",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        7,
+        38
+      ]
+    },
+    {
+      "id": 1187,
+      "name": "Crash Bandicoot: Warped",
+      "releaseYear": 1998,
+      "coverImageId": "co873w",
+      "summary": "Crash Bandicoot: Warped is the third game in the Crash Bandicoot series and the first to feature Coco as a playable character. The player takes control of Crash and Coco Bandicoot, who must travel back and forward in time and gather 25 crystals before Uka Uka and Doctor Neo Cortex can do so. Much of the game takes place in the Time Twister which acts as the hub area of the game. The Time-Twister is split up into five chambers, each chamber has five buttons that open portals to different levels. The goal in each level is to find and obtain the crystal hidden in the level. Crash Bandicoot: Warped was lauded by critics in many areas, and the game has been considered one of the best video games of all time.",
+      "genres": [
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        7,
+        38
+      ]
+    },
+    {
+      "id": 1186,
+      "name": "Crash Bandicoot 2: Cortex Strikes Back",
+      "releaseYear": 1997,
+      "coverImageId": "co82vt",
+      "summary": "Crash Bandicoot 2: Cortex Strikes Back is the second game in the Crash Bandicoot series, and the sequel to the original game. The gameplay is largely similar to that of the original, as players make their way through a limited environment whilst breaking crates that contains bonuses. The goal of the game is to gather 25 crystals for Crash's nemesis, Doctor Neo Cortex. The crystals are scattered between 25 different levels accessible via Warp Rooms, which are hub areas of the game. A level is cleared by collecting its respective crystal and reaching the end of its path, which returns Crash to the Warp Room.",
+      "genres": [
+        "Platform",
+        "Adventure"
+      ],
+      "platformIds": [
+        9,
+        34,
+        7,
+        38
+      ]
+    },
+    {
+      "id": 425,
+      "name": "Final Fantasy VIII",
+      "releaseYear": 1999,
+      "coverImageId": "co2z7d",
+      "summary": "Final Fantasy VIII is the eighth main installment in the Final Fantasy series. The gameplay makes a departure from many series standards. While it still uses the Active Time Battle system, it deviates from the series' traditional means of boosting a character's power via leveling, although levels are not completely abandoned as they were in Final Fantasy II. In addition, it does not have a Magic Point-based system for spell-casting. Instead, magic is collected, drawn, and created from items, and is used to power up the characters via the junction system.",
+      "genres": [
+        "Role-playing (RPG)",
+        "Adventure",
+        "Card \u0026 Board Game"
+      ],
+      "platformIds": [
+        9,
+        7,
+        38
+      ]
+    },
+    {
+      "id": 1192,
+      "name": "Crash Team Racing",
+      "releaseYear": 1999,
+      "coverImageId": "co7r52",
+      "summary": "Crash Team Racing is a kart racing game featuring popular characters from the Crash Bandicoot series. The gameplay is very similar to other kart racing video games like Mario Kart: players have to choose a character and compete against the other racers on various racetracks. The story mode allows you to choose any one of the characters to complete all the main races and beat the ultimate boss Nitrous Oxide. Each of the main races are against 7 other AI competitors with 5 boss races. There are also a few arcade modes up to 4 players.",
+      "genres": [
+        "Racing"
+      ],
+      "platformIds": [
+        9,
+        7,
+        38
+      ]
     }
   ]
 }

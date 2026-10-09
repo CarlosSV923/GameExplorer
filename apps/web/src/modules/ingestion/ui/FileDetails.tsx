@@ -3,9 +3,15 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { fileExtension, singleFile } from '@/modules/catalog/domain/items'
-import { gameFolder, kindDraftError, previewFileName } from '@/modules/catalog/domain/naming'
+import {
+  gameFolder,
+  kindDraftError,
+  normalizeDisc,
+  previewFileName,
+} from '@/modules/catalog/domain/naming'
 import type { Console, DuplicateAction } from '@/modules/catalog/domain/types'
-import { FileTypeFields } from '@/modules/catalog/ui/FileTypeFields'
+import { useConsoleGames, useGame } from '@/modules/catalog/application/queries'
+import { DiscField, FileTypeFields } from '@/modules/catalog/ui/FileTypeFields'
 import { itemLabel } from '@/modules/catalog/ui/itemLabel'
 import { describeError } from '@/shared/i18n/errors'
 import { useFormat } from '@/shared/i18n/hooks'
@@ -29,6 +35,7 @@ import {
   initialDraft,
   initialSkips,
   storedCount,
+  suggestDiscs,
   toCommitFile,
   type FileDraft,
 } from '../domain/details'
@@ -81,7 +88,9 @@ function DuplicateChoice({
  * (and the update's version or the DLC's name); on Wii and PSP the file and
  * its final name are confirmed. Duplicates ask Replace or Skip (RF-09).
  * Assigning an unassigned entry, each file can also be left there ("No
- * guardar", RF-27a); one-file consoles keep exactly one.
+ * guardar", RF-27a); one-file consoles keep exactly one. On GameCube and
+ * PS2 a game of several files is numbered discs, the stored one included
+ * (RF-08a).
  */
 export function FileDetails({
   job,
@@ -99,8 +108,16 @@ export function FileDetails({
   const navigate = useNavigate()
   const valid = files.filter((f) => f.valid)
   const discarded = files.filter((f) => !f.valid)
-  const kinds = !singleFile(console)
+  const hasDiscs = console.kinds.includes('disc')
+  const kinds = !singleFile(console) && !hasDiscs
   const folder = gameFolder(job.title)
+  // The game's stored files: one more disc numbers them all (RF-08a).
+  const games = useConsoleGames(hasDiscs ? console.slug : undefined)
+  const storedId = games.data?.find(
+    (g) => folder.ok && g.folder.toLowerCase() === folder.name.toLowerCase(),
+  )?.id
+  const stored = useGame(storedId).data?.items ?? []
+  const [renumber, setRenumber] = useState<Record<number, string>>({})
   const entry = Boolean(job.fromUnassigned)
   const [drafts, setDrafts] = useState<Record<string, FileDraft>>(() => {
     const skips = entry
@@ -119,20 +136,38 @@ export function FileDetails({
   const [tried, setTried] = useState(false)
   const [cancelling, setCancelling] = useState(false)
 
-  const draftOf = (path: string) => drafts[path] ?? initialDraft(console, valid.length)
+  const rawDraft = (path: string) => drafts[path] ?? initialDraft(console, valid.length)
+  const keptPaths = valid.filter((f) => !rawDraft(f.path).skip).map((f) => f.path)
+  const discMode = hasDiscs && keptPaths.length + stored.length > 1
+  const unnumbered = discMode ? stored.filter((s) => s.kind === 'game') : []
+  const takenDiscs = stored.flatMap((s) => (s.kind === 'disc' && s.label ? [Number(s.label)] : []))
+  const suggested = suggestDiscs(keptPaths, [...takenDiscs, ...(unnumbered.length > 0 ? [1] : [])])
+  // On a console with discs the kind follows from the files: the game, or numbered discs.
+  const draftOf = (path: string): FileDraft => {
+    const d = rawDraft(path)
+    if (!hasDiscs) return d
+    return { ...d, kind: discMode ? 'disc' : 'game', disc: d.disc ?? suggested[path] ?? '' }
+  }
+  const renumbering = unnumbered.map((s) => ({ itemId: s.id, label: renumber[s.id] ?? '1' }))
+  const badRenumber = renumbering.some((r) => normalizeDisc(r.label) === null)
   const kept = valid.filter((f) => !draftOf(f.path).skip)
-  const missing = kept.filter((f) => kindDraftError(draftOf(f.path)) !== null).length
+  const missing =
+    kept.filter((f) => kindDraftError(draftOf(f.path)) !== null).length + (badRenumber ? 1 : 0)
   // What the server would refuse: nothing to store, or two files of a one-file game.
   let keepError: string | null = null
   if (kept.length === 0) keepError = t('details.keepSome')
-  else if (!kinds && kept.length > 1)
+  else if (!kinds && !hasDiscs && kept.length > 1)
     keepError = t('details.keepOne', { console: console.displayName })
   const request: CommitRequest | undefined =
     missing === 0 && keepError === null
-      ? { files: valid.map((f) => toCommitFile(f.path, draftOf(f.path))) }
+      ? {
+          files: valid.map((f) => toCommitFile(f.path, draftOf(f.path))),
+          ...(renumbering.length > 0 ? { renumber: renumbering } : {}),
+        }
       : undefined
-  const plan = useCommitPlan(job.id, request)
-  const current = request && !plan.isPlaceholderData ? plan.data : undefined
+  const { plan, fresh } = useCommitPlan(job.id, request)
+  // A preview of older data (a disc number changed a moment ago) does not count.
+  const current = request && fresh && !plan.isPlaceholderData ? plan.data : undefined
   const undecided = current?.files.some((p) => p.action === 'undecided') ?? false
   const count = storedCount(
     kept.map((f) => f.path),
@@ -200,7 +235,11 @@ export function FileDetails({
       />
       <main className="box-border flex w-full max-w-[1100px] flex-1 flex-col gap-4.5 px-4 pt-7 pb-10 sm:px-6 lg:px-10">
         <p className="m-0 text-body-lg leading-normal text-ink-1">
-          {kinds ? t('details.intro') : t('details.introOne', { console: console.displayName })}
+          {kinds
+            ? t('details.intro')
+            : discMode
+              ? t('details.introDiscs')
+              : t('details.introOne', { console: console.displayName })}
         </p>
         {existing.length > 0 && current && (
           <Banner tone="info">
@@ -211,6 +250,45 @@ export function FileDetails({
           </Banner>
         )}
         {plan.isError && request && <Banner tone="danger">{describeError(t, plan.error)}</Banner>}
+
+        {unnumbered.map((s) => {
+          const value = renumber[s.id] ?? '1'
+          const ext = fileExtension(s.file, consoles)
+          const preview = previewFileName(
+            job.title,
+            { kind: 'disc', version: '', dlcName: '', disc: value },
+            ext,
+          )
+          return (
+            <article
+              key={`stored-${String(s.id)}`}
+              className="flex flex-col gap-3.5 rounded-xl border border-line bg-surface p-4.5"
+            >
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="min-w-0 font-mono text-caption [overflow-wrap:anywhere] text-ink-1">
+                  {s.file}
+                </span>
+                <span className="text-body-sm font-semibold text-ink-2">
+                  {t('details.storedDisc')}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-start gap-4">
+                <DiscField
+                  value={value}
+                  onChange={(next) => {
+                    setRenumber((r) => ({ ...r, [s.id]: next }))
+                  }}
+                  error={tried && normalizeDisc(value) === null}
+                />
+                <div className="min-w-0 flex-[1_1_280px]">
+                  <PathPreview label={t('edit.renamedTo')} complete={preview.complete}>
+                    {`${console.slug}/${folder.ok ? folder.name : '…'}/${preview.name}`}
+                  </PathPreview>
+                </div>
+              </div>
+            </article>
+          )
+        })}
 
         {valid.map((f) => {
           const draft = draftOf(f.path)
@@ -242,7 +320,7 @@ export function FileDetails({
                     type="checkbox"
                     checked={!draft.skip}
                     onChange={(e) => {
-                      set(f.path, { ...draft, skip: !e.target.checked })
+                      set(f.path, { ...rawDraft(f.path), skip: !e.target.checked })
                     }}
                     className="size-4.5 accent-accent"
                   />
@@ -254,7 +332,18 @@ export function FileDetails({
                   )}
                 </label>
               )}
-              {draft.skip ? null : kinds ? (
+              {draft.skip ? null : discMode ? (
+                <div className="flex flex-wrap items-start gap-4">
+                  <DiscField
+                    value={draft.disc ?? ''}
+                    onChange={(disc) => {
+                      set(f.path, { ...rawDraft(f.path), disc })
+                    }}
+                    error={error === 'disc'}
+                  />
+                  <div className="min-w-0 flex-[1_1_280px]">{path}</div>
+                </div>
+              ) : kinds ? (
                 <FileTypeFields
                   name={`kind-${f.path}`}
                   fileName={baseName(f.path)}
@@ -275,7 +364,7 @@ export function FileDetails({
                   planned={planned}
                   value={draft.onDuplicate}
                   onChange={(onDuplicate) => {
-                    set(f.path, { ...draft, onDuplicate })
+                    set(f.path, { ...rawDraft(f.path), onDuplicate })
                   }}
                 />
               )}

@@ -18,7 +18,7 @@ func TestUnassignedSection(t *testing.T) {
 	wantStatus(t, post(t, srv, cookie, "/api/games/"+id(game)+"/unassign", ""), http.StatusNoContent, "unassign")
 	e := entryNamed(t, srv, cookie, "Daxter")
 	if !e.Folder || e.Console == nil || *e.Console != "psp" || len(e.Files) != 1 ||
-		e.Files[0].Path != "Daxter/Daxter.iso" || e.Files[0].Reason != "manual" || len(e.Files[0].Consoles) != 2 || e.Files[0].Archive {
+		e.Files[0].Path != "Daxter/Daxter.iso" || e.Files[0].Reason != "manual" || len(e.Files[0].Consoles) != 4 || e.Files[0].Archive {
 		t.Fatalf("entry = %+v", e)
 	}
 	if exists(filepath.Join(library, "psp")) {
@@ -72,7 +72,7 @@ func TestUnassignedSection(t *testing.T) {
 	}
 
 	// Trash and delete, by file and by entry.
-	writeSettled(t, filepath.Join(library, "_unassigned", "a.z64"), "n64")
+	writeSettled(t, filepath.Join(library, "_unassigned", "a.gba"), "gba")
 	writeSettled(t, filepath.Join(library, "_unassigned", "b.rar"), "rar")
 	writeSettled(t, filepath.Join(library, "_unassigned", "Pack", "c.iso"), "iso")
 	writeSettled(t, filepath.Join(library, "_unassigned", "Pack", "d.txt"), "txt")
@@ -82,9 +82,9 @@ func TestUnassignedSection(t *testing.T) {
 	}
 	for _, e := range entries {
 		switch e.Name {
-		case "a.z64":
+		case "a.gba":
 			if e.Folder || len(e.Files[0].Consoles) != 0 || e.Files[0].Archive {
-				t.Errorf("a.z64 = %+v", e)
+				t.Errorf("a.gba = %+v", e)
 			}
 			wantStatus(t, post(t, srv, cookie, "/api/unassigned/"+id(e.Files[0].ID)+"/trash", ""), http.StatusNoContent, "trash file")
 		case "b.rar":

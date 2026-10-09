@@ -93,6 +93,8 @@ export interface CommitFile {
 
 export interface CommitRequest {
   files: CommitFile[]
+  /** Disc numbers for files already in the game (RF-08a). */
+  renumber?: { itemId: number; label: string }[]
 }
 
 export interface PlannedFile {
@@ -112,6 +114,8 @@ export interface CommitPlan {
   /** The game's current files. */
   existing: LibraryItem[]
   files: PlannedFile[]
+  /** Files already in the game that the commit renumbers (RF-08a). */
+  renamed?: { item: LibraryItem; file: string }[]
   /** Files that are not game files for the console. */
   discarded: string[]
 }

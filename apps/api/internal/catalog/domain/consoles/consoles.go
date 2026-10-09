@@ -5,11 +5,15 @@ package consoles
 
 import "github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
 
-// All returns every console in its default carousel order.
+// All returns every console in its default carousel order: by maker,
+// then by year (spec §6).
 func All() []domain.ConsoleDefinition {
 	return []domain.ConsoleDefinition{
-		Switch(),
+		N64(),
+		GameCube(),
 		Wii(),
+		Switch(),
+		PS2(),
 		PSP(),
 	}
 }

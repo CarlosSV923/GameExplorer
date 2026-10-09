@@ -71,6 +71,9 @@ func (l libraryPort) Plan(ctx context.Context, req ingestionapp.LibraryRequest) 
 		}
 		out.Files = append(out.Files, planned)
 	}
+	for _, r := range p.Renamed {
+		out.Renamed = append(out.Renamed, ingestionapp.RenamedItem{Item: existingItem(r.Item), File: r.File})
+	}
 	return out, nil
 }
 
@@ -146,6 +149,9 @@ func (l libraryPort) UnassignedDir() string { return l.svc.UnassignedPath("") }
 func storeRequest(req ingestionapp.LibraryRequest) catalogapp.StoreRequest {
 	out := catalogapp.StoreRequest{
 		Source: req.Source, Console: req.Console, Name: catalogapp.GameName{Title: req.Title, IGDBID: req.IGDBID},
+	}
+	for _, r := range req.Renumber {
+		out.Renumber = append(out.Renumber, catalogapp.Renumbering{Item: catalogdomain.ItemID(r.Item), Label: r.Label})
 	}
 	for _, f := range req.Files {
 		out.Files = append(out.Files, catalogapp.NewFile{

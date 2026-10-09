@@ -172,17 +172,23 @@ export function useCancelJob() {
   })
 }
 
-/** The preview of a commit (final names, duplicates), as the data changes. */
+/**
+ * The preview of a commit (final names, duplicates), as the data changes.
+ * `fresh` says whether the data shown is the request's own, not the one of
+ * a moment ago (the preview is debounced).
+ */
 export function useCommitPlan(jobId: string, request: CommitRequest | undefined) {
   const ports = useIngestionPorts()
   const debounced = useDebounced(request, 400)
-  return useQuery({
+  const fresh = JSON.stringify(debounced) === JSON.stringify(request)
+  const plan = useQuery({
     queryKey: ['jobs', jobId, 'plan', debounced],
     queryFn: () => ports.plan(jobId, debounced as CommitRequest),
     enabled: debounced !== undefined,
     placeholderData: keepPreviousData,
     retry: false,
   })
+  return { plan, fresh }
 }
 
 /**

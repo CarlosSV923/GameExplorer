@@ -24,8 +24,10 @@ func TestLibraryListsConsolesGamesAndDetail(t *testing.T) {
 		MultipleFiles bool     `json:"multipleFiles"`
 		Extensions    []string `json:"extensions"`
 	}](t, get(t, srv, cookie, "/api/consoles"))
-	if len(consoles) != 3 || consoles[0].Slug != "switch" || consoles[0].GameCount != 1 || !consoles[0].MultipleFiles ||
-		consoles[1].Slug != "wii" || consoles[1].GameCount != 0 || consoles[2].GameCount != 1 || len(consoles[2].Kinds) != 1 {
+	// Default order (spec §6): n64, gc, wii, switch, ps2, psp.
+	if len(consoles) != 6 || consoles[3].Slug != "switch" || consoles[3].GameCount != 1 || !consoles[3].MultipleFiles ||
+		consoles[2].Slug != "wii" || consoles[2].GameCount != 0 || consoles[5].GameCount != 1 || len(consoles[5].Kinds) != 1 ||
+		len(consoles[1].Kinds) != 2 {
 		t.Fatalf("consoles = %+v", consoles)
 	}
 
@@ -33,7 +35,7 @@ func TestLibraryListsConsolesGamesAndDetail(t *testing.T) {
 	if len(list) != 1 || list[0].ID != limbo || list[0].ItemCount != 3 || list[0].Size != int64(len("base")+2*len("update")) {
 		t.Fatalf("switch games = %+v", list)
 	}
-	if res := get(t, srv, cookie, "/api/consoles/ps2/games"); res.StatusCode != http.StatusNotFound {
+	if res := get(t, srv, cookie, "/api/consoles/ps3/games"); res.StatusCode != http.StatusNotFound {
 		t.Fatalf("unknown console = %d, want 404", res.StatusCode)
 	}
 

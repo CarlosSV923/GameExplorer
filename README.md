@@ -2,13 +2,13 @@
 
 [Español](README.es.md)
 
-> **Status:** early development (phases 0–11 of [`docs/tasks.md`](docs/tasks.md) done: the web app works end to end against the API for Switch, Wii and PSP, and a backend-less demo runs in the browser; next: the TrueNAS release and portfolio polish (phase 12)).
+> **Status:** early development (phases 0–11.5 of [`docs/tasks.md`](docs/tasks.md) done: the web app works end to end against the API for Nintendo 64, GameCube, Wii, Switch, PS2 and PSP, and a backend-less demo runs in the browser; next: the TrueNAS release and portfolio polish (phase 12)).
 >
 > **Live demo:** [game-explorer-gold.vercel.app](https://game-explorer-gold.vercel.app/), no server and no sign-in; your files never leave the browser.
 
 Self-hosted web app for a home NAS (TrueNAS SCALE) to **upload, extract, classify, rename, browse and download emulation game files** from any browser: desktop, tablet, touch screen or gamepad. The UI is inspired by EmulationStation.
 
-Drop a `.rar`, `.zip`, `.7z` or a raw game file, say which game and console it is (IGDB suggests names, but any name works), and GameExplorer extracts it, checks the files fit the console and stores them as `[console]/[game]/[file]` with consistent names. Switch base games, updates and DLC are handled; Wii and PSP keep one file per game.
+Drop a `.rar`, `.zip`, `.7z` or a raw game file, say which game and console it is (IGDB suggests names, but any name works), and GameExplorer extracts it, checks the files fit the console and stores them as `[console]/[game]/[file]` with consistent names. Switch base games, updates and DLC are handled; GameCube and PS2 games of several discs become `Game (Disc 1).iso`, `Game (Disc 2).iso`; Nintendo 64, Wii and PSP keep one file per game.
 
 ## Highlights (planned)
 - Resumable uploads of tens of gigabytes (tus protocol), streamed to disk.

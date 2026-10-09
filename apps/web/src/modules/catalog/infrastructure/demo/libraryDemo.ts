@@ -90,6 +90,8 @@ export interface StoreRequest {
   title: string
   igdbId?: number | null
   files: NewFile[]
+  /** Disc numbers for files already in the game (RF-08a). */
+  renumber?: { itemId: number; label: string }[]
 }
 
 export interface StorePlan {
@@ -99,6 +101,7 @@ export interface StorePlan {
   gameId: number | null
   existing: LibraryItem[]
   files: { path: string; file: string; action: PlannedAction; duplicate?: LibraryItem | null }[]
+  renamed: { item: LibraryItem; file: string }[]
 }
 
 const retentionMs = 30 * 24 * 3600 * 1000
@@ -315,7 +318,7 @@ export class DemoLibrary {
     const g = this.games.get(id)
     const items = g ? this.liveItems(id) : []
     if (!g || items.length === 0) throw notFound()
-    const order: Record<ItemKind, number> = { base: 0, game: 0, update: 1, dlc: 2 }
+    const order: Record<ItemKind, number> = { base: 0, game: 0, disc: 0, update: 1, dlc: 2 }
     items.sort(
       (a, b) =>
         order[a.kind] - order[b.kind] ||
@@ -402,16 +405,38 @@ export class DemoLibrary {
     const game = this.gameByFolder(console.slug, folder)
     const existing = game ? this.liveItems(game.id) : []
     const exts = consoleExtensions(console)
+    // Stored files that become numbered discs keep their place under the new name.
+    const renamed = (req.renumber ?? []).map((r) => {
+      const it = existing.find((e) => e.id === r.itemId)
+      if (!it || !console.kinds.includes('disc')) {
+        throw invalid('Solo los discos de un juego guardado se pueden numerar.')
+      }
+      const name = itemFileName(
+        { title: game?.title ?? title, kind: 'disc', label: r.label },
+        extensionOf(it.file, this.known()),
+      )
+      if (!name.ok) throw invalid('Escribe un número de disco del 1 al 99.')
+      return { item: toItem(it), file: name.name }
+    })
+    const current = existing.map((e) => {
+      const r = renamed.find((x) => x.item.id === e.id)
+      return r ? { ...e, file: r.file } : e
+    })
     const replaced = new Set<number>()
     const files = req.files.map((f) => {
       const ext = extensionOf(f.name, this.known())
       if (!exts.includes(ext))
         throw invalid(`«${f.ref}» no es un archivo de ${console.displayName}.`)
-      const kind = console.kinds.length === 1 ? console.kinds[0] : f.kind
+      // One disc is the game itself (spec §5).
+      const kind =
+        f.kind ??
+        (console.kinds.length === 1 || console.kinds.includes('game')
+          ? console.kinds[0]
+          : undefined)
       if (!kind || !console.kinds.includes(kind)) throw invalid(`Falta el tipo de «${f.ref}».`)
       const name = itemFileName({ title: game?.title ?? title, kind, label: f.label ?? '' }, ext)
       if (!name.ok) throw invalid(`Revisa los datos de «${f.ref}».`)
-      const duplicate = existing.find((e) => e.file.toLowerCase() === name.name.toLowerCase())
+      const duplicate = current.find((e) => e.file.toLowerCase() === name.name.toLowerCase())
       let action: PlannedAction = 'store'
       if (duplicate) {
         action = f.onDuplicate ?? 'undecided'
@@ -437,6 +462,7 @@ export class DemoLibrary {
       gameId: game?.id ?? null,
       existing: existing.map(toItem),
       files,
+      renamed,
     }
   }
 
@@ -445,6 +471,26 @@ export class DemoLibrary {
     const plan = this.plan(req)
     if (plan.files.some((f) => f.action === 'undecided')) {
       throw conflict('Hay archivos que ya existen: elige Reemplazar u Omitir.')
+    }
+    // A game of several files has every disc numbered (spec §5).
+    if (this.console(plan.console).kinds.includes('disc')) {
+      const renamedIds = new Set(plan.renamed.map((r) => r.item.id))
+      const replacedIds = new Set(
+        plan.files.flatMap((f) => (f.action === 'replace' && f.duplicate ? [f.duplicate.id] : [])),
+      )
+      const kinds = [
+        ...plan.existing
+          .filter((e) => !replacedIds.has(e.id))
+          .map((e) => (renamedIds.has(e.id) ? 'disc' : e.kind)),
+        ...plan.files.flatMap((f, i) =>
+          f.action === 'skip' ? [] : [req.files[i]?.kind ?? 'game'],
+        ),
+      ]
+      if (kinds.length > 1 && kinds.some((k) => k !== 'disc')) {
+        throw invalid(
+          'Un juego de varios discos necesita el número de cada disco, también del que ya está guardado.',
+        )
+      }
     }
     let game = plan.gameId === null ? undefined : this.games.get(plan.gameId)
     if (!game) game = this.newGame(plan.console, req)
@@ -459,6 +505,11 @@ export class DemoLibrary {
           genres: info.genres,
         })
       }
+    }
+    for (const r of plan.renamed) {
+      const it = this.items.get(r.item.id)
+      const label = (req.renumber ?? []).find((x) => x.itemId === r.item.id)?.label.trim() ?? '1'
+      if (it) Object.assign(it, { kind: 'disc', label: String(Number(label)), file: r.file })
     }
     let stored = 0
     let replaced = 0

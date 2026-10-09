@@ -38,6 +38,10 @@ var required = []struct {
 	{130, "Splatoon 3"},
 	{5, "The Legend of Zelda: Twilight Princess"},
 	{38, "Daxter"},
+	{4, "Super Mario 64"},
+	{21, "Resident Evil 4"},
+	{21, "Metroid Prime"},
+	{8, "Shadow of the Colossus"},
 }
 
 type credentials struct {
@@ -74,7 +78,7 @@ type catalogGame struct {
 
 func main() {
 	out := flag.String("out", "../web/src/modules/metadata/infrastructure/demo/catalog.json", "output file")
-	perPlatform := flag.Int("per-platform", 18, "top-rated games per platform")
+	perPlatform := flag.Int("per-platform", 15, "top-rated games per platform")
 	flag.Parse()
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
