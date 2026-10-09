@@ -105,7 +105,7 @@ export function ConsoleScreen({ slug, gameId }: { slug: string; gameId: number |
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-app flex-col">
       <PageHeader
         back={
           <BackLink to="/" search={{ consola: slug }}>

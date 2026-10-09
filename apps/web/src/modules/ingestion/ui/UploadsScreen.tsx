@@ -22,7 +22,7 @@ export function UploadsScreen() {
   })
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-app flex-col">
       <PageHeader
         back={
           <BackLink to="/">

@@ -45,7 +45,7 @@ export function SearchScreen({ query, gameId }: { query: string; gameId: number 
   const empty = !query.trim() || (results.isSuccess && results.data.length === 0)
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-app flex-col">
       <PageHeader
         back={
           <BackLink to="/">

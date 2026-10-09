@@ -339,7 +339,7 @@ export function HomeScreen({
   }
 
   return (
-    <div className="flex min-h-dvh flex-col overflow-hidden">
+    <div className="flex min-h-app flex-col overflow-hidden">
       <header className="flex flex-wrap items-center justify-between gap-4 px-4 pt-7 sm:px-6 lg:px-10">
         <div className="flex min-w-0 flex-wrap items-center gap-5">
           <span className="flex items-center gap-2.5 text-body-lg font-bold">

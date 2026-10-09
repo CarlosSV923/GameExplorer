@@ -47,7 +47,7 @@ export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-app flex-col">
       <main className="flex flex-1 flex-col justify-center py-12">
         <div className="flex w-full items-center">
           <Rails side="left" />

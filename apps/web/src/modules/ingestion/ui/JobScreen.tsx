@@ -90,7 +90,7 @@ export function JobScreen({ jobId }: { jobId: string }) {
         />
       )
     return (
-      <div className="flex min-h-dvh flex-col">
+      <div className="flex min-h-app flex-col">
         {view}
         <HelpBar
           actions={[
@@ -105,7 +105,7 @@ export function JobScreen({ jobId }: { jobId: string }) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-app flex-col">
       <PageHeader
         back={
           <BackLink to="/subidas">

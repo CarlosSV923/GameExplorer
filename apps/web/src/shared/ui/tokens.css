@@ -160,3 +160,9 @@
     }
   }
 }
+
+/* A screen's full height, minus a fixed notice above every screen (the
+   demo's), which sets --chrome-top. */
+@utility min-h-app {
+  min-height: calc(100dvh - var(--chrome-top, 0px));
+}

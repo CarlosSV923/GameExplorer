@@ -45,7 +45,7 @@ function RouteError() {
   const { t } = useTranslation()
   const router = useRouter()
   return (
-    <main className="box-border flex min-h-dvh items-center justify-center p-6">
+    <main className="box-border flex min-h-app items-center justify-center p-6">
       <EmptyState
         title={t('errors.loadTitle')}
         body={t('errors.loadBody')}
@@ -67,7 +67,7 @@ function RouteError() {
 function NotFound() {
   const { t } = useTranslation()
   return (
-    <main className="box-border flex min-h-dvh items-center justify-center p-6">
+    <main className="box-border flex min-h-app items-center justify-center p-6">
       <EmptyState
         title={t('notFound.title')}
         body={t('notFound.body')}
