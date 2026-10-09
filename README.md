@@ -2,7 +2,9 @@
 
 [Español](README.es.md)
 
-> **Status:** early development (phases 0–10 of [`docs/tasks.md`](docs/tasks.md) done: the web app works end to end against the API for Switch, Wii and PSP — sign in, browse the carousel, upload with a form and resumable transfers, confirm each file, edit and move games, the unassigned section fed by a Samba scan, trash and restore; next: the backend-less demo (phase 11) and the TrueNAS release (phase 12)).
+> **Status:** early development (phases 0–11 of [`docs/tasks.md`](docs/tasks.md) done: the web app works end to end against the API for Switch, Wii and PSP, and a backend-less demo runs in the browser; next: the TrueNAS release and portfolio polish (phase 12)).
+>
+> **Live demo:** [game-explorer-gold.vercel.app](https://game-explorer-gold.vercel.app/), no server and no sign-in; your files never leave the browser.
 
 Self-hosted web app for a home NAS (TrueNAS SCALE) to **upload, extract, classify, rename, browse and download emulation game files** from any browser: desktop, tablet, touch screen or gamepad. The UI is inspired by EmulationStation.
 
