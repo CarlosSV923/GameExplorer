@@ -2,7 +2,7 @@
 
 1. **Datasets.** Usa el dataset de juegos que ya compartes por SMB (la biblioteca) y crea otro pequeño para el estado de la app, por ejemplo `apps/gameexplorer` (SQLite y caché de imágenes).
 2. **Permisos.** La app corre como el usuario `3000:3000` (`user:` en el YAML). Dale una entrada ACL propia con **Modify** e **Inherit** en los dos datasets: un contenedor no hereda grupos suplementarios (RNF-03).
-3. **App.** En *Apps › Discover Apps › Custom App › Install via YAML*, pega [`compose.yaml`](compose.yaml) y cambia lo marcado con `CHANGE`:
+3. **App.** En *Apps › Discover Apps › Custom App › Install via YAML*, pon como *Name* `gameexplorer` (TrueNAS solo acepta minúsculas, números y guiones), pega [`compose.yaml`](compose.yaml) y cambia lo marcado con `CHANGE`:
    - las dos rutas `/mnt/...`;
    - `APP_PASSWORD` (o `APP_PASSWORD_HASH`, generado con `task hash-password`);
    - `SESSION_SECRET`: 32 caracteres aleatorios o más;
