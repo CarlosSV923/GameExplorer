@@ -1,0 +1,9 @@
+**/node_modules
+.dev
+.git
+.task
+**/dist
+!apps/api/internal/platform/web/dist/.gitkeep
+apps/api/bin
+.env*
+!.env.example

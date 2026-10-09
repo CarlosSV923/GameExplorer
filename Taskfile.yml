@@ -141,6 +141,11 @@ tasks:
       - task: embed:web
       - '{{.DOCKER_GO}} -e CGO_ENABLED=0 {{.GO_IMAGE}} go build -trimpath -o bin/gameexplorer ./cmd/gameexplorer'
 
+  image:
+    desc: Build the production image (gameexplorer:local); tags v* publish it to GHCR from CI
+    cmds:
+      - docker build -t gameexplorer:local .
+
   embed:web:
     internal: true
     cmds:
