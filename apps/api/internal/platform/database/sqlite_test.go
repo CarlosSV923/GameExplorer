@@ -6,7 +6,7 @@ import (
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/database"
 )
 
-func TestOpenMigratesAndSeedsConsoles(t *testing.T) {
+func TestOpenMigrates(t *testing.T) {
 	t.Parallel()
 
 	conn, err := database.Open(t.Context(), t.TempDir())
@@ -16,11 +16,8 @@ func TestOpenMigratesAndSeedsConsoles(t *testing.T) {
 	t.Cleanup(func() { _ = conn.Close() })
 
 	var n int
-	if err := conn.QueryRowContext(t.Context(), "SELECT count(*) FROM consoles").Scan(&n); err != nil {
-		t.Fatalf("count consoles: %v", err)
-	}
-	if n != 6 {
-		t.Fatalf("seeded consoles = %d, want 6", n)
+	if err := conn.QueryRowContext(t.Context(), "SELECT count(*) FROM games").Scan(&n); err != nil || n != 0 {
+		t.Fatalf("games table: %d, %v", n, err)
 	}
 
 	var journal string

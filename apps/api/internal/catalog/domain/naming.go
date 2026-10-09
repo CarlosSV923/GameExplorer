@@ -3,28 +3,29 @@ package domain
 import (
 	"errors"
 	"fmt"
-	"strconv"
+	"regexp"
 	"strings"
 	"unicode"
 
 	"golang.org/x/text/unicode/norm"
 )
 
-// ItemKind is what an item is within a game folder.
+// ItemKind is what a file is within its game (spec §5).
 type ItemKind string
 
-// Item kinds (spec §5).
+// Item kinds. Consoles with add-ons (Switch) use base, update and DLC;
+// consoles with one file per game (Wii, PSP) use game.
 const (
 	KindBase   ItemKind = "base"
 	KindUpdate ItemKind = "update"
 	KindDLC    ItemKind = "dlc"
-	KindDisc   ItemKind = "disc"
+	KindGame   ItemKind = "game"
 )
 
 // Valid reports whether k is a known kind.
 func (k ItemKind) Valid() bool {
 	switch k {
-	case KindBase, KindUpdate, KindDLC, KindDisc:
+	case KindBase, KindUpdate, KindDLC, KindGame:
 		return true
 	}
 	return false
@@ -38,7 +39,7 @@ var (
 
 // NameError is a rejected naming input.
 type NameError struct {
-	Field string // title | label | disc | kind | extension
+	Field string // title | label | version | kind | extension
 	Err   error
 }
 
@@ -50,8 +51,9 @@ const maxNameBytes = 255
 
 var colonReplacer = strings.NewReplacer(":", " -", "꞉", " -", "/", " ", `\`, " ")
 
-// SanitizeTitle turns an IGDB title (or a label) into something every file
-// system and SMB client accepts (spec §5). It returns "" when nothing is left.
+// SanitizeTitle turns a game title (or a DLC name) into something every
+// file system and SMB client accepts (spec §5). It returns "" when nothing
+// is left.
 func SanitizeTitle(s string) string {
 	s = norm.NFC.String(s)
 	s = colonReplacer.Replace(s)
@@ -68,78 +70,63 @@ func SanitizeTitle(s string) string {
 	return strings.TrimRight(s, " .")
 }
 
-// ItemName describes one item to name.
-type ItemName struct {
-	Title      string
-	Kind       ItemKind
-	Label      string // update version or DLC name
-	DiscNumber int
+var versionPattern = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*$`)
+
+// NormalizeVersion turns what the user typed for an update ("1.0.4",
+// "v1.0.4", "122345") into the stored version, without the "v".
+func NormalizeVersion(s string) (string, error) {
+	v := strings.TrimSpace(s)
+	v = strings.TrimPrefix(strings.TrimPrefix(v, "v"), "V")
+	if len(v) > 32 || !versionPattern.MatchString(v) {
+		return "", &NameError{Field: "version", Err: ErrInvalidName}
+	}
+	return v, nil
 }
 
-// Stem is the item's name without extension: "Juego [Update v1.2.1]".
+// ItemName describes one file to name.
+type ItemName struct {
+	Title string
+	Kind  ItemKind
+	// Label is the update version (as NormalizeVersion returns it) or the
+	// DLC name; empty for base and game.
+	Label string
+}
+
+// Stem is the file's name without extension: "Limbo [UPDATE v1.0.4]".
 func (n ItemName) Stem() (string, error) {
 	title := SanitizeTitle(n.Title)
 	if title == "" {
 		return "", &NameError{Field: "title", Err: ErrInvalidName}
 	}
-	var stem string
 	switch n.Kind {
+	case KindGame:
+		return title, nil
 	case KindBase:
-		stem = title
-	case KindUpdate, KindDLC:
-		label := SanitizeTitle(n.Label)
-		if label == "" {
+		return title + " [BASE]", nil
+	case KindUpdate:
+		v, err := NormalizeVersion(n.Label)
+		if err != nil {
+			return "", err
+		}
+		return title + " [UPDATE v" + v + "]", nil
+	case KindDLC:
+		name := SanitizeTitle(n.Label)
+		if name == "" {
 			return "", &NameError{Field: "label", Err: ErrInvalidName}
 		}
-		if n.Kind == KindUpdate {
-			stem = title + " [Update " + label + "]"
-		} else {
-			stem = title + " [DLC] " + label
-		}
-	case KindDisc:
-		if n.DiscNumber < 1 || n.DiscNumber > 99 {
-			return "", &NameError{Field: "disc", Err: ErrInvalidName}
-		}
-		stem = title + " (Disc " + strconv.Itoa(n.DiscNumber) + ")"
-	default:
-		return "", &NameError{Field: "kind", Err: ErrInvalidName}
+		return title + " [DLC " + name + "]", nil
 	}
-	return stem, nil
+	return "", &NameError{Field: "kind", Err: ErrInvalidName}
 }
 
-// FileName is Stem plus the lower-cased extension ("" for folder games).
+// FileName is Stem plus the lower-cased extension.
 func (n ItemName) FileName(ext string) (string, error) {
 	stem, err := n.Stem()
 	if err != nil {
 		return "", err
 	}
-	return withExtension(stem, ext)
-}
-
-// TrackNames names the tracks of a disc, Redump style: one track takes the
-// disc's name; several are "(Track N)", with two digits from ten tracks on.
-func TrackNames(stem string, extensions []string) ([]string, error) {
-	out := make([]string, len(extensions))
-	for i, ext := range extensions {
-		name := stem
-		if len(extensions) > 1 {
-			format := "%s (Track %d)"
-			if len(extensions) >= 10 {
-				format = "%s (Track %02d)"
-			}
-			name = fmt.Sprintf(format, stem, i+1)
-		}
-		var err error
-		if out[i], err = withExtension(name, ext); err != nil {
-			return nil, err
-		}
-	}
-	return out, nil
-}
-
-func withExtension(stem, ext string) (string, error) {
 	ext = strings.ToLower(ext)
-	if ext != "" && (!strings.HasPrefix(ext, ".") || SanitizeTitle(ext) != ext || strings.Contains(ext, " ")) {
+	if !extensionPattern.MatchString(ext) {
 		return "", &NameError{Field: "extension", Err: ErrInvalidName}
 	}
 	name := stem + ext
@@ -149,32 +136,31 @@ func withExtension(stem, ext string) (string, error) {
 	return name, nil
 }
 
-// GameFolder picks the game's folder name inside its console folder. A
-// different game may already use the plain title (a remake, or a folder
-// created over SMB): then the release year is added and, if that is taken
-// too, the IGDB id.
-func GameFolder(title string, year *int, igdbID int64, taken func(string) (bool, error)) (string, error) {
-	base := SanitizeTitle(title)
-	if base == "" {
+// GameFolder is the game's folder name inside its console folder: the
+// sanitized title (RF-11).
+func GameFolder(title string) (string, error) {
+	folder := SanitizeTitle(title)
+	if folder == "" {
 		return "", &NameError{Field: "title", Err: ErrInvalidName}
 	}
-	candidates := []string{base}
-	if year != nil {
-		base = fmt.Sprintf("%s (%d)", base, *year)
-		candidates = append(candidates, base)
+	if len(folder) > maxNameBytes {
+		return "", &NameError{Field: "title", Err: ErrNameTooLong}
 	}
-	candidates = append(candidates, fmt.Sprintf("%s [%d]", base, igdbID))
-	for _, c := range candidates {
-		if len(c) > maxNameBytes {
-			return "", &NameError{Field: "title", Err: ErrNameTooLong}
+	return folder, nil
+}
+
+// CleanLabel normalizes an item's label for its kind: the version without
+// "v" for updates, the trimmed name for DLC and nothing for the others.
+func CleanLabel(kind ItemKind, label string) (string, error) {
+	switch kind {
+	case KindUpdate:
+		return NormalizeVersion(label)
+	case KindDLC:
+		name := strings.Join(strings.Fields(label), " ")
+		if SanitizeTitle(name) == "" {
+			return "", &NameError{Field: "label", Err: ErrInvalidName}
 		}
-		t, err := taken(c)
-		if err != nil {
-			return "", err
-		}
-		if !t {
-			return c, nil
-		}
+		return name, nil
 	}
-	return "", fmt.Errorf("game folder %q: every candidate name is taken", candidates[len(candidates)-1])
+	return "", nil
 }

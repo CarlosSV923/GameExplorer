@@ -10,10 +10,14 @@ import (
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/httpapi"
 )
 
-// CommitService plans and performs commits (implemented by application.Committer).
+// CommitService confirms, re-validates and sets aside uploads (implemented
+// by application.Committer).
 type CommitService interface {
-	Plan(ctx context.Context, id domain.JobID, req application.CommitRequest) (application.CommitPlan, error)
-	Commit(ctx context.Context, id domain.JobID, req application.CommitRequest) (*domain.UploadJob, application.CommitResult, error)
+	Files(ctx context.Context, id domain.JobID) ([]application.FileView, error)
+	Plan(ctx context.Context, id domain.JobID, req []application.CommitFile) (application.CommitPlan, error)
+	Commit(ctx context.Context, id domain.JobID, req []application.CommitFile) (*domain.UploadJob, application.CommitResult, error)
+	ChangeConsole(ctx context.Context, id domain.JobID, console string) (*domain.UploadJob, error)
+	Resolve(ctx context.Context, id domain.JobID, r application.Resolution) (*domain.UploadJob, error)
 }
 
 // WithCommits sets the commit use case.
@@ -22,12 +26,30 @@ func (h *Handler) WithCommits(c CommitService) *Handler {
 	return h
 }
 
+// ListJobFiles implements httpapi.StrictServerInterface.
+func (h *Handler) ListJobFiles(ctx context.Context, req httpapi.ListJobFilesRequestObject) (httpapi.ListJobFilesResponseObject, error) {
+	files, err := h.commits.Files(ctx, domain.JobID(req.Id))
+	if errors.Is(err, domain.ErrJobNotFound) {
+		return httpapi.ListJobFiles404ApplicationProblemPlusJSONResponse{
+			NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(problem(http.StatusNotFound, "Not Found", "La subida no existe.")),
+		}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := make(httpapi.ListJobFiles200JSONResponse, 0, len(files))
+	for _, f := range files {
+		out = append(out, httpapi.StagedFile{Path: f.Path, Size: f.Size, Valid: f.Valid, Consoles: f.Consoles})
+	}
+	return out, nil
+}
+
 // PlanJobCommit implements httpapi.StrictServerInterface.
 func (h *Handler) PlanJobCommit(ctx context.Context, req httpapi.PlanJobCommitRequestObject) (httpapi.PlanJobCommitResponseObject, error) {
 	if req.Body == nil {
 		return httpapi.PlanJobCommit400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: badRequest("Falta el cuerpo de la petición.")}, nil
 	}
-	plan, err := h.commits.Plan(ctx, domain.JobID(req.Id), commitRequest(*req.Body))
+	plan, err := h.commits.Plan(ctx, domain.JobID(req.Id), commitFiles(*req.Body))
 	if err == nil {
 		return httpapi.PlanJobCommit200JSONResponse(planToAPI(plan)), nil
 	}
@@ -52,7 +74,7 @@ func (h *Handler) CommitJob(ctx context.Context, req httpapi.CommitJobRequestObj
 	if req.Body == nil {
 		return httpapi.CommitJob400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: badRequest("Falta el cuerpo de la petición.")}, nil
 	}
-	job, res, err := h.commits.Commit(ctx, domain.JobID(req.Id), commitRequest(*req.Body))
+	job, res, err := h.commits.Commit(ctx, domain.JobID(req.Id), commitFiles(*req.Body))
 	if err == nil {
 		return httpapi.CommitJob200JSONResponse{
 			Job: ToAPI(*job), GameId: res.GameID, Path: res.Path,
@@ -62,8 +84,7 @@ func (h *Handler) CommitJob(ctx context.Context, req httpapi.CommitJobRequestObj
 	status, p := commitProblem(err)
 	if status == http.StatusInternalServerError && job != nil && job.Error != "" {
 		// The commit failed and was undone (or could not be): say why.
-		detail := job.Error
-		p = problem(http.StatusInternalServerError, "Internal Server Error", detail)
+		p = problem(http.StatusInternalServerError, "Internal Server Error", job.Error)
 		return httpapi.CommitJob500ApplicationProblemPlusJSONResponse{InternalErrorApplicationProblemPlusJSONResponse: httpapi.InternalErrorApplicationProblemPlusJSONResponse(p)}, nil
 	}
 	switch status {
@@ -81,6 +102,48 @@ func (h *Handler) CommitJob(ctx context.Context, req httpapi.CommitJobRequestObj
 	return nil, err
 }
 
+// ChangeJobConsole implements httpapi.StrictServerInterface.
+func (h *Handler) ChangeJobConsole(ctx context.Context, req httpapi.ChangeJobConsoleRequestObject) (httpapi.ChangeJobConsoleResponseObject, error) {
+	if req.Body == nil {
+		return httpapi.ChangeJobConsole400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: badRequest("Falta el cuerpo de la petición.")}, nil
+	}
+	job, err := h.commits.ChangeConsole(ctx, domain.JobID(req.Id), req.Body.Console)
+	if err == nil {
+		return httpapi.ChangeJobConsole200JSONResponse(ToAPI(*job)), nil
+	}
+	switch status, p := commitProblem(err); status {
+	case http.StatusBadRequest:
+		return httpapi.ChangeJobConsole400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: httpapi.BadRequestApplicationProblemPlusJSONResponse(p)}, nil
+	case http.StatusNotFound:
+		return httpapi.ChangeJobConsole404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+	case http.StatusConflict:
+		return httpapi.ChangeJobConsole409ApplicationProblemPlusJSONResponse{ConflictApplicationProblemPlusJSONResponse: httpapi.ConflictApplicationProblemPlusJSONResponse(p)}, nil
+	}
+	return nil, err
+}
+
+// ResolveJob implements httpapi.StrictServerInterface.
+func (h *Handler) ResolveJob(ctx context.Context, req httpapi.ResolveJobRequestObject) (httpapi.ResolveJobResponseObject, error) {
+	if req.Body == nil {
+		return httpapi.ResolveJob400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: badRequest("Falta el cuerpo de la petición.")}, nil
+	}
+	job, err := h.commits.Resolve(ctx, domain.JobID(req.Id), application.Resolution(req.Body.Action))
+	if err == nil {
+		return httpapi.ResolveJob200JSONResponse(ToAPI(*job)), nil
+	}
+	switch status, p := commitProblem(err); status {
+	case http.StatusBadRequest:
+		return httpapi.ResolveJob400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: httpapi.BadRequestApplicationProblemPlusJSONResponse(p)}, nil
+	case http.StatusNotFound:
+		return httpapi.ResolveJob404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
+	case http.StatusConflict:
+		return httpapi.ResolveJob409ApplicationProblemPlusJSONResponse{ConflictApplicationProblemPlusJSONResponse: httpapi.ConflictApplicationProblemPlusJSONResponse(p)}, nil
+	default:
+		detail := "No se pudieron apartar los archivos y se deshizo el cambio: " + err.Error()
+		return httpapi.ResolveJob500ApplicationProblemPlusJSONResponse{InternalErrorApplicationProblemPlusJSONResponse: httpapi.InternalErrorApplicationProblemPlusJSONResponse(problem(http.StatusInternalServerError, "Internal Server Error", detail))}, nil
+	}
+}
+
 func badRequest(detail string) httpapi.BadRequestApplicationProblemPlusJSONResponse {
 	return httpapi.BadRequestApplicationProblemPlusJSONResponse(problem(http.StatusBadRequest, "Bad Request", detail))
 }
@@ -91,8 +154,12 @@ func commitProblem(err error) (int, httpapi.Problem) {
 	switch {
 	case errors.Is(err, domain.ErrJobNotFound):
 		return http.StatusNotFound, problem(http.StatusNotFound, "Not Found", "La subida no existe.")
-	case errors.Is(err, application.ErrNotInReview):
-		return http.StatusConflict, problem(http.StatusConflict, "Conflict", "La subida no está en revisión.")
+	case errors.Is(err, application.ErrNotConfirmable):
+		return http.StatusConflict, problem(http.StatusConflict, "Conflict", "La subida no está esperando confirmación.")
+	case errors.Is(err, application.ErrNotInvalid):
+		return http.StatusConflict, problem(http.StatusConflict, "Conflict", "La subida encaja en su consola; no hay nada que apartar.")
+	case errors.Is(err, domain.ErrInvalidTransition):
+		return http.StatusConflict, problem(http.StatusConflict, "Conflict", "La subida cambió de estado; vuelve a intentarlo.")
 	case errors.As(err, &rejected):
 		status := map[application.RejectReason]int{
 			application.RejectInvalid:     http.StatusBadRequest,
@@ -108,26 +175,20 @@ func commitProblem(err error) (int, httpapi.Problem) {
 	return http.StatusInternalServerError, problem(http.StatusInternalServerError, "Internal Server Error", "")
 }
 
-func commitRequest(b httpapi.CommitRequest) application.CommitRequest {
-	out := application.CommitRequest{Console: b.Console, IGDBGameID: b.IgdbGameId}
-	for _, it := range b.Items {
-		ci := application.CommitItem{Path: it.Path}
-		if it.Skip != nil {
-			ci.Skip = *it.Skip
+func commitFiles(b httpapi.CommitRequest) []application.CommitFile {
+	out := make([]application.CommitFile, 0, len(b.Files))
+	for _, f := range b.Files {
+		cf := application.CommitFile{Path: f.Path}
+		if f.Kind != nil {
+			cf.Kind = string(*f.Kind)
 		}
-		if it.Kind != nil {
-			ci.Kind = string(*it.Kind)
+		if f.Label != nil {
+			cf.Label = *f.Label
 		}
-		if it.Label != nil {
-			ci.Label = *it.Label
+		if f.OnDuplicate != nil {
+			cf.OnDuplicate = string(*f.OnDuplicate)
 		}
-		if it.DiscNumber != nil {
-			ci.DiscNumber = *it.DiscNumber
-		}
-		if it.OnDuplicate != nil {
-			ci.OnDuplicate = string(*it.OnDuplicate)
-		}
-		out.Items = append(out.Items, ci)
+		out = append(out, cf)
 	}
 	return out
 }
@@ -135,8 +196,9 @@ func commitRequest(b httpapi.CommitRequest) application.CommitRequest {
 func planToAPI(p application.CommitPlan) httpapi.CommitPlan {
 	out := httpapi.CommitPlan{
 		Console: p.Console, Title: p.Title, Folder: p.Folder,
-		Existing: make([]httpapi.LibraryItem, 0, len(p.Existing)),
-		Items:    make([]httpapi.PlannedItem, 0, len(p.Items)),
+		Existing:  make([]httpapi.LibraryItem, 0, len(p.Existing)),
+		Files:     make([]httpapi.PlannedFile, 0, len(p.Files)),
+		Discarded: append([]string{}, p.Discarded...),
 	}
 	if p.GameID != 0 {
 		id := p.GameID
@@ -145,29 +207,22 @@ func planToAPI(p application.CommitPlan) httpapi.CommitPlan {
 	for _, e := range p.Existing {
 		out.Existing = append(out.Existing, libraryItemToAPI(e))
 	}
-	for _, it := range p.Items {
-		pi := httpapi.PlannedItem{Path: it.Path, Files: it.Files, Action: httpapi.PlannedItemAction(it.Action)}
-		if it.Duplicate != nil {
-			d := libraryItemToAPI(*it.Duplicate)
-			pi.Duplicate = &d
+	for _, f := range p.Files {
+		pf := httpapi.PlannedFile{Path: f.Path, File: f.File, Action: httpapi.PlanAction(f.Action)}
+		if f.Duplicate != nil {
+			d := libraryItemToAPI(*f.Duplicate)
+			pf.Duplicate = &d
 		}
-		out.Items = append(out.Items, pi)
+		out.Files = append(out.Files, pf)
 	}
 	return out
 }
 
 func libraryItemToAPI(e application.ExistingItem) httpapi.LibraryItem {
-	out := httpapi.LibraryItem{
-		Id: e.ID, Kind: httpapi.ItemKind(e.Kind), Shape: httpapi.LibraryItemShape(e.Shape),
-		Files: e.Files, Size: e.Size, CreatedAt: e.CreatedAt,
-	}
+	out := httpapi.LibraryItem{Id: e.ID, Kind: httpapi.ItemKind(e.Kind), File: e.File, Size: e.Size, CreatedAt: e.CreatedAt}
 	if e.Label != "" {
 		l := e.Label
 		out.Label = &l
-	}
-	if e.DiscNumber > 0 {
-		n := e.DiscNumber
-		out.DiscNumber = &n
 	}
 	return out
 }

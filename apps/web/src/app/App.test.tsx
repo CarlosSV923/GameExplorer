@@ -1,13 +1,26 @@
 import { createMemoryHistory } from '@tanstack/react-router'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { createI18n } from '@/shared/i18n'
 import { AppError } from '@/shared/kernel/errors'
-import { fakeServices } from '@/test/fakeServices'
+import type { UnassignedFile } from '@/modules/catalog/domain/types'
+import { consoles, fakeServices } from '@/test/fakeServices'
 
 import { App } from './App'
 import { safeRedirect } from './router'
+
+const unassignedFile: UnassignedFile = {
+  id: 1,
+  path: 'n64/Mario.z64',
+  name: 'Mario.z64',
+  origin: 'n64/',
+  reason: 'samba',
+  size: 8_000_000,
+  arrivedAt: '2026-10-08T10:00:00Z',
+  consoles: [],
+  archive: false,
+}
 
 function renderAt(path: string, services = fakeServices()) {
   const history = createMemoryHistory({ initialEntries: [path] })
@@ -28,22 +41,74 @@ describe('App', () => {
     expect(screen.getByText('2 juegos')).toBeInTheDocument()
   })
 
-  it('moves through the carousel with the arrow keys and remembers it in the URL', async () => {
+  it('moves through the consoles with games and the unassigned section', async () => {
     const user = userEvent.setup()
-    const { history } = renderAt('/')
+    const services = fakeServices()
+    services.catalog.unassigned.list = vi.fn(() => Promise.resolve([unassignedFile]))
+    const { history } = renderAt('/', services)
     await screen.findByRole('heading', { level: 1, name: 'Nintendo Switch' })
 
     await user.keyboard('{ArrowRight}')
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'PlayStation 2' }),
-    ).toBeInTheDocument()
-    expect(screen.getByText('0 juegos')).toBeInTheDocument()
-    expect(history.location.search).toContain('consola=ps2')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Wii' })).toBeInTheDocument()
+    expect(screen.getByText('1 juego')).toBeInTheDocument()
+    expect(history.location.search).toContain('consola=wii')
 
-    await user.keyboard('{ArrowLeft}{ArrowLeft}')
+    // PlayStation Portable has no games: the unassigned section comes next.
+    await user.keyboard('{ArrowRight}')
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Nintendo GameCube' }),
+      await screen.findByRole('heading', { level: 1, name: 'No asignados' }),
     ).toBeInTheDocument()
+    expect(screen.getAllByText('1 archivo').length).toBeGreaterThan(0)
+
+    await user.keyboard('{ArrowRight}')
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Nintendo Switch' }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows the empty library when no console has games', async () => {
+    const services = fakeServices()
+    services.catalog.consoles.list = vi.fn(() =>
+      Promise.resolve(consoles.map((c) => ({ ...c, gameCount: 0 }))),
+    )
+    renderAt('/', services)
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Tu biblioteca está vacía' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Nintendo Switch, Wii o PlayStation Portable/)).toBeInTheDocument()
+  })
+
+  it('asks for the name and console before uploading (RF-03)', async () => {
+    const user = userEvent.setup()
+    const services = fakeServices()
+    const upload = vi.fn(() => ({ abort: vi.fn() }))
+    services.ingestion.upload = upload
+    const { history } = renderAt('/', services)
+    await screen.findByRole('heading', { level: 1, name: 'Nintendo Switch' })
+
+    const picker = document.querySelector<HTMLInputElement>('input[data-shortcut="upload"]')
+    if (!picker) throw new Error('no upload input')
+    await user.upload(picker, new File(['x'], 'Limbo.iso'))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Subir juego' })
+    // The console in the middle of the carousel comes preselected.
+    expect(within(dialog).getByRole('radio', { name: /Nintendo Switch/ })).toBeChecked()
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Nintendo Switch')
+
+    await user.click(within(dialog).getByRole('radio', { name: /^Wii/ }))
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    await user.type(within(dialog).getByRole('combobox', { name: 'Nombre del juego' }), 'Ōkami')
+    expect(within(dialog).getByText('wii/Ōkami/')).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Subir' }))
+    await waitFor(() => {
+      expect(history.location.pathname).toBe('/subidas')
+    })
+    expect(upload).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Limbo.iso' }),
+      { spec: { console: 'wii', title: 'Ōkami' } },
+      expect.anything(),
+    )
   })
 
   it('sends a signed-out visitor to the login and back after it', async () => {

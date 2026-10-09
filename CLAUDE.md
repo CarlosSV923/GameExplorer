@@ -18,7 +18,7 @@ Self-hosted web app (TrueNAS SCALE) to upload, extract, classify, rename, browse
 | `contracts/` | Golden test vectors |
 | `docs/` | Spec, tasks, design handoff |
 
-Bounded contexts: `catalog` (also the trash: trashing and restoring must be atomic with the library), `ingestion`, `metadata` (IGDB anti-corruption layer), `identity`, `platform` (shared kernel). Every library change goes through the journaled operation engine in `catalog/application/engine.go`.
+Bounded contexts: `catalog` (also the trash and the unassigned section: changes must be atomic with the library; consoles are defined in code in `catalog/domain/consoles`, see [`docs/adding-a-console.md`](docs/adding-a-console.md)), `ingestion`, `metadata` (IGDB anti-corruption layer), `identity`, `platform` (shared kernel). Every library change goes through the journaled operation engine in `catalog/application/engine.go`.
 
 ## Rules
 - DDD: `domain` packages are pure (no I/O, no framework imports). Cross-context calls go through application ports.

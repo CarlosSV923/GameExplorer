@@ -9,13 +9,9 @@ export interface MetadataGame {
   platformIds: number[]
 }
 
-/** An IGDB platform, to add a console (RF-41). */
-export interface MetadataPlatform {
-  id: number
-  name: string
-  abbreviation?: string | null
-  logoImageId?: string | null
-  releaseYear?: number | null
+/** Whether IGDB credentials are set (RF-54): without them nothing is suggested. */
+export interface MetadataStatus {
+  configured: boolean
 }
 
 export type ImageSize = 'cover_small' | 'cover_big' | 'logo_med' | 'screenshot_med'

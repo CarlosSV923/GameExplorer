@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -51,6 +53,15 @@ type Config struct {
 	// deleted for good (RF-30).
 	TrashRetentionDays int `env:"TRASH_RETENTION_DAYS" envDefault:"30"`
 
+	// ScanInterval is how often the library is scanned for changes made over
+	// SMB (RF-26).
+	ScanInterval time.Duration `env:"LIBRARY_SCAN_INTERVAL" envDefault:"15m"`
+
+	// Extensions holds every *_EXTENSIONS variable (e.g. SWITCH_EXTENSIONS):
+	// each console's fixed extensions, comma separated (RF-41). The catalog
+	// knows which variable belongs to which console.
+	Extensions map[string]string `env:"-"`
+
 	LogLevel slog.Level `env:"LOG_LEVEL" envDefault:"info"`
 }
 
@@ -64,6 +75,15 @@ func Load(environ map[string]string) (Config, error) {
 	}
 	if err := env.ParseWithOptions(&cfg, opts); err != nil {
 		return Config{}, fmt.Errorf("config: %w", err)
+	}
+	if environ == nil {
+		environ = env.ToMap(os.Environ())
+	}
+	cfg.Extensions = map[string]string{}
+	for k, v := range environ {
+		if strings.HasSuffix(k, "_EXTENSIONS") {
+			cfg.Extensions[k] = v
+		}
 	}
 	if err := cfg.validate(); err != nil {
 		return Config{}, fmt.Errorf("config: %w", err)
@@ -96,6 +116,9 @@ func (c Config) validate() error {
 	}
 	if c.TrashRetentionDays < 1 || c.TrashRetentionDays > 3650 {
 		errs = append(errs, fmt.Errorf("TRASH_RETENTION_DAYS must be between 1 and 3650, got %d", c.TrashRetentionDays))
+	}
+	if c.ScanInterval < time.Minute {
+		errs = append(errs, fmt.Errorf("LIBRARY_SCAN_INTERVAL must be at least 1m, got %s", c.ScanInterval))
 	}
 	if c.Port <= 0 || c.Port > 65535 {
 		errs = append(errs, fmt.Errorf("PORT %d is out of range", c.Port))

@@ -39,8 +39,8 @@ func (r *LibraryRepository) ListGames(ctx context.Context) ([]domain.GameSummary
 	out := make([]domain.GameSummary, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, domain.GameSummary{
-			ID: domain.GameID(row.ID), ConsoleID: domain.ConsoleID(row.ConsoleID), IGDBID: row.IgdbID, Title: row.Title, Folder: row.Folder,
-			ItemCount: int(row.ItemCount), MissingCount: int(row.MissingCount), Size: row.Size,
+			ID: domain.GameID(row.ID), Console: domain.Slug(row.Console), IGDBID: int64Ptr(row.IgdbID),
+			Title: row.Title, Folder: row.Folder, ItemCount: int(row.ItemCount), Size: row.Size,
 			ReleaseYear: intPtr(row.ReleaseYear), CoverImageID: stringPtr(row.CoverImageID),
 		})
 	}
@@ -53,9 +53,9 @@ func (r *LibraryRepository) GameByID(ctx context.Context, id domain.GameID) (*do
 	return r.withItems(ctx, row, err)
 }
 
-// FindGame implements domain.LibraryRepository.
-func (r *LibraryRepository) FindGame(ctx context.Context, console domain.ConsoleID, igdbID int64) (*domain.Game, error) {
-	row, err := r.q.FindGameByIGDB(ctx, sqlcgen.FindGameByIGDBParams{ConsoleID: int64(console), IgdbID: igdbID})
+// GameByFolder implements domain.LibraryRepository.
+func (r *LibraryRepository) GameByFolder(ctx context.Context, console domain.Slug, folder string) (*domain.Game, error) {
+	row, err := r.q.GetGameByFolder(ctx, sqlcgen.GetGameByFolderParams{Console: string(console), Folder: folder})
 	return r.withItems(ctx, row, err)
 }
 
@@ -96,14 +96,46 @@ func (r *LibraryRepository) ItemByID(ctx context.Context, id domain.ItemID) (dom
 	return itemToDomain(row)
 }
 
-// FolderTaken implements domain.LibraryRepository.
-func (r *LibraryRepository) FolderTaken(ctx context.Context, console domain.ConsoleID, folder string, except domain.GameID) (bool, error) {
-	return r.q.FolderTaken(ctx, sqlcgen.FolderTakenParams{ConsoleID: int64(console), Folder: folder, ExceptID: int64(except)})
+// LibraryFiles implements domain.LibraryRepository.
+func (r *LibraryRepository) LibraryFiles(ctx context.Context) ([]domain.LibraryFile, error) {
+	rows, err := r.q.ListLibraryFiles(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.LibraryFile, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domain.LibraryFile{
+			Item: domain.ItemID(row.ID), Game: domain.GameID(row.GameID), Console: domain.Slug(row.Console),
+			Folder: row.Folder, File: row.File,
+		})
+	}
+	return out, nil
 }
 
 // HasItemsFrom implements domain.LibraryRepository.
 func (r *LibraryRepository) HasItemsFrom(ctx context.Context, source string) (bool, error) {
 	return r.q.HasItemsFromSource(ctx, source)
+}
+
+// UnassignedFiles implements domain.LibraryRepository.
+func (r *LibraryRepository) UnassignedFiles(ctx context.Context) ([]domain.UnassignedFile, error) {
+	rows, err := r.q.ListUnassigned(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return unassignedToDomainAll(rows)
+}
+
+// UnassignedByID implements domain.LibraryRepository.
+func (r *LibraryRepository) UnassignedByID(ctx context.Context, id domain.UnassignedID) (domain.UnassignedFile, error) {
+	row, err := r.q.GetUnassigned(ctx, int64(id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.UnassignedFile{}, domain.ErrUnassignedNotFound
+	}
+	if err != nil {
+		return domain.UnassignedFile{}, err
+	}
+	return unassignedToDomain(row)
 }
 
 // TrashEntries implements domain.LibraryRepository.
@@ -112,28 +144,15 @@ func (r *LibraryRepository) TrashEntries(ctx context.Context) ([]domain.TrashEnt
 	if err != nil {
 		return nil, err
 	}
-	items, err := r.q.ListTrashItems(ctx)
-	if err != nil {
-		return nil, err
-	}
-	byEntry := map[int64][]domain.GameItem{}
-	for _, row := range items {
-		it, err := itemToDomain(row)
-		if err != nil {
-			return nil, err
-		}
-		byEntry[row.TrashEntryID.Int64] = append(byEntry[row.TrashEntryID.Int64], it)
-	}
 	out := make([]domain.TrashEntry, 0, len(rows))
 	for _, row := range rows {
 		e, err := entryToDomain(row)
 		if err != nil {
 			return nil, err
 		}
-		e.Items = byEntry[row.ID]
 		out = append(out, e)
 	}
-	return out, nil
+	return r.withTrashFiles(ctx, out)
 }
 
 // TrashEntry implements domain.LibraryRepository.
@@ -149,20 +168,88 @@ func (r *LibraryRepository) TrashEntry(ctx context.Context, id domain.TrashEntry
 	if err != nil {
 		return nil, err
 	}
-	items, err := r.q.ListGameItems(ctx, row.GameID)
+	out, err := r.withTrashFiles(ctx, []domain.TrashEntry{e})
 	if err != nil {
 		return nil, err
 	}
-	for _, it := range items {
-		if it.TrashEntryID.Valid && it.TrashEntryID.Int64 == row.ID {
-			item, err := itemToDomain(it)
-			if err != nil {
-				return nil, err
-			}
-			e.Items = append(e.Items, item)
+	return &out[0], nil
+}
+
+// withTrashFiles fills the entries' game files and unassigned files.
+func (r *LibraryRepository) withTrashFiles(ctx context.Context, entries []domain.TrashEntry) ([]domain.TrashEntry, error) {
+	items, err := r.q.ListTrashItems(ctx)
+	if err != nil {
+		return nil, err
+	}
+	files, err := r.q.ListTrashUnassigned(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byEntry := map[domain.TrashEntryID]*domain.TrashEntry{}
+	for i := range entries {
+		byEntry[entries[i].ID] = &entries[i]
+	}
+	for _, row := range items {
+		e, ok := byEntry[domain.TrashEntryID(row.TrashEntryID.Int64)]
+		if !ok {
+			continue
+		}
+		it, err := itemToDomain(row)
+		if err != nil {
+			return nil, err
+		}
+		e.Items = append(e.Items, it)
+	}
+	for _, row := range files {
+		e, ok := byEntry[domain.TrashEntryID(row.TrashEntryID.Int64)]
+		if !ok {
+			continue
+		}
+		f, err := unassignedToDomain(row)
+		if err != nil {
+			return nil, err
+		}
+		e.Files = append(e.Files, f)
+	}
+	return entries, nil
+}
+
+// PendingFiles implements domain.LibraryRepository.
+func (r *LibraryRepository) PendingFiles(ctx context.Context) ([]domain.PendingFile, error) {
+	rows, err := r.q.ListScanPending(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.PendingFile, 0, len(rows))
+	for _, row := range rows {
+		t, err := time.Parse(time.RFC3339Nano, row.ModTime)
+		if err != nil {
+			return nil, fmt.Errorf("pending %q: %w", row.Path, err)
+		}
+		out = append(out, domain.PendingFile{Path: row.Path, Size: row.Size, ModTime: t})
+	}
+	return out, nil
+}
+
+// SetPendingFiles implements domain.LibraryRepository.
+func (r *LibraryRepository) SetPendingFiles(ctx context.Context, files []domain.PendingFile) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	q := r.q.WithTx(tx)
+	if err := q.ClearScanPending(ctx); err != nil {
+		return err
+	}
+	for _, f := range files {
+		if err := q.InsertScanPending(ctx, sqlcgen.InsertScanPendingParams{
+			Path: f.Path, Size: f.Size, ModTime: f.ModTime.UTC().Format(time.RFC3339Nano),
+		}); err != nil {
+			return err
 		}
 	}
-	return &e, nil
+	return tx.Commit()
 }
 
 // SaveOperation implements domain.LibraryRepository.
@@ -236,7 +323,7 @@ func (t libraryTx) InsertGame(ctx context.Context, g domain.Game, now time.Time)
 		return 0, err
 	}
 	id, err := t.q.InsertGame(ctx, sqlcgen.InsertGameParams{
-		ConsoleID: int64(g.ConsoleID), IgdbID: g.IGDBID, Title: g.Title, Folder: g.Folder,
+		Console: string(g.Console), Title: g.Title, Folder: g.Folder, IgdbID: nullInt64(g.IGDBID),
 		ReleaseYear: nullInt(g.ReleaseYear), CoverImageID: nullString(g.CoverImageID), Summary: nullString(g.Summary),
 		Genres: string(genres), CreatedAt: formatTime(now), UpdatedAt: formatTime(now),
 	})
@@ -249,9 +336,9 @@ func (t libraryTx) UpdateGame(ctx context.Context, g domain.Game, now time.Time)
 		return err
 	}
 	return t.q.UpdateGame(ctx, sqlcgen.UpdateGameParams{
-		IgdbID: g.IGDBID, Title: g.Title, Folder: g.Folder, ReleaseYear: nullInt(g.ReleaseYear),
-		CoverImageID: nullString(g.CoverImageID), Summary: nullString(g.Summary), Genres: string(genres),
-		UpdatedAt: formatTime(now), ID: int64(g.ID),
+		Console: string(g.Console), Title: g.Title, Folder: g.Folder, IgdbID: nullInt64(g.IGDBID),
+		ReleaseYear: nullInt(g.ReleaseYear), CoverImageID: nullString(g.CoverImageID), Summary: nullString(g.Summary),
+		Genres: string(genres), UpdatedAt: formatTime(now), ID: int64(g.ID),
 	})
 }
 
@@ -268,43 +355,30 @@ func (t libraryTx) DeleteGameIfEmpty(ctx context.Context, id domain.GameID) erro
 }
 
 func (t libraryTx) InsertItem(ctx context.Context, it domain.GameItem, now time.Time) (domain.ItemID, error) {
-	files, err := json.Marshal(it.Files)
-	if err != nil {
-		return 0, err
-	}
 	id, err := t.q.InsertGameItem(ctx, sqlcgen.InsertGameItemParams{
-		GameID: int64(it.GameID), Kind: string(it.Kind), Label: it.Label, DiscNumber: int64(it.DiscNumber),
-		Shape: string(it.Shape), Files: string(files), Size: it.Size, TitleID: it.TitleID,
+		GameID: int64(it.GameID), Kind: string(it.Kind), Label: it.Label, File: it.File, Size: it.Size,
 		SourceJob: it.SourceJob, CreatedAt: formatTime(now),
 	})
 	return domain.ItemID(id), err
 }
 
-func (t libraryTx) PlaceItem(ctx context.Context, id domain.ItemID, game domain.GameID, files []string) error {
-	b, err := json.Marshal(files)
-	if err != nil {
-		return err
-	}
-	return t.q.UpdateItemPlace(ctx, sqlcgen.UpdateItemPlaceParams{GameID: int64(game), Files: string(b), ID: int64(id)})
+func (t libraryTx) UpdateItem(ctx context.Context, it domain.GameItem) error {
+	return t.q.UpdateGameItem(ctx, sqlcgen.UpdateGameItemParams{
+		GameID: int64(it.GameID), Kind: string(it.Kind), Label: it.Label, File: it.File, ID: int64(it.ID),
+	})
 }
 
 func (t libraryTx) DeleteItem(ctx context.Context, id domain.ItemID) error {
 	return t.q.DeleteGameItem(ctx, int64(id))
 }
 
-func (t libraryTx) SetMissing(ctx context.Context, id domain.ItemID, since *time.Time) error {
-	v := sql.NullString{}
-	if since != nil {
-		v = sql.NullString{String: formatTime(*since), Valid: true}
-	}
-	return t.q.SetItemMissing(ctx, sqlcgen.SetItemMissingParams{MissingSince: v, ID: int64(id)})
-}
-
 func (t libraryTx) MoveGameContents(ctx context.Context, from, to domain.GameID) error {
 	if err := t.q.MoveGameItems(ctx, sqlcgen.MoveGameItemsParams{ToGame: int64(to), FromGame: int64(from)}); err != nil {
 		return err
 	}
-	return t.q.MoveTrashEntries(ctx, sqlcgen.MoveTrashEntriesParams{ToGame: int64(to), FromGame: int64(from)})
+	return t.q.MoveTrashEntries(ctx, sqlcgen.MoveTrashEntriesParams{
+		ToGame: sql.NullInt64{Int64: int64(to), Valid: true}, FromGame: sql.NullInt64{Int64: int64(from), Valid: true},
+	})
 }
 
 func (t libraryTx) InsertTrashEntry(ctx context.Context, e domain.TrashEntry) (domain.TrashEntryID, error) {
@@ -312,27 +386,43 @@ func (t libraryTx) InsertTrashEntry(ctx context.Context, e domain.TrashEntry) (d
 	if e.WholeGame {
 		whole = 1
 	}
+	var game sql.NullInt64
+	if e.GameID != nil {
+		game = sql.NullInt64{Int64: int64(*e.GameID), Valid: true}
+	}
 	id, err := t.q.InsertTrashEntry(ctx, sqlcgen.InsertTrashEntryParams{
-		GameID: int64(e.GameID), WholeGame: whole, Reason: string(e.Reason), Dir: e.Dir, TrashedAt: formatTime(e.TrashedAt),
+		GameID: game, WholeGame: whole, Reason: string(e.Reason), Dir: e.Dir, TrashedAt: formatTime(e.TrashedAt),
 	})
 	return domain.TrashEntryID(id), err
 }
 
 func (t libraryTx) SetItemTrash(ctx context.Context, id domain.ItemID, entry *domain.TrashEntryID) error {
-	v := sql.NullInt64{}
-	if entry != nil {
-		v = sql.NullInt64{Int64: int64(*entry), Valid: true}
-	}
-	return t.q.SetItemTrash(ctx, sqlcgen.SetItemTrashParams{TrashEntryID: v, ID: int64(id)})
+	return t.q.SetItemTrash(ctx, sqlcgen.SetItemTrashParams{TrashEntryID: nullEntry(entry), ID: int64(id)})
 }
 
 func (t libraryTx) DeleteTrashEntry(ctx context.Context, id domain.TrashEntryID) error {
 	return t.q.DeleteTrashEntry(ctx, int64(id))
 }
 
+func (t libraryTx) InsertUnassigned(ctx context.Context, f domain.UnassignedFile) (domain.UnassignedID, error) {
+	id, err := t.q.InsertUnassigned(ctx, sqlcgen.InsertUnassignedParams{
+		Path: f.Path, Origin: f.Origin, Reason: string(f.Reason), Size: f.Size,
+		ArrivedAt: formatTime(f.ArrivedAt), TrashEntryID: nullEntry(f.TrashEntry),
+	})
+	return domain.UnassignedID(id), err
+}
+
+func (t libraryTx) SetUnassignedPlace(ctx context.Context, id domain.UnassignedID, path string, entry *domain.TrashEntryID) error {
+	return t.q.SetUnassignedPlace(ctx, sqlcgen.SetUnassignedPlaceParams{Path: path, TrashEntryID: nullEntry(entry), ID: int64(id)})
+}
+
+func (t libraryTx) DeleteUnassigned(ctx context.Context, id domain.UnassignedID) error {
+	return t.q.DeleteUnassigned(ctx, int64(id))
+}
+
 func gameToDomain(row sqlcgen.Game) (*domain.Game, error) {
 	g := &domain.Game{
-		ID: domain.GameID(row.ID), ConsoleID: domain.ConsoleID(row.ConsoleID), IGDBID: row.IgdbID,
+		ID: domain.GameID(row.ID), Console: domain.Slug(row.Console), IGDBID: int64Ptr(row.IgdbID),
 		Title: row.Title, Folder: row.Folder, ReleaseYear: intPtr(row.ReleaseYear),
 		CoverImageID: stringPtr(row.CoverImageID), Summary: stringPtr(row.Summary),
 	}
@@ -351,28 +441,38 @@ func gameToDomain(row sqlcgen.Game) (*domain.Game, error) {
 func itemToDomain(row sqlcgen.GameItem) (domain.GameItem, error) {
 	it := domain.GameItem{
 		ID: domain.ItemID(row.ID), GameID: domain.GameID(row.GameID), Kind: domain.ItemKind(row.Kind),
-		Label: row.Label, DiscNumber: int(row.DiscNumber), Shape: domain.Shape(row.Shape), Size: row.Size,
-		TitleID: row.TitleID, SourceJob: row.SourceJob,
-	}
-	if err := json.Unmarshal([]byte(row.Files), &it.Files); err != nil {
-		return it, fmt.Errorf("item %d: decode files: %w", row.ID, err)
+		Label: row.Label, File: row.File, Size: row.Size, SourceJob: row.SourceJob,
+		TrashEntry: entryPtr(row.TrashEntryID),
 	}
 	var err error
 	if it.CreatedAt, err = time.Parse(timeLayout, row.CreatedAt); err != nil {
 		return it, fmt.Errorf("item %d: %w", row.ID, err)
 	}
-	if row.TrashEntryID.Valid {
-		e := domain.TrashEntryID(row.TrashEntryID.Int64)
-		it.TrashEntry = &e
-	}
-	if row.MissingSince.Valid {
-		t, err := time.Parse(timeLayout, row.MissingSince.String)
-		if err != nil {
-			return it, fmt.Errorf("item %d: %w", row.ID, err)
-		}
-		it.MissingSince = &t
-	}
 	return it, nil
+}
+
+func unassignedToDomain(row sqlcgen.UnassignedFile) (domain.UnassignedFile, error) {
+	f := domain.UnassignedFile{
+		ID: domain.UnassignedID(row.ID), Path: row.Path, Origin: row.Origin, Reason: domain.UnassignedReason(row.Reason),
+		Size: row.Size, TrashEntry: entryPtr(row.TrashEntryID),
+	}
+	var err error
+	if f.ArrivedAt, err = time.Parse(timeLayout, row.ArrivedAt); err != nil {
+		return f, fmt.Errorf("unassigned %d: %w", row.ID, err)
+	}
+	return f, nil
+}
+
+func unassignedToDomainAll(rows []sqlcgen.UnassignedFile) ([]domain.UnassignedFile, error) {
+	out := make([]domain.UnassignedFile, 0, len(rows))
+	for _, row := range rows {
+		f, err := unassignedToDomain(row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, nil
 }
 
 func entryToDomain(row sqlcgen.TrashEntry) (domain.TrashEntry, error) {
@@ -380,10 +480,30 @@ func entryToDomain(row sqlcgen.TrashEntry) (domain.TrashEntry, error) {
 	if err != nil {
 		return domain.TrashEntry{}, fmt.Errorf("trash entry %d: %w", row.ID, err)
 	}
-	return domain.TrashEntry{
-		ID: domain.TrashEntryID(row.ID), GameID: domain.GameID(row.GameID), WholeGame: row.WholeGame == 1,
+	e := domain.TrashEntry{
+		ID: domain.TrashEntryID(row.ID), WholeGame: row.WholeGame == 1,
 		Reason: domain.TrashReason(row.Reason), Dir: row.Dir, TrashedAt: t,
-	}, nil
+	}
+	if row.GameID.Valid {
+		g := domain.GameID(row.GameID.Int64)
+		e.GameID = &g
+	}
+	return e, nil
+}
+
+func entryPtr(v sql.NullInt64) *domain.TrashEntryID {
+	if !v.Valid {
+		return nil
+	}
+	e := domain.TrashEntryID(v.Int64)
+	return &e
+}
+
+func nullEntry(e *domain.TrashEntryID) sql.NullInt64 {
+	if e == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: int64(*e), Valid: true}
 }
 
 func intPtr(v sql.NullInt64) *int {
@@ -391,6 +511,14 @@ func intPtr(v sql.NullInt64) *int {
 		return nil
 	}
 	n := int(v.Int64)
+	return &n
+}
+
+func int64Ptr(v sql.NullInt64) *int64 {
+	if !v.Valid {
+		return nil
+	}
+	n := v.Int64
 	return &n
 }
 
@@ -407,6 +535,13 @@ func nullInt(v *int) sql.NullInt64 {
 		return sql.NullInt64{}
 	}
 	return sql.NullInt64{Int64: int64(*v), Valid: true}
+}
+
+func nullInt64(v *int64) sql.NullInt64 {
+	if v == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: *v, Valid: true}
 }
 
 func nullString(v *string) sql.NullString {

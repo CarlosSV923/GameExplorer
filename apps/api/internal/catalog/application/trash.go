@@ -14,16 +14,15 @@ import (
 // TrashView is a trash entry with what the trash screen shows.
 type TrashView struct {
 	domain.TrashEntry
-	Console   domain.Slug
-	Title     string
-	Folder    string
+	// Game is set for entries of game files.
+	Game      *domain.Game
 	Size      int64
 	ExpiresAt time.Time
 }
 
-// trashItems records items as one trash entry (inside a transaction).
+// trashItems records game files as one trash entry (inside a transaction).
 func trashItems(ctx context.Context, tx domain.LibraryTx, game domain.GameID, reason domain.TrashReason, whole bool, dir string, now time.Time, items ...domain.ItemID) error {
-	entry, err := tx.InsertTrashEntry(ctx, domain.TrashEntry{GameID: game, WholeGame: whole, Reason: reason, Dir: dir, TrashedAt: now})
+	entry, err := tx.InsertTrashEntry(ctx, domain.TrashEntry{GameID: &game, WholeGame: whole, Reason: reason, Dir: dir, TrashedAt: now})
 	if err != nil {
 		return err
 	}
@@ -35,7 +34,7 @@ func trashItems(ctx context.Context, tx domain.LibraryTx, game domain.GameID, re
 	return nil
 }
 
-// TrashItem sends one item to the trash (RF-25).
+// TrashItem sends one file to the trash (RF-25).
 func (s *LibraryService) TrashItem(ctx context.Context, id domain.ItemID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -53,7 +52,7 @@ func (s *LibraryService) TrashItem(ctx context.Context, id domain.ItemID) error 
 	return s.trash(ctx, g, false, it)
 }
 
-// TrashGame sends every item of a game to the trash as one entry (RF-25).
+// TrashGame sends every file of a game to the trash as one entry (RF-25).
 func (s *LibraryService) TrashGame(ctx context.Context, id domain.GameID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -69,17 +68,12 @@ func (s *LibraryService) TrashGame(ctx context.Context, id domain.GameID) error 
 }
 
 func (s *LibraryService) trash(ctx context.Context, g *domain.Game, whole bool, items ...domain.GameItem) error {
-	console, err := s.consoleByID(ctx, g.ConsoleID)
-	if err != nil {
-		return err
-	}
 	b := s.newOp("trash")
-	gameDir := s.files.LibraryPath(string(console.Slug), g.Folder)
-	dir, err := b.trash(gameDir, items...)
+	dir, err := b.trash(s.gameDir(g), items...)
 	if err != nil {
 		return err
 	}
-	b.prune = append(b.prune, gameDir) // the folder goes when its last item does
+	b.pruneGame(g.Console, g.Folder) // the folders go when their last file does
 	ids := make([]domain.ItemID, len(items))
 	for i, it := range items {
 		ids[i] = it.ID
@@ -100,20 +94,22 @@ func (s *LibraryService) Trash(ctx context.Context, retention time.Duration) ([]
 	out := make([]TrashView, 0, len(entries))
 	games := map[domain.GameID]*domain.Game{}
 	for _, e := range entries {
-		g, ok := games[e.GameID]
-		if !ok {
-			if g, err = s.repo.GameByID(ctx, e.GameID); err != nil {
-				return nil, err
+		v := TrashView{TrashEntry: e, ExpiresAt: e.TrashedAt.Add(retention)}
+		if e.GameID != nil {
+			g, ok := games[*e.GameID]
+			if !ok {
+				if g, err = s.repo.GameByID(ctx, *e.GameID); err != nil {
+					return nil, err
+				}
+				games[*e.GameID] = g
 			}
-			games[e.GameID] = g
+			v.Game = g
 		}
-		console, err := s.consoleByID(ctx, g.ConsoleID)
-		if err != nil {
-			return nil, err
-		}
-		v := TrashView{TrashEntry: e, Console: console.Slug, Title: g.Title, Folder: g.Folder, ExpiresAt: e.TrashedAt.Add(retention)}
 		for _, it := range e.Items {
 			v.Size += it.Size
+		}
+		for _, f := range e.Files {
+			v.Size += f.Size
 		}
 		out = append(out, v)
 	}
@@ -122,13 +118,17 @@ func (s *LibraryService) Trash(ctx context.Context, retention time.Duration) ([]
 
 // RestoreResult says where a trash entry went back to.
 type RestoreResult struct {
-	GameID domain.GameID
-	Path   string
+	// GameID is set for entries of game files.
+	GameID *domain.GameID
+	// Path is the library-relative folder: the game's, or the unassigned one.
+	Path string
 }
 
-// Restore puts a trash entry back in its game, with names for the game's
-// current title. If an item's place is taken (a duplicate was stored since),
-// onConflict must be Replace: the current item then goes to the trash.
+// Restore puts a trash entry back where it came from. Game files take the
+// names of the game's current title; if a place is taken (a duplicate was
+// stored since), onConflict must be Replace: the current file then goes to
+// the trash. Unassigned files go back to the unassigned section, with a
+// free name if theirs was taken meanwhile.
 func (s *LibraryService) Restore(ctx context.Context, id domain.TrashEntryID, onConflict domain.DuplicateAction) (RestoreResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -136,32 +136,34 @@ func (s *LibraryService) Restore(ctx context.Context, id domain.TrashEntryID, on
 	if err != nil {
 		return RestoreResult{}, err
 	}
-	g, err := s.repo.GameByID(ctx, e.GameID)
+	if e.GameID == nil {
+		return s.restoreUnassigned(ctx, e)
+	}
+	g, err := s.repo.GameByID(ctx, *e.GameID)
 	if err != nil {
 		return RestoreResult{}, err
 	}
-	console, err := s.consoleByID(ctx, g.ConsoleID)
+	consoles, err := s.consoles.List(ctx)
 	if err != nil {
 		return RestoreResult{}, err
 	}
-	res := RestoreResult{GameID: g.ID, Path: string(console.Slug) + "/" + g.Folder}
+	res := RestoreResult{GameID: &g.ID, Path: string(g.Console) + "/" + g.Folder}
 
 	live := g.LiveItems()
 	names := nameSet{}
-	newNames := make([][]string, len(e.Items))
+	newNames := make([]string, len(e.Items))
 	var conflicts []domain.GameItem
 	seen := map[domain.ItemID]bool{}
 	for i, it := range e.Items {
-		files, err := storedNames(g.Title, it)
+		name, err := fileName(g.Title, it.Kind, it.Label, extensionOf(it.File, consoles), it.File)
 		if err != nil {
 			return res, err
 		}
-		if err := names.add(it.Files[0], files); err != nil {
+		if err := names.add(it.File, name); err != nil {
 			return res, err
 		}
-		newNames[i] = files
-		dup := domain.FindDuplicate(live, domain.Candidate{Kind: it.Kind, Label: it.Label, DiscNumber: it.DiscNumber, Files: files})
-		if dup != nil && !seen[dup.ID] {
+		newNames[i] = name
+		if dup := domain.FindDuplicate(live, name); dup != nil && !seen[dup.ID] {
 			seen[dup.ID] = true
 			conflicts = append(conflicts, *dup)
 		}
@@ -169,14 +171,14 @@ func (s *LibraryService) Restore(ctx context.Context, id domain.TrashEntryID, on
 	if len(conflicts) > 0 && onConflict != domain.Replace {
 		var taken []string
 		for _, c := range conflicts {
-			taken = append(taken, c.Files[0])
+			taken = append(taken, c.File)
 		}
 		return res, reject(RejectConflict, "Su lugar está ocupado por: %s. Elige Reemplazar (lo actual va a la papelera) o Cancelar.",
 			strings.Join(taken, ", "))
 	}
 
 	b := s.newOp("restore")
-	gameDir := s.files.LibraryPath(string(console.Slug), g.Folder)
+	gameDir := s.gameDir(g)
 	b.mkdir(gameDir)
 	var replacedDir string
 	if len(conflicts) > 0 {
@@ -185,7 +187,7 @@ func (s *LibraryService) Restore(ctx context.Context, id domain.TrashEntryID, on
 		}
 	}
 	for i, it := range e.Items {
-		if err := b.place(it.Shape, s.files.TrashPath(e.Dir), it.Files, gameDir, newNames[i], false); err != nil {
+		if err := b.place(s.files.TrashPath(e.Dir), it.File, gameDir, newNames[i], false); err != nil {
 			return res, err
 		}
 	}
@@ -205,13 +207,41 @@ func (s *LibraryService) Restore(ctx context.Context, id domain.TrashEntryID, on
 			if err := tx.SetItemTrash(ctx, it.ID, nil); err != nil {
 				return err
 			}
-			if err := tx.PlaceItem(ctx, it.ID, g.ID, newNames[i]); err != nil {
+			restored := it
+			restored.File = newNames[i]
+			if err := tx.UpdateItem(ctx, restored); err != nil {
 				return err
 			}
 		}
 		return tx.DeleteTrashEntry(ctx, e.ID)
 	})
 	return res, err
+}
+
+func (s *LibraryService) restoreUnassigned(ctx context.Context, e *domain.TrashEntry) (RestoreResult, error) {
+	res := RestoreResult{Path: unassignedDir}
+	b := s.newOp("restore")
+	paths := make([]string, len(e.Files))
+	for i, f := range e.Files {
+		free, err := b.freeName(s.files.UnassignedPath(), f.Path)
+		if err != nil {
+			return res, err
+		}
+		paths[i] = free
+		b.mkdirsFor(s.files.UnassignedPath(), free)
+		if err := b.place(s.files.TrashPath(e.Dir), f.Path, s.files.UnassignedPath(), free, false); err != nil {
+			return res, err
+		}
+	}
+	b.purge = append(b.purge, s.files.TrashPath(e.Dir))
+	return res, s.run(ctx, b, func(tx domain.LibraryTx) error {
+		for i, f := range e.Files {
+			if err := tx.SetUnassignedPlace(ctx, f.ID, paths[i], nil); err != nil {
+				return err
+			}
+		}
+		return tx.DeleteTrashEntry(ctx, e.ID)
+	})
 }
 
 // DeleteTrashEntry deletes an entry and its files for good.
@@ -260,9 +290,8 @@ func (s *LibraryService) purgeWhere(ctx context.Context, match func(domain.Trash
 		n++
 	}
 	// Folders left by an interrupted purge, or by a trash operation undone
-	// after its folder was created.
-	// Folders of an operation whose undo is still pending stay: the next
-	// start moves their files back.
+	// after its folder was created. Folders of an operation whose undo is
+	// still pending stay: the next start moves their files back.
 	pending, err := s.repo.Operations(ctx)
 	if err != nil {
 		return n, errors.Join(append(errs, err)...)
@@ -289,10 +318,18 @@ func (s *LibraryService) purge(ctx context.Context, e domain.TrashEntry) error {
 				return err
 			}
 		}
+		for _, f := range e.Files {
+			if err := tx.DeleteUnassigned(ctx, f.ID); err != nil {
+				return err
+			}
+		}
 		if err := tx.DeleteTrashEntry(ctx, e.ID); err != nil {
 			return err
 		}
-		return tx.DeleteGameIfEmpty(ctx, e.GameID)
+		if e.GameID != nil {
+			return tx.DeleteGameIfEmpty(ctx, *e.GameID)
+		}
+		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("purge trash entry %d: %w", e.ID, err)

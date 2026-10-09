@@ -1,32 +1,34 @@
--- name: ListConsoles :many
-SELECT id, slug, display_name, igdb_platform_id, release_year, logo_image_id, extensions, detector_key, sort_order,
-       (SELECT COUNT(DISTINCT g.id)
-        FROM games g
-        JOIN game_items i ON i.game_id = g.id AND i.trash_entry_id IS NULL
-        WHERE g.console_id = consoles.id) AS game_count
-FROM consoles
-ORDER BY sort_order, id;
+-- name: ListConsoleSettings :many
+SELECT slug, display_name, sort_order, logo_image_id, release_year FROM console_settings;
 
--- name: UpdateConsolePlatformMetadata :exec
-UPDATE consoles
+-- name: UpsertConsoleOrder :exec
+INSERT INTO console_settings (slug, sort_order) VALUES (?, ?)
+ON CONFLICT (slug) DO UPDATE SET sort_order = excluded.sort_order;
+
+-- name: SetConsoleDisplayName :exec
+UPDATE console_settings SET display_name = ? WHERE slug = ?;
+
+-- name: SetConsolePlatformMetadata :exec
+UPDATE console_settings
 SET logo_image_id = sqlc.narg(logo_image_id),
     release_year  = COALESCE(sqlc.narg(release_year), release_year)
-WHERE id = sqlc.arg(id);
+WHERE slug = sqlc.arg(slug);
 
--- name: InsertConsole :one
-INSERT INTO consoles (slug, display_name, igdb_platform_id, release_year, logo_image_id, extensions, sort_order)
-VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM consoles))
-RETURNING id;
+-- name: ListConsoleExtensions :many
+SELECT slug, extension FROM console_extensions ORDER BY slug, rowid;
 
--- name: UpdateConsole :exec
-UPDATE consoles SET slug = ?, display_name = ?, extensions = ? WHERE id = ?;
+-- name: AddConsoleExtension :exec
+INSERT OR IGNORE INTO console_extensions (slug, extension) VALUES (?, ?);
 
--- name: DeleteConsole :exec
-DELETE FROM consoles WHERE id = ?;
+-- name: RemoveConsoleExtension :exec
+DELETE FROM console_extensions WHERE slug = ? AND extension = ?;
 
--- name: SetConsoleOrder :exec
-UPDATE consoles SET sort_order = ? WHERE id = ?;
+-- name: CountGamesByConsole :many
+-- Games with at least one file outside the trash.
+SELECT g.console, COUNT(DISTINCT g.id) AS games
+FROM games g
+JOIN game_items i ON i.game_id = g.id AND i.trash_entry_id IS NULL
+GROUP BY g.console;
 
--- name: ConsoleHasGames :one
--- Any game, even one whose items are all in the trash.
-SELECT EXISTS (SELECT 1 FROM games WHERE console_id = ?);
+-- name: ListConsoleItemFiles :many
+SELECT i.file FROM game_items i JOIN games g ON g.id = i.game_id WHERE g.console = ?;

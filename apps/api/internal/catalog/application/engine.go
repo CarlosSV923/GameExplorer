@@ -6,18 +6,19 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
 )
 
-// An operation changes files and the catalog together (RF-11, RF-24):
+// An operation changes files and the catalog together (RF-10, RF-24):
 //
-//  1. a builder plans it: moves, folders to create and scratch files
-//     (rewritten .cue sheets) — reading the disk but changing nothing;
-//  2. run checks that nothing is in the way, creates the folders, writes the
-//     scratch files, journals the moves and performs them;
+//  1. a builder plans it: moves and folders to create — reading the disk
+//     but changing nothing;
+//  2. run checks that nothing is in the way, creates the folders, journals
+//     the moves and performs them;
 //  3. the catalog changes are applied in one transaction that also deletes
 //     the journal entry.
 //
@@ -31,15 +32,12 @@ type opBuilder struct {
 	op domain.Operation
 	// mkdirs are created before moving, in order.
 	mkdirs []string
-	writes []scratchWrite
-	// After success: purge is deleted recursively, prune only if empty.
+	// After success: purge is deleted recursively, prune only if empty (in order).
 	purge, prune []string
-	n            int
-}
-
-type scratchWrite struct {
-	path string
-	data []byte
+	// targets are the destinations planned so far, so two moves of the same
+	// operation never pick the same free name.
+	targets map[string]bool
+	n       int
 }
 
 // ErrUndoFailed means a failed change could not be fully reverted: some
@@ -48,7 +46,7 @@ type scratchWrite struct {
 var ErrUndoFailed = errors.New("library change could not be undone")
 
 func (s *LibraryService) newOp(source string) *opBuilder {
-	return &opBuilder{s: s, op: domain.Operation{ID: s.newID(), Source: source, CreatedAt: s.now()}}
+	return &opBuilder{s: s, op: domain.Operation{ID: s.newID(), Source: source, CreatedAt: s.now()}, targets: map[string]bool{}}
 }
 
 func (b *opBuilder) next() int {
@@ -66,6 +64,7 @@ func (b *opBuilder) mkdir(dir string) { b.mkdirs = append(b.mkdirs, dir) }
 // through a temporary name: on case-insensitive datasets (TrueNAS SMB shares
 // usually are) the destination "exists" because it is the source.
 func (b *opBuilder) move(from, to string) {
+	b.targets[strings.ToLower(to)] = true
 	switch {
 	case from == to:
 	case strings.EqualFold(from, to):
@@ -76,82 +75,87 @@ func (b *opBuilder) move(from, to string) {
 	}
 }
 
-// place moves an item's files from srcDir (names src, "/" separators) to
-// dstDir with the names dst. A disc whose track names change gets a
-// rewritten .cue sheet; the original goes to scratch (restored on undo,
-// deleted on success). Missing sources are skipped unless required.
-func (b *opBuilder) place(shape domain.Shape, srcDir string, src []string, dstDir string, dst []string, required bool) error {
-	return b.placeAfter(srcDir, shape, srcDir, src, dstDir, dst, required)
+// place moves one file from srcDir/src to dstDir/dst. A missing source is
+// skipped unless required.
+func (b *opBuilder) place(srcDir, src, dstDir, dst string, required bool) error {
+	return b.placeAfter(srcDir, srcDir, src, dstDir, dst, required)
 }
 
-// placeAfter is place for files that an earlier move of the same operation
-// brings to srcDir: they are looked up (and .cue sheets read) in nowDir.
-func (b *opBuilder) placeAfter(nowDir string, shape domain.Shape, srcDir string, src []string, dstDir string, dst []string, required bool) error {
-	for i := range src {
-		from := filepath.Join(srcDir, filepath.FromSlash(src[i]))
-		now := filepath.Join(nowDir, filepath.FromSlash(src[i]))
-		to := filepath.Join(dstDir, dst[i])
-		ok, err := b.s.files.Exists(now)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			if required {
-				return fmt.Errorf("%s is missing", from)
-			}
-			continue
-		}
-		if shape == domain.ShapeDisc && i == 0 && tracksRenamed(src, dst) {
-			sheet, err := b.s.files.ReadFile(now, maxCueSize)
-			if err != nil {
-				return fmt.Errorf("read cue: %w", err)
-			}
-			n := strconv.Itoa(b.next())
-			rewritten, original := b.scratch(n+".cue"), b.scratch(n+".orig.cue")
-			b.writes = append(b.writes, scratchWrite{rewritten, []byte(rewriteCue(string(sheet), src, dst))})
-			b.move(from, original)
-			b.move(rewritten, to)
-			continue
-		}
-		b.move(from, to)
+// placeAfter is place for a file that an earlier move of the same operation
+// brings to srcDir: it is looked up in nowDir.
+func (b *opBuilder) placeAfter(nowDir, srcDir, src, dstDir, dst string, required bool) error {
+	from := filepath.Join(srcDir, filepath.FromSlash(src))
+	ok, err := b.s.files.Exists(filepath.Join(nowDir, filepath.FromSlash(src)))
+	if err != nil {
+		return err
 	}
+	if !ok {
+		if required {
+			return fmt.Errorf("%s is missing", from)
+		}
+		return nil
+	}
+	b.move(from, filepath.Join(dstDir, filepath.FromSlash(dst)))
 	return nil
 }
 
-func tracksRenamed(src, dst []string) bool {
-	for i := 1; i < len(src); i++ {
-		if path.Base(src[i]) != dst[i] {
-			return true
+// freeName returns rel (relative to dir, "/" separators) or, when it is
+// taken on disk or by this operation, rel with " (2)", " (3)"… before the
+// extension.
+func (b *opBuilder) freeName(dir, rel string) (string, error) {
+	ext := path.Ext(rel)
+	stem := strings.TrimSuffix(rel, ext)
+	for i := 1; i < 1000; i++ {
+		candidate := rel
+		if i > 1 {
+			candidate = fmt.Sprintf("%s (%d)%s", stem, i, ext)
+		}
+		full := filepath.Join(dir, filepath.FromSlash(candidate))
+		if b.targets[strings.ToLower(full)] {
+			continue
+		}
+		taken, err := b.s.files.Exists(full)
+		if err != nil {
+			return "", err
+		}
+		if !taken {
+			return candidate, nil
 		}
 	}
-	return false
+	return "", fmt.Errorf("no free name for %s", rel)
 }
 
-// rewriteCue points the sheet's FILE lines (relative to the sheet) at the
-// new track names.
-func rewriteCue(sheet string, src, dst []string) string {
-	tracks := map[string]string{}
-	for i := 1; i < len(src); i++ {
-		tracks[strings.ToLower(src[i])] = dst[i]
-	}
-	dir := path.Dir(src[0])
-	return domain.RewriteCue(sheet, func(ref string) (string, bool) {
-		name, ok := tracks[strings.ToLower(path.Join(dir, strings.ReplaceAll(ref, `\`, "/")))]
-		return name, ok
-	})
-}
-
-// trash plans moving items' files from gameDir into a new trash directory
-// and returns its name (relative to the trash).
+// trash plans moving game files from gameDir into a new trash directory and
+// returns its name (relative to the trash).
 func (b *opBuilder) trash(gameDir string, items ...domain.GameItem) (string, error) {
-	dir := b.op.ID + "-" + strconv.Itoa(b.next())
-	b.mkdir(b.s.files.TrashPath(dir))
+	dir := b.newTrashDir()
 	for _, it := range items {
-		if err := b.place(it.Shape, gameDir, it.Files, b.s.files.TrashPath(dir), it.Files, false); err != nil {
+		if err := b.place(gameDir, it.File, b.s.files.TrashPath(dir), it.File, false); err != nil {
 			return "", err
 		}
 	}
 	return dir, nil
+}
+
+func (b *opBuilder) newTrashDir() string {
+	dir := b.op.ID + "-" + strconv.Itoa(b.next())
+	b.mkdir(b.s.files.TrashPath(dir))
+	return dir
+}
+
+// mkdirsFor plans the parent folders of rel (relative to dir).
+func (b *opBuilder) mkdirsFor(dir, rel string) {
+	if parent := path.Dir(rel); parent != "." {
+		b.mkdir(filepath.Join(dir, filepath.FromSlash(parent)))
+	}
+}
+
+// pruneParents removes the empty folders between a file and stop
+// (exclusive), innermost first.
+func (b *opBuilder) pruneParents(stop, rel string) {
+	for d := path.Dir(rel); d != "." && d != "/"; d = path.Dir(d) {
+		b.prune = append(b.prune, filepath.Join(stop, filepath.FromSlash(d)))
+	}
 }
 
 // run performs the operation (see the top of this file).
@@ -173,7 +177,7 @@ func (s *LibraryService) run(ctx context.Context, b *opBuilder, apply func(domai
 		}
 	}
 
-	if len(b.writes) > 0 || len(b.op.Moves) > 0 {
+	if len(b.op.Moves) > 0 {
 		b.mkdirs = append(b.mkdirs, b.scratch())
 	}
 	for _, d := range b.mkdirs {
@@ -182,12 +186,6 @@ func (s *LibraryService) run(ctx context.Context, b *opBuilder, apply func(domai
 		if err != nil {
 			s.discard(b.op)
 			return fmt.Errorf("create folder: %w", err)
-		}
-	}
-	for _, w := range b.writes {
-		if err := s.files.WriteFile(w.path, w.data); err != nil {
-			s.discard(b.op)
-			return fmt.Errorf("write %s: %w", filepath.Base(w.path), err)
 		}
 	}
 
@@ -216,7 +214,7 @@ func (s *LibraryService) run(ctx context.Context, b *opBuilder, apply func(domai
 	for _, d := range b.purge {
 		s.removeAll(d)
 	}
-	for _, d := range b.prune {
+	for _, d := range slices.Compact(b.prune) {
 		if err := s.files.RemoveEmptyDir(d); err != nil {
 			s.log.Warn("remove empty folder", "dir", d, "error", err)
 		}

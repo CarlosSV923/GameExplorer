@@ -8,7 +8,12 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
+	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/application"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
@@ -56,7 +61,7 @@ func (h *Handler) SearchLibrary(ctx context.Context, req httpapi.SearchLibraryRe
 
 // GetGame implements httpapi.StrictServerInterface.
 func (h *Handler) GetGame(ctx context.Context, req httpapi.GetGameRequestObject) (httpapi.GetGameResponseObject, error) {
-	v, err := h.browse.Game(ctx, domain.GameID(req.Id))
+	out, err := h.gameDetail(ctx, domain.GameID(req.Id))
 	if errors.Is(err, domain.ErrGameNotFound) {
 		return httpapi.GetGame404ApplicationProblemPlusJSONResponse{
 			NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(notFound("El juego no existe.")),
@@ -65,11 +70,19 @@ func (h *Handler) GetGame(ctx context.Context, req httpapi.GetGameRequestObject)
 	if err != nil {
 		return nil, err
 	}
+	return httpapi.GetGame200JSONResponse(out), nil
+}
+
+func (h *Handler) gameDetail(ctx context.Context, id domain.GameID) (httpapi.GameDetail, error) {
+	v, err := h.browse.Game(ctx, id)
+	if err != nil {
+		return httpapi.GameDetail{}, err
+	}
 	g := v.Game
 	out := httpapi.GameDetail{
-		Id: int64(g.ID), Console: string(v.Console), Title: g.Title, Folder: g.Folder, ReleaseYear: g.ReleaseYear,
-		CoverImageId: g.CoverImageID, ItemCount: len(v.Items), MissingCount: v.Missing, Size: v.Size, IgdbId: g.IGDBID,
-		Path: string(v.Console) + "/" + g.Folder, Summary: g.Summary, Genres: g.Genres,
+		Id: int64(g.ID), Console: string(g.Console), Title: g.Title, Folder: g.Folder, ReleaseYear: g.ReleaseYear,
+		CoverImageId: g.CoverImageID, ItemCount: len(v.Items), Size: v.Size, IgdbId: g.IGDBID,
+		Path: string(g.Console) + "/" + g.Folder, Summary: g.Summary, Genres: g.Genres,
 		Items: make([]httpapi.LibraryItem, 0, len(v.Items)),
 	}
 	if out.Genres == nil {
@@ -78,22 +91,17 @@ func (h *Handler) GetGame(ctx context.Context, req httpapi.GetGameRequestObject)
 	for _, it := range v.Items {
 		out.Items = append(out.Items, ItemToAPI(it))
 	}
-	return httpapi.GetGame200JSONResponse(out), nil
+	return out, nil
 }
 
-// ItemToAPI maps a stored item.
+// ItemToAPI maps a stored file.
 func ItemToAPI(it domain.GameItem) httpapi.LibraryItem {
 	out := httpapi.LibraryItem{
-		Id: int64(it.ID), Kind: httpapi.ItemKind(it.Kind), Shape: httpapi.LibraryItemShape(it.Shape),
-		Files: it.Files, Size: it.Size, CreatedAt: it.CreatedAt, MissingSince: it.MissingSince,
+		Id: int64(it.ID), Kind: httpapi.ItemKind(it.Kind), File: it.File, Size: it.Size, CreatedAt: it.CreatedAt,
 	}
 	if it.Label != "" {
 		l := it.Label
 		out.Label = &l
-	}
-	if it.DiscNumber > 0 {
-		n := it.DiscNumber
-		out.DiscNumber = &n
 	}
 	return out
 }
@@ -101,7 +109,7 @@ func ItemToAPI(it domain.GameItem) httpapi.LibraryItem {
 // DownloadItem implements httpapi.StrictServerInterface.
 func (h *Handler) DownloadItem(ctx context.Context, req httpapi.DownloadItemRequestObject) (httpapi.DownloadItemResponseObject, error) {
 	d, err := h.browse.ItemDownload(ctx, domain.ItemID(req.Id))
-	if p, ok := downloadProblem(err, "El elemento no existe."); ok {
+	if p, ok := downloadProblem(err, "El archivo no existe."); ok {
 		return httpapi.DownloadItem404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(p)}, nil
 	}
 	if err != nil {
@@ -122,12 +130,28 @@ func (h *Handler) DownloadGame(ctx context.Context, req httpapi.DownloadGameRequ
 	return h.download(ctx, d), nil
 }
 
+// DownloadUnassigned implements httpapi.StrictServerInterface.
+func (h *Handler) DownloadUnassigned(ctx context.Context, req httpapi.DownloadUnassignedRequestObject) (httpapi.DownloadUnassignedResponseObject, error) {
+	p, f, err := h.library.UnassignedFile(ctx, domain.UnassignedID(req.Id))
+	var d application.Download
+	if err == nil {
+		d, err = h.browse.FileDownload(p, f.Name())
+	}
+	if prob, ok := downloadProblem(err, "El archivo no existe."); ok {
+		return httpapi.DownloadUnassigned404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(prob)}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return h.download(ctx, d), nil
+}
+
 func downloadProblem(err error, missing string) (httpapi.Problem, bool) {
 	switch {
-	case errors.Is(err, domain.ErrGameNotFound), errors.Is(err, domain.ErrItemNotFound):
+	case errors.Is(err, domain.ErrGameNotFound), errors.Is(err, domain.ErrItemNotFound), errors.Is(err, domain.ErrUnassignedNotFound):
 		return notFound(missing), true
 	case errors.Is(err, application.ErrFileMissing):
-		return notFound("Faltan archivos en el disco (¿se borraron por SMB?): " + err.Error()), true
+		return notFound("Falta el archivo en el disco (¿se borró por SMB?): " + err.Error()), true
 	}
 	return httpapi.Problem{}, false
 }
@@ -136,15 +160,40 @@ func notFound(detail string) httpapi.Problem {
 	return httpapi.Problem{Status: http.StatusNotFound, Title: "Not Found", Detail: &detail}
 }
 
-func summaries(games []application.GameListing) []httpapi.GameSummary {
+func summaries(games []domain.GameSummary) []httpapi.GameSummary {
 	out := make([]httpapi.GameSummary, 0, len(games))
 	for _, g := range games {
 		out = append(out, httpapi.GameSummary{
 			Id: int64(g.ID), IgdbId: g.IGDBID, Console: string(g.Console), Title: g.Title, Folder: g.Folder,
-			ReleaseYear: g.ReleaseYear, CoverImageId: g.CoverImageID, ItemCount: g.ItemCount, MissingCount: g.MissingCount, Size: g.Size,
+			ReleaseYear: g.ReleaseYear, CoverImageId: g.CoverImageID, ItemCount: g.ItemCount, Size: g.Size,
 		})
 	}
 	return out
+}
+
+// contentDisposition names a download. Non-ASCII names (Ōkami.zip) get an
+// ASCII fallback (Okami.zip) for clients that ignore filename*.
+func contentDisposition(name string) string {
+	ascii := asciiName(name)
+	if ascii == name {
+		return mime.FormatMediaType("attachment", map[string]string{"filename": name})
+	}
+	return mime.FormatMediaType("attachment", map[string]string{"filename": ascii}) + "; filename*=UTF-8''" + url.PathEscape(name)
+}
+
+func asciiName(name string) string {
+	var b strings.Builder
+	for _, r := range norm.NFD.String(name) {
+		switch {
+		case unicode.Is(unicode.Mn, r): // combining accent
+		case r < 0x20 || r == '"' || r == '\\' || r == 0x7f:
+		case r < 0x80:
+			b.WriteRune(r)
+		default:
+			b.WriteRune('_')
+		}
+	}
+	return b.String()
 }
 
 // downloadResponse sends a Download. It replaces the generated response
@@ -167,8 +216,12 @@ func (d downloadResponse) VisitDownloadItemResponse(w http.ResponseWriter) error
 
 func (d downloadResponse) VisitDownloadGameResponse(w http.ResponseWriter) error { return d.visit(w) }
 
+func (d downloadResponse) VisitDownloadUnassignedResponse(w http.ResponseWriter) error {
+	return d.visit(w)
+}
+
 func (d downloadResponse) visit(w http.ResponseWriter) error {
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": d.d.Name}))
+	w.Header().Set("Content-Disposition", contentDisposition(d.d.Name))
 	w.Header().Set("Cache-Control", "no-store")
 	if d.d.File != nil {
 		return d.serveFile(w)

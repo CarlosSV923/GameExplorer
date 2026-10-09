@@ -5,13 +5,26 @@ import type { CatalogPorts } from '../../application/ports'
 
 export function createCatalogHttp(client: ApiClient, baseUrl = '/api'): CatalogPorts {
   const id = (n: number) => ({ params: { path: { id: n } } })
+  const slugExt = (slug: string, extension: string) => ({
+    params: { path: { slug }, query: { extension } },
+  })
   return {
     consoles: {
       list: () => unwrap(client.GET('/consoles')),
-      create: (body) => unwrap(client.POST('/consoles', { body })),
-      update: (n, body) => unwrap(client.PATCH('/consoles/{id}', { ...id(n), body })),
-      remove: (n) => unwrapVoid(client.DELETE('/consoles/{id}', id(n))),
-      reorder: (ids) => unwrap(client.PUT('/consoles/order', { body: { ids } })),
+      rename: (slug, displayName) =>
+        unwrap(
+          client.PATCH('/consoles/{slug}', { params: { path: { slug } }, body: { displayName } }),
+        ),
+      reorder: (slugs) => unwrap(client.PUT('/consoles/order', { body: { slugs } })),
+      addExtension: (slug, extension) =>
+        unwrap(
+          client.POST('/consoles/{slug}/extensions', {
+            params: { path: { slug } },
+            body: { extension },
+          }),
+        ),
+      removeExtension: (slug, extension) =>
+        unwrap(client.DELETE('/consoles/{slug}/extensions', slugExt(slug, extension))),
     },
     library: {
       consoleGames: (slug) =>
@@ -20,13 +33,21 @@ export function createCatalogHttp(client: ApiClient, baseUrl = '/api'): CatalogP
       game: (n) => unwrap(client.GET('/games/{id}', id(n))),
       trashGame: (n) => unwrapVoid(client.POST('/games/{id}/trash', id(n))),
       trashItem: (n) => unwrapVoid(client.POST('/items/{id}/trash', id(n))),
-      forgetItem: (n) => unwrapVoid(client.POST('/items/{id}/forget', id(n))),
-      planRematch: (n, body) => unwrap(client.POST('/games/{id}/rematch/plan', { ...id(n), body })),
-      rematch: (n, body) => unwrap(client.POST('/games/{id}/rematch', { ...id(n), body })),
-      lastCheck: async () => (await unwrap(client.GET('/library/check'))).lastCheck ?? null,
-      check: () => unwrap(client.POST('/library/check')),
+      unassignGame: (n) => unwrapVoid(client.POST('/games/{id}/unassign', id(n))),
+      unassignItem: (n) => unwrapVoid(client.POST('/items/{id}/unassign', id(n))),
+      planEdit: (n, body) => unwrap(client.POST('/games/{id}/edit/plan', { ...id(n), body })),
+      edit: (n, body) => unwrap(client.POST('/games/{id}/edit', { ...id(n), body })),
+      editItem: (n, body) => unwrap(client.PATCH('/items/{id}', { ...id(n), body })),
+      lastScan: async () => (await unwrap(client.GET('/library/scan'))).lastScan ?? null,
+      scan: () => unwrap(client.POST('/library/scan')),
       gameDownloadUrl: (n) => `${baseUrl}/games/${String(n)}/download`,
       itemDownloadUrl: (n) => `${baseUrl}/items/${String(n)}/download`,
+    },
+    unassigned: {
+      list: () => unwrap(client.GET('/unassigned')),
+      trash: (n) => unwrapVoid(client.POST('/unassigned/{id}/trash', id(n))),
+      remove: (n) => unwrapVoid(client.DELETE('/unassigned/{id}', id(n))),
+      downloadUrl: (n) => `${baseUrl}/unassigned/${String(n)}/download`,
     },
     trash: {
       list: () => unwrap(client.GET('/trash')),

@@ -13,14 +13,22 @@ import { useTranslation } from 'react-i18next'
 import { useAction } from '../input'
 import { tabbables } from '../input/spatial'
 import { Button } from './Button'
+import { cx } from './cx'
 
 interface DialogProps {
   title: string
   onClose: () => void
   /** Buttons, the main action last (drawn on the right). */
   actions: ReactNode
-  /** What gets focus on open: the main action (default) or the first field. */
-  initialFocus?: 'action' | 'first'
+  /**
+   * What gets focus on open: the main action (default), the first control,
+   * or the first text field (forms whose first controls are optional).
+   */
+  initialFocus?: 'action' | 'first' | 'field'
+  /** A line under the title. */
+  subtitle?: string
+  /** lg: forms with several sections (the upload form). */
+  size?: 'md' | 'lg'
   children?: ReactNode
 }
 
@@ -34,6 +42,8 @@ export function Dialog({
   onClose,
   actions,
   initialFocus = 'action',
+  subtitle,
+  size = 'md',
   children,
 }: DialogProps) {
   const titleId = useId()
@@ -63,7 +73,15 @@ export function Dialog({
     const items = box.current ? tabbables(box.current) : []
     // The main action is the last button; fall back to the first control.
     const buttons = items.filter((el) => el instanceof HTMLButtonElement)
-    const target = initialFocus === 'first' ? items[0] : (buttons[buttons.length - 1] ?? items[0])
+    const field = items.find(
+      (el) => el instanceof HTMLInputElement && (el.type === 'text' || el.type === 'search'),
+    )
+    const target =
+      initialFocus === 'field'
+        ? (field ?? items[0])
+        : initialFocus === 'first'
+          ? items[0]
+          : (buttons[buttons.length - 1] ?? items[0])
     target?.focus()
     // Only on open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,11 +111,17 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={onKeyDown}
-        className="box-border flex max-h-full w-full max-w-[560px] animate-dialog-in flex-col gap-4.5 overflow-y-auto rounded-xl border border-control bg-surface p-7"
+        className={cx(
+          'box-border flex max-h-full w-full animate-dialog-in flex-col gap-4.5 overflow-y-auto rounded-xl border border-control bg-surface p-7',
+          size === 'lg' ? 'max-w-[720px] gap-6' : 'max-w-[560px]',
+        )}
       >
-        <h2 id={titleId} className="m-0 text-title font-bold">
-          {title}
-        </h2>
+        <div className="flex flex-col gap-1.5">
+          <h2 id={titleId} className="m-0 text-title font-bold">
+            {title}
+          </h2>
+          {subtitle && <p className="m-0 text-body font-semibold text-ink-2">{subtitle}</p>}
+        </div>
         {children && <div className="flex flex-col gap-4 text-body-lg text-ink-1">{children}</div>}
         <div className="flex flex-wrap justify-end gap-3">{actions}</div>
       </div>

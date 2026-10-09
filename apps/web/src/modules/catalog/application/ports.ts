@@ -2,43 +2,56 @@ import { createPortContext } from '@/shared/kernel/ports'
 
 import type {
   Console,
-  ConsoleCreate,
-  ConsoleInput,
   GameDetail,
+  GameEdit,
+  GameEditPlan,
+  GameEditResult,
   GameSummary,
-  IntegrityReport,
-  RematchPlan,
-  RematchRequest,
-  RematchResult,
+  ItemEdit,
   RestoreResult,
+  ScanReport,
   TrashEntry,
+  UnassignedFile,
 } from '../domain/types'
 
-/** Consoles: the carousel and Settings (RF-40, RF-41). */
+/** Consoles: the carousel and Settings (RF-40 to RF-42). */
 export interface ConsolePorts {
   list(): Promise<Console[]>
-  create(input: ConsoleCreate): Promise<Console>
-  update(id: number, input: ConsoleInput): Promise<Console>
-  remove(id: number): Promise<void>
-  /** Every console id, first to last. */
-  reorder(ids: number[]): Promise<Console[]>
+  rename(slug: string, displayName: string): Promise<Console>
+  /** Every console slug, first to last. */
+  reorder(slugs: string[]): Promise<Console[]>
+  /** Rejects with `conflict` when another console already has it. */
+  addExtension(slug: string, extension: string): Promise<Console>
+  /** Rejects with `conflict` while a file uses it. */
+  removeExtension(slug: string, extension: string): Promise<Console>
 }
 
-/** Browsing, downloads, re-match and integrity (RF-20 to RF-26). */
+/** Browsing, downloads, editing and the scan (RF-20 to RF-26). */
 export interface LibraryPorts {
   consoleGames(slug: string): Promise<GameSummary[]>
   search(query: string): Promise<GameSummary[]>
   game(id: number): Promise<GameDetail>
   trashGame(id: number): Promise<void>
   trashItem(id: number): Promise<void>
-  forgetItem(id: number): Promise<void>
-  planRematch(gameId: number, request: RematchRequest): Promise<RematchPlan>
-  rematch(gameId: number, request: RematchRequest): Promise<RematchResult>
-  lastCheck(): Promise<IntegrityReport | null>
-  check(): Promise<IntegrityReport>
+  unassignGame(id: number): Promise<void>
+  unassignItem(id: number): Promise<void>
+  planEdit(gameId: number, edit: GameEdit): Promise<GameEditPlan>
+  edit(gameId: number, edit: GameEdit): Promise<GameEditResult>
+  /** Rejects with `conflict` when the new name is taken and onDuplicate is unset. */
+  editItem(itemId: number, edit: ItemEdit): Promise<GameDetail>
+  lastScan(): Promise<ScanReport | null>
+  scan(): Promise<ScanReport>
   /** Where a download link points (a real file, or the demo's note). */
   gameDownloadUrl(gameId: number): string
   itemDownloadUrl(itemId: number): string
+}
+
+/** The unassigned section (RF-27); assigning starts an upload job (ingestion). */
+export interface UnassignedPorts {
+  list(): Promise<UnassignedFile[]>
+  trash(id: number): Promise<void>
+  remove(id: number): Promise<void>
+  downloadUrl(id: number): string
 }
 
 /** The trash (RF-30). */
@@ -53,6 +66,7 @@ export interface TrashPorts {
 export interface CatalogPorts {
   consoles: ConsolePorts
   library: LibraryPorts
+  unassigned: UnassignedPorts
   trash: TrashPorts
 }
 

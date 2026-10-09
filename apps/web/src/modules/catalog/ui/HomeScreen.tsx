@@ -11,17 +11,18 @@ import { useTranslation } from 'react-i18next'
 
 import { UploadButton, UploadsIndicator } from '@/modules/ingestion/ui/UploadButton'
 import { ConsoleLogo } from '@/modules/metadata/ui/Cover'
+import { useFormat } from '@/shared/i18n/hooks'
 import { useAction } from '@/shared/input'
 import { ownsArrows } from '@/shared/input/context'
 import { useDelayedFlag } from '@/shared/kernel/hooks'
 import { ButtonLink } from '@/shared/routing/links'
 import {
-  Banner,
   Button,
   ChevronLeftIcon,
   ChevronRightIcon,
   cx,
   EmptyState,
+  FolderIcon,
   GamepadIcon,
   HelpBar,
   IconButton,
@@ -31,36 +32,46 @@ import {
   UploadIcon,
 } from '@/shared/ui'
 
-import { useConsoles } from '../application/queries'
-import type { Console } from '../domain/types'
+import { useCarousel, type CarouselEntry } from '../application/carousel'
 
 /** Swipe distance that changes console (docs/design-handoff.md §4). */
 const swipeThreshold = 48
 
+/** The visible name of an entry: the console's, or "No asignados". */
+function useEntryName() {
+  const { t } = useTranslation()
+  return (e: CarouselEntry) => (e.unassigned ? t('unassigned.title') : e.name)
+}
+
 function SideConsole({
-  console: c,
+  entry: c,
   distance,
   onPick,
 }: {
-  console: Console
+  entry: CarouselEntry
   distance: number
   onPick: () => void
 }) {
   const { t } = useTranslation()
+  const name = useEntryName()(c)
   return (
     <button
       type="button"
       onClick={onPick}
-      aria-label={t('home.show', { name: c.displayName })}
+      aria-label={t('home.show', { name })}
       className={cx(
         'min-h-24 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border-0 bg-transparent px-1 py-3 text-ink-1 md:p-3',
         distance === 3 ? 'hidden xl:flex' : distance === 2 ? 'hidden md:flex' : 'flex',
       )}
     >
       <span className="line-clamp-2 text-center text-chip leading-tight font-bold break-words uppercase opacity-78 md:text-body md:tracking-[0.06em]">
-        {c.displayName}
+        {name}
       </span>
-      {c.releaseYear && <span className="text-chip text-ink-2">{c.releaseYear}</span>}
+      {c.unassigned ? (
+        <span className="text-chip text-ink-2">{t('unassigned.files', { count: c.count })}</span>
+      ) : (
+        c.releaseYear && <span className="text-chip text-ink-2">{c.releaseYear}</span>
+      )}
     </button>
   )
 }
@@ -81,7 +92,7 @@ function Rail({ side, children }: { side: 'left' | 'right'; children: ReactNode 
   )
 }
 
-/** Home: the console carousel, EmulationStation style (RF-20). */
+/** Home: the carousel of consoles with games and the unassigned section (RF-20). */
 export function HomeScreen({
   selected,
   onSelect,
@@ -90,16 +101,18 @@ export function HomeScreen({
   onSelect: (slug: string) => void
 }) {
   const { t } = useTranslation()
+  const format = useFormat()
   const navigate = useNavigate()
-  const consoles = useConsoles()
-  const slow = useDelayedFlag(consoles.isPending)
+  const carousel = useCarousel()
+  const entryName = useEntryName()
+  const slow = useDelayedFlag(carousel.isPending)
   const [dir, setDir] = useState<'next' | 'prev'>('next')
   const [query, setQuery] = useState('')
   const [badLogo, setBadLogo] = useState<string | null>(null)
   const center = useRef<HTMLAnchorElement>(null)
   const swipe = useRef<number | null>(null)
 
-  const list = consoles.data ?? []
+  const list = carousel.entries
   const n = list.length
   const index = Math.max(
     0,
@@ -107,7 +120,9 @@ export function HomeScreen({
   )
   const current = list[index]
   const at = (offset: number) => list[(((index + offset) % n) + n) % n]
-  const side = Math.min(3, Math.ceil((n - 1) / 2))
+  // The others split between both sides without repeating (Main.dc.html).
+  const right = Math.min(3, Math.ceil((n - 1) / 2))
+  const left = Math.min(3, n - 1 - right)
 
   const go = (offset: number) => {
     const target = at(offset)
@@ -175,12 +190,15 @@ export function HomeScreen({
     if (Math.abs(dx) >= swipeThreshold) go(dx > 0 ? -1 : 1)
   }
 
-  const total = list.reduce((sum, c) => sum + c.gameCount, 0)
   const showLogo = current?.logoImageId && badLogo !== current.slug
-  const long = (current?.displayName.length ?? 0) > 14
+  const currentName = current ? entryName(current) : ''
+  const long = currentName.length > 14
+  const empty = !carousel.isPending && !carousel.isError && list.length === 0
+  // Uploading from here preselects the console in the middle (RF-03).
+  const uploadConsole = current && !current.unassigned ? current.slug : undefined
 
   let main
-  if (consoles.isError) {
+  if (carousel.isError) {
     main = (
       <EmptyState
         title={t('errors.loadTitle')}
@@ -188,13 +206,25 @@ export function HomeScreen({
         action={
           <Button
             onClick={() => {
-              void consoles.refetch()
+              void carousel.refetch()
             }}
           >
             {t('common.retry')}
           </Button>
         }
       />
+    )
+  } else if (empty) {
+    main = (
+      <div className="mx-auto flex max-w-[620px] flex-col items-center gap-5 px-4 text-center">
+        <GamepadIcon size={56} strokeWidth={1.6} className="text-ink-3" />
+        <h1 className="m-0 text-display leading-[1.1] font-bold">{t('home.emptyTitle')}</h1>
+        <p className="m-0 text-body-lg text-ink-2">
+          {t('home.emptyBody', { names: format.orList(carousel.consoleNames) })}
+        </p>
+        <UploadButton size="lg">{t('help.upload')}</UploadButton>
+        <span className="text-body text-ink-3">{t('home.emptyDrop')}</span>
+      </div>
     )
   } else if (!current) {
     main = slow ? <Spinner label={t('common.loading')} size={32} /> : null
@@ -203,12 +233,12 @@ export function HomeScreen({
       <>
         <div className="flex w-full items-center">
           <Rail side="left">
-            {Array.from({ length: side }, (_, i) => side - i).map((d) => {
+            {Array.from({ length: left }, (_, i) => left - i).map((d) => {
               const c = at(-d)
               return c ? (
                 <SideConsole
                   key={`l${String(d)}`}
-                  console={c}
+                  entry={c}
                   distance={d}
                   onPick={() => {
                     go(-d)
@@ -220,8 +250,9 @@ export function HomeScreen({
           <div className="box-border flex w-[46vw] flex-none flex-col items-center gap-4.5 px-3 md:w-[min(560px,62vw)]">
             <Link
               ref={center}
-              to="/consolas/$slug"
-              params={{ slug: current.slug }}
+              {...(current.unassigned
+                ? { to: '/no-asignados' as const }
+                : { to: '/consolas/$slug' as const, params: { slug: current.slug } })}
               className="flex flex-col items-center gap-2 rounded-xl px-4 py-2 text-ink-1 no-underline hover:text-ink-1"
             >
               <span
@@ -231,6 +262,9 @@ export function HomeScreen({
                   dir === 'next' ? 'animate-carousel-next' : 'animate-carousel-prev',
                 )}
               >
+                {current.unassigned && (
+                  <FolderIcon size={72} strokeWidth={1.6} className="text-ink-2" />
+                )}
                 {showLogo && (
                   <ConsoleLogo
                     imageId={current.logoImageId}
@@ -247,22 +281,30 @@ export function HomeScreen({
                     showLogo ? 'text-title' : long ? 'text-display-lg' : 'text-display-xl',
                   )}
                 >
-                  {current.displayName}
+                  {currentName}
                 </h1>
               </span>
-              {current.releaseYear && (
-                <span className="text-heading font-bold">{current.releaseYear}</span>
+              {current.unassigned ? (
+                <span className="text-heading font-bold">
+                  {t('unassigned.files', { count: current.count })}
+                </span>
+              ) : (
+                current.releaseYear && (
+                  <span className="text-heading font-bold">{current.releaseYear}</span>
+                )
               )}
             </Link>
-            <span className="font-mono text-caption text-ink-3">/{current.slug}</span>
+            <span className="text-center font-mono text-caption text-ink-3">
+              {current.unassigned ? t('home.unassignedHint') : `/${current.slug}`}
+            </span>
           </div>
           <Rail side="right">
-            {Array.from({ length: side }, (_, i) => i + 1).map((d) => {
+            {Array.from({ length: right }, (_, i) => i + 1).map((d) => {
               const c = at(d)
               return c ? (
                 <SideConsole
                   key={`r${String(d)}`}
-                  console={c}
+                  entry={c}
                   distance={d}
                   onPick={() => {
                     go(d)
@@ -272,7 +314,7 @@ export function HomeScreen({
             })}
           </Rail>
         </div>
-        <div className="mt-10 flex justify-center gap-3">
+        <div className={cx('mt-10 flex justify-center gap-3', n < 2 && 'invisible')}>
           <IconButton
             label={t('home.previous')}
             className="border border-control"
@@ -292,11 +334,6 @@ export function HomeScreen({
             <ChevronRightIcon />
           </IconButton>
         </div>
-        {total === 0 && (
-          <div className="mx-auto mt-8 max-w-[640px] px-4">
-            <Banner tone="info">{t('home.emptyLibrary')}</Banner>
-          </div>
-        )}
       </>
     )
   }
@@ -325,7 +362,9 @@ export function HomeScreen({
           <UploadsIndicator />
           {current && (
             <span className="text-count font-medium">
-              {t('home.games', { count: current.gameCount })}
+              {current.unassigned
+                ? t('unassigned.files', { count: current.count })
+                : t('home.games', { count: current.count })}
             </span>
           )}
         </div>
@@ -355,9 +394,15 @@ export function HomeScreen({
         </ButtonLink>
         <span className="hidden items-center gap-2.5 text-body text-ink-3 md:inline-flex">
           <UploadIcon />
-          {t('help.dropHint')}
+          {current?.unassigned
+            ? t('home.unassignedUpload')
+            : current
+              ? t('home.dropHintConsole', { name: currentName })
+              : t('help.dropHint')}
         </span>
-        <UploadButton>{t('help.upload')}</UploadButton>
+        <UploadButton {...(uploadConsole ? { consoleSlug: uploadConsole } : {})}>
+          {t('help.upload')}
+        </UploadButton>
       </HelpBar>
     </div>
   )

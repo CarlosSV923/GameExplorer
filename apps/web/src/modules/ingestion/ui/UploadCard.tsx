@@ -1,6 +1,7 @@
 import { useState, type SubmitEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useConsoles } from '@/modules/catalog/application/queries'
 import { describeError } from '@/shared/i18n/errors'
 import { useFormat } from '@/shared/i18n/hooks'
 import { ButtonLink } from '@/shared/routing/links'
@@ -11,12 +12,14 @@ import {
   CloseIcon,
   cx,
   ErrorIcon,
+  FolderIcon,
   FileButton,
   IconButton,
   LockIcon,
   ProgressBar,
   Spinner,
   TextField,
+  TrashIcon,
 } from '@/shared/ui'
 
 import { useCancelJob, useSubmitPassword, useUploadQueue } from '../application/queries'
@@ -99,7 +102,9 @@ export function UploadCard({ row }: { row: UploadRow }) {
   const format = useFormat()
   const queue = useUploadQueue()
   const cancelJob = useCancelJob()
+  const consoles = useConsoles()
   const [wrongFile, setWrongFile] = useState(false)
+  const consoleName = consoles.data?.find((c) => c.slug === row.console)?.displayName ?? row.console
 
   const pct = row.size > 0 ? (row.sent / row.size) * 100 : 0
   const amounts = t('uploads.amounts', {
@@ -179,7 +184,16 @@ export function UploadCard({ row }: { row: UploadRow }) {
               onFiles={([file]) => {
                 if (!file || !row.jobId) return
                 setWrongFile(
-                  !queue.resume({ id: row.jobId, fileName: row.fileName, size: row.size }, file),
+                  !queue.resume(
+                    {
+                      id: row.jobId,
+                      fileName: row.fileName,
+                      size: row.size,
+                      console: row.console,
+                      title: row.title,
+                    },
+                    file,
+                  ),
                 )
               }}
             >
@@ -204,7 +218,7 @@ export function UploadCard({ row }: { row: UploadRow }) {
     case 'waitingParts':
       body = (
         <Status icon={<ClockIcon size={14} />}>
-          {t('uploads.waitingParts', { part: row.volumeIndex ?? 1 })}
+          {t('uploads.waitingParts', { count: row.groupSize ?? 2 })}
         </Status>
       )
       break
@@ -234,15 +248,29 @@ export function UploadCard({ row }: { row: UploadRow }) {
         </>
       )
       break
-    case 'review':
+    case 'confirm':
+      border = 'border-accent'
       corner = row.jobId ? (
         <ButtonLink to="/subidas/$jobId" params={{ jobId: row.jobId }} size="sm" variant="primary">
-          {t('uploads.review')}
+          {t('uploads.complete')}
         </ButtonLink>
       ) : null
       body = (
         <Status icon={<CheckIcon size={14} />} tone="success">
           {t('uploads.ready')}
+        </Status>
+      )
+      break
+    case 'invalid':
+      border = 'border-danger'
+      corner = row.jobId ? (
+        <ButtonLink to="/subidas/$jobId" params={{ jobId: row.jobId }} size="sm" variant="primary">
+          {t('uploads.resolve')}
+        </ButtonLink>
+      ) : null
+      body = (
+        <Status icon={<ErrorIcon size={14} />} tone="danger">
+          {t('uploads.invalid', { console: consoleName })}
         </Status>
       )
       break
@@ -260,6 +288,14 @@ export function UploadCard({ row }: { row: UploadRow }) {
           {t('uploads.done')}
         </Status>
       )
+      break
+    case 'unassigned':
+      corner = <CornerButton label={t('uploads.dismiss', { name })} onClick={dismiss} />
+      body = <Status icon={<FolderIcon size={14} />}>{t('uploads.unassigned')}</Status>
+      break
+    case 'trashed':
+      corner = <CornerButton label={t('uploads.dismiss', { name })} onClick={dismiss} />
+      body = <Status icon={<TrashIcon size={14} />}>{t('uploads.trashed')}</Status>
       break
     case 'failed':
       border = 'border-danger'
@@ -285,6 +321,9 @@ export function UploadCard({ row }: { row: UploadRow }) {
           {corner}
         </span>
       </div>
+      <span className="-mt-1 truncate text-caption font-bold text-ink-2">
+        {t('uploads.target', { title: row.title, console: consoleName })}
+      </span>
       {body}
       {row.warning && row.phase !== 'failed' && (
         <span className="text-caption text-ink-3">{row.warning}</span>

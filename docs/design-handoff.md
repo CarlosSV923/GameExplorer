@@ -29,7 +29,7 @@ Se definen en `apps/web/src/shared/ui/tokens.css` como `@theme` de Tailwind v4, 
 | `on-accent` | `#1a1a1a` | Texto sobre `accent`, `danger`, `kind-*` claros (9,5:1) |
 | `success` | `#9be29b` | "Listo para revisar", detección que coincide |
 | `danger` | `#ff8a78` | Acciones destructivas y errores (5,1:1 sobre `bg`) |
-| `warning-surface` / `warning-ink` | `#3f3626` / `#ffe2a6` | Avisos (duplicado, faltante, fusión), con borde `accent` |
+| `warning-surface` / `warning-ink` | `#3f3626` / `#ffe2a6` | Avisos (duplicado, fusión), con borde `accent` |
 | `danger-surface` / `danger-ink` | `#4a2620` / `#ffd9d2` | Banner de error grave, con borde `danger` |
 | `progress-upload` | `#ffffff` | Barra de subida |
 | `progress-extract` | `#8ab4ff` | Barra de extracción (siempre con el texto del estado al lado, WCAG 1.4.1) |
@@ -41,9 +41,9 @@ Se definen en `apps/web/src/shared/ui/tokens.css` como `@theme` de Tailwind v4, 
 | Base | `#ffffff` | `on-accent` |
 | Update | `#8ab4ff` | `#10203d` (7,8:1) |
 | DLC | `accent` | `on-accent` |
-| Disco | `ink-2` | `on-accent` |
+| Juego (Wii, PSP) | `ink-2` (`kind-game`) | `on-accent` |
 | Juego completo (papelera) | transparente, borde `ink-1` | `ink-1` |
-| Falta en el disco | transparente, borde `accent` | `accent` |
+| No asignado (papelera) | `surface-raised` | `ink-1` |
 
 ### Tipografía
 Familias: **Quicksand** 500/600/700 para la interfaz y **JetBrains Mono** 400/500 para nombres de archivo, rutas, extensiones y atajos. Se sirven desde la app (`@fontsource`), nunca desde Google, para que el navegador no contacte a terceros (RF-20a).

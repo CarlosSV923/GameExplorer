@@ -23,26 +23,52 @@ import (
 type Area struct {
 	root    string
 	volumes string
+	sources string
 }
 
 var _ application.Staging = (*Area)(nil)
 
 // New builds the area: job directories under root, multi-volume parts under
-// volumes (both created on first use).
-func New(root, volumes string) *Area {
-	return &Area{root: root, volumes: volumes}
+// volumes and files taken from the unassigned section under sources (all
+// created on first use).
+func New(root, volumes, sources string) *Area {
+	return &Area{root: root, volumes: volumes, sources: sources}
 }
 
-// VolumeDir implements application.Staging. The set name comes from a file
-// name, so it is hashed into a safe directory name.
-func (a *Area) VolumeDir(set string) string {
-	sum := sha256.Sum256([]byte(set))
+// SourceDir implements application.Staging.
+func (a *Area) SourceDir(id domain.JobID) string {
+	return filepath.Join(a.sources, filepath.Base(string(id)))
+}
+
+// RemoveSource implements application.Staging.
+func (a *Area) RemoveSource(id domain.JobID) error {
+	return os.RemoveAll(a.SourceDir(id))
+}
+
+// Exists implements application.Staging.
+func (a *Area) Exists(path string) bool {
+	_, err := os.Lstat(path)
+	return err == nil
+}
+
+// Adopt implements application.Staging.
+func (a *Area) Adopt(src, dest string) error {
+	if err := os.MkdirAll(filepath.Dir(dest), 0o750); err != nil {
+		return err
+	}
+	return os.Rename(src, dest)
+}
+
+// VolumeDir implements application.Staging. The group id comes from the
+// browser, so it is hashed into a safe directory name.
+func (a *Area) VolumeDir(group string) string {
+	sum := sha256.Sum256([]byte(group))
 	return filepath.Join(a.volumes, hex.EncodeToString(sum[:8]))
 }
 
 // RemoveVolumes implements application.Staging.
-func (a *Area) RemoveVolumes(set string) error {
-	return os.RemoveAll(a.VolumeDir(set))
+func (a *Area) RemoveVolumes(group string) error {
+	return os.RemoveAll(a.VolumeDir(group))
 }
 
 // RemovePart implements application.Staging; it only deletes inside the

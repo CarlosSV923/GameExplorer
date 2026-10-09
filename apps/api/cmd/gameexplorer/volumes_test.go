@@ -1,129 +1,89 @@
 package main
 
 import (
-	"crypto/rand"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
+	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/config"
 )
 
-type partJSON struct {
-	fullJob
-	VolumeIndex *int    `json:"volumeIndex"`
-	MergedInto  *string `json:"mergedInto"`
-}
-
-// splitArchive packs a ~2.5 MB file into 1 MB 7z volumes: set.7z.001..003.
+// splitArchive builds a 7z split in three volumes (game.7z.001…003).
 func splitArchive(t *testing.T) map[string][]byte {
 	t.Helper()
-	src, out := t.TempDir(), t.TempDir()
-	data := make([]byte, 2_500_000)
-	_, _ = rand.Read(data) // incompressible, so the volumes keep their size
-	_ = os.WriteFile(filepath.Join(src, "Shadow of the Colossus.iso"), data, 0o600)
-	cmd := exec.CommandContext(t.Context(), "7zz", "a", "-bso0", "-bsp0", "-t7z", "-mx0", "-v1m",
-		filepath.Join(out, "Shadow of the Colossus.7z"), ".")
-	cmd.Dir = src
-	if o, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("7zz a: %v %s", err, o)
+	dir := t.TempDir()
+	game := filepath.Join(dir, "Game.iso")
+	content := strings.Repeat("0123456789", 3000)
+	writeFile(t, game, content)
+	//nolint:gosec // fixed arguments in a test
+	if out, err := exec.CommandContext(t.Context(), "7zz", "a", "-mx0", "-v10k", filepath.Join(dir, "game.7z"), game).CombinedOutput(); err != nil {
+		t.Fatalf("7zz: %v %s", err, out)
 	}
 	parts := map[string][]byte{}
-	entries, _ := os.ReadDir(out)
-	for _, e := range entries {
-		parts[e.Name()], _ = os.ReadFile(filepath.Join(out, e.Name()))
+	for i := 1; ; i++ {
+		name := "game.7z.00" + strconv.Itoa(i)
+		b, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			break
+		}
+		parts[name] = b
 	}
-	if len(parts) != 3 {
-		t.Fatalf("expected 3 volumes, got %v", slices.Collect(func(yield func(string) bool) {
-			for k := range parts {
-				if !yield(k) {
-					return
-				}
-			}
-		}))
+	if len(parts) < 3 {
+		t.Fatalf("parts = %d", len(parts))
 	}
 	return parts
 }
 
-func TestVolumesArrivingOutOfOrderAreMerged(t *testing.T) {
+func TestPartsOfOneArchiveAreJoined(t *testing.T) {
 	t.Parallel()
 	require7zz(t)
-	library := t.TempDir()
-	srv := newTestServer(t, func(c *config.Config) { c.LibraryPath = library })
-	cookie := login(t, srv)
+	srv, cookie, _ := libraryServer(t)
 	parts := splitArchive(t)
+	size := strconv.Itoa(len(parts))
 
-	id3 := upload(t, srv, cookie, "Shadow of the Colossus.7z.003", parts["Shadow of the Colossus.7z.003"])
-	id2 := upload(t, srv, cookie, "Shadow of the Colossus.7z.002", parts["Shadow of the Colossus.7z.002"])
-	waitStatus(t, srv, cookie, id3, "waiting_parts")
-	waitStatus(t, srv, cookie, id2, "waiting_parts")
-
-	id1 := upload(t, srv, cookie, "Shadow of the Colossus.7z.001", parts["Shadow of the Colossus.7z.001"])
-	first := waitStatus(t, srv, cookie, id1, "review", "failed")
-	if first.Status != "review" {
-		t.Fatalf("first volume = %+v (error %v)", first, first.Error)
+	// The last part first: nothing happens until every part has arrived.
+	ids := map[string]string{}
+	names := []string{"game.7z.003", "game.7z.001", "game.7z.002"}
+	for _, n := range names[:len(names)-1] {
+		ids[n] = upload(t, srv, cookie, n, "psp", "Game", parts[n], "group", "g1", "groupSize", size)
+		waitStatus(t, srv, cookie, ids[n], "waiting_parts")
 	}
-	for _, id := range []string{id2, id3} {
-		p := decode[partJSON](t, do(t, http.MethodGet, srv.URL+"/api/jobs/"+id, "", cookie))
-		if p.Status != "merged" || p.MergedInto == nil || *p.MergedInto != id1 || p.VolumeIndex == nil {
-			t.Fatalf("part %s = %+v", id, p)
+	last := names[len(names)-1]
+	ids[last] = upload(t, srv, cookie, last, "psp", "Game", parts[last], "group", "g1", "groupSize", size)
+
+	first := waitStatus(t, srv, cookie, ids["game.7z.001"], "confirm", "failed")
+	if first.Status != "confirm" {
+		t.Fatalf("first volume = %+v", first)
+	}
+	for _, n := range []string{"game.7z.002", "game.7z.003"} {
+		if j := waitStatus(t, srv, cookie, ids[n], "merged"); j.MergedInto == nil || *j.MergedInto != first.ID {
+			t.Fatalf("%s = %+v", n, j)
 		}
 	}
-
-	got := items(t, srv, cookie, id1)
-	if len(got) != 1 || got[0].Path != "Shadow of the Colossus.iso" {
-		t.Fatalf("items = %+v", got)
-	}
-	if entries, _ := os.ReadDir(volumesDir(library)); len(entries) != 0 {
-		t.Fatalf("volumes must be deleted after extraction, found %v", entries)
+	if files := jobFiles(t, srv, cookie, first.ID); len(files) != 1 || files[0].Path != "Game.iso" || !files[0].Valid {
+		t.Fatalf("files = %+v", files)
 	}
 }
 
-func TestIncompleteSetWaitsAndPartsCanBeCancelled(t *testing.T) {
+func TestFilesThatAreNotPartsOfOneArchiveFail(t *testing.T) {
 	t.Parallel()
-	require7zz(t)
-	library := t.TempDir()
-	srv := newTestServer(t, func(c *config.Config) { c.LibraryPath = library })
-	cookie := login(t, srv)
-	parts := splitArchive(t)
+	srv, cookie, _ := libraryServer(t)
 
-	id1 := upload(t, srv, cookie, "Shadow of the Colossus.7z.001", parts["Shadow of the Colossus.7z.001"])
-	id2 := upload(t, srv, cookie, "Shadow of the Colossus.7z.002", parts["Shadow of the Colossus.7z.002"])
-	waitStatus(t, srv, cookie, id1, "waiting_parts")
-	waitStatus(t, srv, cookie, id2, "waiting_parts")
-
-	// Volume 3 is missing: 7-Zip cannot open the set, so nothing is promoted.
-	if j := decode[fullJob](t, do(t, http.MethodGet, srv.URL+"/api/jobs/"+id1, "", cookie)); j.Status != "waiting_parts" {
-		t.Fatalf("first volume = %s, want waiting_parts", j.Status)
-	}
-
-	if res := do(t, http.MethodPost, srv.URL+"/api/jobs/"+id2+"/cancel", "", cookie); res.StatusCode != http.StatusOK {
-		t.Fatalf("cancel part = %d", res.StatusCode)
-	}
-	remaining := 0
-	_ = filepath.WalkDir(volumesDir(library), func(_ string, d os.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
-			remaining++
+	a := upload(t, srv, cookie, "a.iso", "psp", "Game", []byte("a"), "group", "g2", "groupSize", "2")
+	b := upload(t, srv, cookie, "b.iso", "psp", "Game", []byte("b"), "group", "g2", "groupSize", "2")
+	for _, id := range []string{a, b} {
+		if j := waitStatus(t, srv, cookie, id, "failed"); j.Error == nil || !strings.Contains(*j.Error, "partes") {
+			t.Fatalf("job = %+v", j)
 		}
-		return nil
-	})
-	if remaining != 1 {
-		t.Fatalf("files left in volumes = %d, want only volume 1", remaining)
 	}
 }
 
 func TestLegacyRarVolumesFailClearly(t *testing.T) {
 	t.Parallel()
-	srv := newTestServer(t, nil)
-	cookie := login(t, srv)
-
-	id := upload(t, srv, cookie, "game.r00", []byte("Rar!\x1A\x07\x00 old volume"))
-	job := waitStatus(t, srv, cookie, id, "failed")
-	if job.Error == nil || !strings.Contains(*job.Error, ".part1.rar") {
-		t.Fatalf("error = %v", job.Error)
+	srv, cookie, _ := libraryServer(t)
+	id := upload(t, srv, cookie, "game.r00", "psp", "Game", []byte("rar"))
+	if j := waitStatus(t, srv, cookie, id, "failed"); j.Error == nil || !strings.Contains(*j.Error, ".r00") {
+		t.Fatalf("job = %+v", j)
 	}
 }

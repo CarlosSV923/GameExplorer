@@ -2,58 +2,64 @@ package domain
 
 import (
 	"context"
-
-	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain/detection"
+	"path"
+	"slices"
+	"strings"
 )
 
-// ItemShape is how a staged item is laid out on disk.
-type ItemShape string
-
-// Item shapes.
-const (
-	// ShapeFile is a single file (an .nsp, an .iso...).
-	ShapeFile ItemShape = "file"
-	// ShapeDisc is a .cue sheet plus the .bin tracks it references.
-	ShapeDisc ItemShape = "disc"
-	// ShapeFolder is a folder-format game (PS3 JB); never renamed inside.
-	ShapeFolder ItemShape = "folder"
-)
-
-// Confidence says how a console was suggested.
-type Confidence string
-
-// Detection confidence levels.
-const (
-	ConfidenceHeader    Confidence = "header"
-	ConfidenceExtension Confidence = "extension"
-	ConfidenceNone      Confidence = "none"
-)
-
-// StagedItem is one reviewable unit found in an upload (RF-06, RF-07).
-type StagedItem struct {
+// StagedFile is a file found in an upload (RF-07).
+type StagedFile struct {
 	JobID JobID
-	Shape ItemShape
-	// Path is relative to the job's staging directory ("." for a folder game
-	// that is the whole upload). For discs it is the .cue file.
+	// Path is relative to the job's staging directory ("/" separators).
 	Path string
-	// Parts are every file the item consists of (relative paths).
-	Parts []string
-	Size  int64
-	// Ignored items are junk (readme, .nfo...) listed only for transparency.
-	Ignored bool
-
-	Consoles       []string
-	Confidence     Confidence
-	SuggestedKind  detection.ItemKind
-	TitleID        string
-	VersionCode    string
-	DisplayVersion string
-	DiscNumber     int
+	Size int64
 }
 
-// StagedItemRepository persists the items found in each job.
-type StagedItemRepository interface {
-	// Replace stores items as the full set for the job (re-extraction safe).
-	Replace(ctx context.Context, id JobID, items []StagedItem) error
-	List(ctx context.Context, id JobID) ([]StagedItem, error)
+// StagedFileRepository persists the files found in each job.
+type StagedFileRepository interface {
+	// Replace stores files as the full set for the job (re-extraction safe).
+	Replace(ctx context.Context, id JobID, files []StagedFile) error
+	List(ctx context.Context, id JobID) ([]StagedFile, error)
+}
+
+// ConsoleRule is what validation needs to know about a console.
+type ConsoleRule struct {
+	Slug string
+	// Extensions are every extension the console accepts.
+	Extensions []string
+	// MultipleFiles allows several game files in one upload (Switch).
+	MultipleFiles bool
+}
+
+// ExtensionOf returns the longest of known that the file name ends with,
+// or "" (the same rule as the catalog's, RF-41).
+func ExtensionOf(name string, known []string) string {
+	lower := strings.ToLower(name)
+	best := ""
+	for _, ext := range known {
+		if len(ext) > len(best) && len(lower) > len(ext) && strings.HasSuffix(lower, ext) {
+			best = ext
+		}
+	}
+	return best
+}
+
+// Validate splits an upload's files into game files of the console and the
+// rest (discarded), and says why the upload does not fit, if it does not
+// (RF-07). known is every extension of every console: "Game.nkit.iso" is a
+// .nkit.iso even for a console that accepts .iso.
+func Validate(rule ConsoleRule, files []StagedFile, known []string) ([]StagedFile, InvalidReason) {
+	var valid []StagedFile
+	for _, f := range files {
+		if ext := ExtensionOf(path.Base(f.Path), known); ext != "" && slices.Contains(rule.Extensions, ext) {
+			valid = append(valid, f)
+		}
+	}
+	switch {
+	case len(valid) == 0:
+		return nil, InvalidNone
+	case len(valid) > 1 && !rule.MultipleFiles:
+		return valid, InvalidMany
+	}
+	return valid, ""
 }

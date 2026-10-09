@@ -6,9 +6,11 @@ import type {
 } from '@/modules/catalog/domain/types'
 
 /**
- * uploading → uploaded → (extracting ⇄ needs_password) → review →
- * committing → done; failed, cancelled and merged are terminal. Parts of a
- * multi-volume archive wait in waiting_parts until the set is complete.
+ * uploading → uploaded → (extracting ⇄ needs_password) → confirm | invalid →
+ * committing → done. Parts of a multi-volume archive wait in waiting_parts;
+ * the first volume continues and the rest become merged. An invalid job can
+ * change console or be set aside (unassigned, trashed, cancelled). done,
+ * failed, cancelled, merged, unassigned and trashed are terminal.
  */
 export type JobStatus =
   | 'uploading'
@@ -17,11 +19,17 @@ export type JobStatus =
   | 'merged'
   | 'extracting'
   | 'needs_password'
-  | 'review'
+  | 'confirm'
+  | 'invalid'
   | 'committing'
   | 'done'
+  | 'unassigned'
+  | 'trashed'
   | 'failed'
   | 'cancelled'
+
+/** none: no file fits the console; many: more than one on a one-file console. */
+export type InvalidReason = 'none' | 'many'
 
 export interface UploadJob {
   /** Equals the tus upload id. */
@@ -30,54 +38,62 @@ export interface UploadJob {
   size: number
   received: number
   status: JobStatus
+  /** Console slug and game name chosen in the form. */
+  console: string
+  title: string
+  /** IGDB game the name was picked from. */
+  igdbId?: number | null
+  invalidReason?: InvalidReason | null
+  /** Started from an unassigned file. */
+  fromUnassigned?: boolean
   /** Extraction percentage while extracting. */
   progress?: number
   error?: string | null
   warning?: string | null
-  /** Console screen the upload started from (RF-08). */
-  originConsole?: string | null
-  volumeIndex?: number | null
+  /** Parts of the multi-volume archive this job belongs to. */
+  groupSize?: number | null
   mergedInto?: string | null
   createdAt: string
   updatedAt: string
 }
 
-export interface StagedItem {
-  /** Relative to the upload; identifies the item in the review. */
-  path: string
-  shape: 'file' | 'disc' | 'folder'
-  parts: string[]
-  size: number
-  ignored: boolean
-  /** Candidate console slugs: one when conclusive, none when unknown. */
-  consoles: string[]
-  confidence: 'header' | 'extension' | 'none'
-  suggestedKind?: ItemKind | null
-  titleId?: string | null
-  versionCode?: string | null
-  displayVersion?: string | null
-  discNumber?: number | null
+/** What the form decided for an upload (RF-03): it travels with the upload. */
+export interface UploadSpec {
+  console: string
+  title: string
+  igdbId?: number
+  /** The parts of one multi-volume archive share a group (RF-03a). */
+  group?: string
+  groupSize?: number
 }
 
-export interface CommitItem {
+/** A file found in an upload (RF-07). */
+export interface StagedFile {
+  /** Relative to the upload; identifies the file in the commit. */
   path: string
-  skip?: boolean
+  size: number
+  /** A game file for the job's console; the others are discarded. */
+  valid: boolean
+  /** Every console whose extensions accept it. */
+  consoles: string[]
+}
+
+export interface CommitFile {
+  path: string
+  /** Required on consoles with several kinds; omitted means game. */
   kind?: ItemKind
   label?: string
-  discNumber?: number
   onDuplicate?: DuplicateAction
 }
 
 export interface CommitRequest {
-  console: string
-  igdbGameId: number
-  items: CommitItem[]
+  files: CommitFile[]
 }
 
-export interface PlannedItem {
+export interface PlannedFile {
   path: string
-  /** Final names inside the game folder (a .cue sheet first). */
-  files: string[]
+  /** Final name inside the game folder. */
+  file: string
   action: PlannedAction
   duplicate?: LibraryItem | null
 }
@@ -86,21 +102,26 @@ export interface CommitPlan {
   console: string
   title: string
   folder: string
+  /** Set when the game is already in the library. */
   gameId?: number | null
-  /** The game's current items. */
+  /** The game's current files. */
   existing: LibraryItem[]
-  items: PlannedItem[]
+  files: PlannedFile[]
+  /** Files that are not game files for the console. */
+  discarded: string[]
 }
 
 export interface CommitResult {
   job: UploadJob
   gameId: number
-  /** Library-relative game folder ("switch/Mario Kart 8 Deluxe"). */
+  /** Library-relative game folder ("switch/Limbo"). */
   path: string
   stored: number
   replaced: number
   skipped: number
 }
+
+export type ResolveAction = 'unassigned' | 'trash' | 'delete'
 
 /** Statuses after which nothing else happens to a job. */
 export const terminalStatuses: ReadonlySet<JobStatus> = new Set([
@@ -108,4 +129,6 @@ export const terminalStatuses: ReadonlySet<JobStatus> = new Set([
   'failed',
   'cancelled',
   'merged',
+  'unassigned',
+  'trashed',
 ])

@@ -12,23 +12,13 @@ import (
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
 )
 
-func dirNames(t *testing.T, dir string) []string {
-	t.Helper()
-	entries, _ := os.ReadDir(dir)
-	var names []string
-	for _, e := range entries {
-		names = append(names, e.Name())
-	}
-	return names
-}
-
 func TestPurgeExpiredKeepsRecentEntriesAndPendingUndos(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t)
 	t0 := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 	clock := t0
 	svc := fx.serviceAt(t, fx.files, func() time.Time { return clock })
-	res, err := svc.Store(t.Context(), fx.disc())
+	res, err := svc.Store(t.Context(), fx.pack())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,71 +58,81 @@ func TestPurgeExpiredKeepsRecentEntriesAndPendingUndos(t *testing.T) {
 	}
 }
 
-func TestRematchUndoesEverythingWhenAMoveFails(t *testing.T) {
+func TestEditUndoesEverythingWhenAMoveFails(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t)
-	res, err := fx.service(t, fx.files).Store(t.Context(), fx.disc())
+	res, err := fx.service(t, fx.files).Store(t.Context(), fx.pack())
 	if err != nil {
 		t.Fatal(err)
 	}
-	gameDir := filepath.Join(fx.root, "psx", "Final Fantasy VII")
+	gameDir := filepath.Join(fx.root, "switch", "Final Fantasy VII")
 	before := dirNames(t, gameDir)
 
-	// Moves: folder, original cue to scratch, rewritten cue, track 1 (fails).
-	flaky := &flakyFiles{Files: fx.files, failOn: map[int]bool{4: true}}
-	req := application.RematchRequest{GameID: res.GameID, IGDBGameID: 428}
-	if _, err := fx.service(t, flaky).Rematch(t.Context(), req); !errors.Is(err, errDiskGone) {
+	// Moves: the folder, then each file (the third one fails).
+	flaky := &flakyFiles{Files: fx.files, failOn: map[int]bool{3: true}}
+	remake := int64(428)
+	req := application.EditRequest{GameID: res.GameID, Console: "switch", Name: application.GameName{IGDBID: &remake}}
+	if _, err := fx.service(t, flaky).Edit(t.Context(), req); !errors.Is(err, errDiskGone) {
 		t.Fatalf("err = %v", err)
 	}
 	if got := dirNames(t, gameDir); !slices.Equal(got, before) {
 		t.Fatalf("game folder = %v, want %v", got, before)
 	}
-	if _, err := os.Stat(filepath.Join(fx.root, "psx", "Final Fantasy VII Remake")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(fx.root, "switch", "Final Fantasy VII Remake")); !os.IsNotExist(err) {
 		t.Fatalf("new folder left behind: %v", err)
 	}
-	if b, _ := os.ReadFile(filepath.Join(gameDir, "Final Fantasy VII (Disc 1).cue")); string(b) !=
-		"FILE \"Final Fantasy VII (Disc 1) (Track 1).bin\" BINARY\nFILE \"Final Fantasy VII (Disc 1) (Track 2).bin\" BINARY\n" {
-		t.Fatalf("cue changed: %q", b)
-	}
 	g, _ := fx.repo.GameByID(t.Context(), res.GameID)
-	if g.IGDBID != 427 || g.Folder != "Final Fantasy VII" || g.Items[0].Files[0] != "Final Fantasy VII (Disc 1).cue" {
+	if *g.IGDBID != 427 || g.Folder != "Final Fantasy VII" || g.Items[0].File != "Final Fantasy VII [BASE].nsp" {
 		t.Fatalf("catalog changed: %+v", g)
 	}
 	if ops, _ := fx.repo.Operations(t.Context()); len(ops) != 0 {
 		t.Fatalf("journal left: %+v", ops)
 	}
-	if names := dirNames(t, filepath.Join(fx.root, ".gameexplorer", "ops")); len(names) != 0 {
-		t.Fatalf("scratch left: %v", names)
-	}
 
-	// The same rematch works once the disk is back.
-	if _, err := fx.service(t, fx.files).Rematch(t.Context(), req); err != nil {
+	// The same edit works once the disk is back.
+	if _, err := fx.service(t, fx.files).Edit(t.Context(), req); err != nil {
 		t.Fatal(err)
 	}
-	if got := dirNames(t, filepath.Join(fx.root, "psx", "Final Fantasy VII Remake")); len(got) != 3 {
+	if got := dirNames(t, filepath.Join(fx.root, "switch", "Final Fantasy VII Remake")); len(got) != 3 {
 		t.Fatalf("renamed folder = %v", got)
 	}
 }
 
-// A title that only changes letter case goes through temporary names: on
+// A name that only changes letter case goes through temporary names: on
 // case-insensitive datasets the new name "exists" because it is the old one.
-func TestRematchThatOnlyChangesLetterCase(t *testing.T) {
+func TestEditThatOnlyChangesLetterCase(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t)
 	svc := fx.service(t, fx.files)
-	res, err := svc.Store(t.Context(), fx.disc())
+	res, err := svc.Store(t.Context(), fx.pack())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.Rematch(t.Context(), application.RematchRequest{GameID: res.GameID, IGDBGameID: 429}); err != nil {
+	upper := int64(429)
+	if _, err := svc.Edit(t.Context(), application.EditRequest{GameID: res.GameID, Console: "switch", Name: application.GameName{IGDBID: &upper}}); err != nil {
 		t.Fatal(err)
 	}
-	got := dirNames(t, filepath.Join(fx.root, "psx"))
-	if !slices.Equal(got, []string{"FINAL FANTASY VII"}) {
+	if got := dirNames(t, filepath.Join(fx.root, "switch")); !slices.Equal(got, []string{"FINAL FANTASY VII"}) {
 		t.Fatalf("console folder = %v", got)
 	}
-	want := []string{"FINAL FANTASY VII (Disc 1) (Track 1).bin", "FINAL FANTASY VII (Disc 1) (Track 2).bin", "FINAL FANTASY VII (Disc 1).cue"}
-	if got := dirNames(t, filepath.Join(fx.root, "psx", "FINAL FANTASY VII")); !slices.Equal(got, want) {
+	want := []string{"FINAL FANTASY VII [BASE].nsp", "FINAL FANTASY VII [DLC Extra].nsp", "FINAL FANTASY VII [UPDATE v1.0.2].nsp"}
+	if got := dirNames(t, filepath.Join(fx.root, "switch", "FINAL FANTASY VII")); !slices.Equal(got, want) {
 		t.Fatalf("files = %v", got)
+	}
+}
+
+func TestPutAsideSanitizesTheFolder(t *testing.T) {
+	t.Parallel()
+	fx := newFixture(t)
+	svc := fx.service(t, fx.files)
+	err := svc.PutAside(t.Context(), application.SetAside{
+		Source: "job1", Root: fx.staging, Files: []string{"base.nsp"}, Folder: "Zelda: TP/../x", Origin: "z.zip",
+		Reason: domain.UnassignedUpload,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(fx.root, "_unassigned", "Zelda - TP", "x", "base.nsp")); err != nil {
+		t.Fatalf("set aside: %v", err)
 	}
 }

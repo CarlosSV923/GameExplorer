@@ -38,14 +38,24 @@ function retentionDays(entries: readonly TrashEntry[]): number | undefined {
   return Math.round((Date.parse(e.expiresAt) - Date.parse(e.trashedAt)) / 86_400_000)
 }
 
-function entryFiles(e: TrashEntry, t: TFunction) {
-  if (e.wholeGame)
-    return `${e.console}/${e.folder}/ · ${t('trash.files', { count: e.items.length })}`
-  const item = e.items[0]
-  if (!item) return ''
-  return item.files.length > 1
-    ? `${item.files[0] ?? ''} + ${t('trash.files', { count: item.files.length - 1 })}`
-    : (item.files[0] ?? '')
+/** What the entry holds: the game folder, the file, or the unassigned files. */
+function entryFiles(e: TrashEntry, t: TFunction): string {
+  if (e.kind === 'unassigned') {
+    const [first, ...rest] = e.files
+    if (!first) return ''
+    return rest.length > 0
+      ? `${first.path} + ${t('trash.files', { count: rest.length })}`
+      : first.path
+  }
+  if (e.wholeGame) {
+    return `${e.console ?? ''}/${e.folder ?? ''}/ · ${t('trash.files', { count: e.items.length })}`
+  }
+  return e.items[0]?.file ?? ''
+}
+
+/** The entry's name: the game's title, or the first unassigned file. */
+function entryTitle(e: TrashEntry): string {
+  return e.title || (e.files[0]?.name ?? '')
 }
 
 type Ask =
@@ -80,7 +90,7 @@ export function TrashPanel() {
           setAsk(null)
           setNotice({
             tone: 'info',
-            text: t('trash.restored', { title: entry.title, path: r.path }),
+            text: t('trash.restored', { title: entryTitle(entry), path: r.path }),
           })
         },
         onError: (e) => {
@@ -163,9 +173,11 @@ export function TrashPanel() {
                   <tr key={e.id} className="border-t border-line">
                     <td className="px-5 py-3.5">
                       <div className="flex flex-col gap-1">
-                        <span className="flex flex-wrap items-center gap-2.5 font-bold">
-                          {e.title}
-                          {e.wholeGame ? (
+                        <span className="flex flex-wrap items-center gap-2.5 font-bold [overflow-wrap:anywhere]">
+                          {entryTitle(e)}
+                          {e.kind === 'unassigned' ? (
+                            <Chip>{t('trash.unassigned')}</Chip>
+                          ) : e.wholeGame ? (
                             <Chip kind="whole">{t('kind.whole')}</Chip>
                           ) : (
                             item && <ItemChip item={item} />
@@ -179,7 +191,11 @@ export function TrashPanel() {
                         )}
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-ink-1">{names.get(e.console) ?? e.console}</td>
+                    <td className="px-5 py-3.5 text-ink-1">
+                      {e.kind === 'unassigned' || !e.console
+                        ? t('unassigned.title')
+                        : (names.get(e.console) ?? e.console)}
+                    </td>
                     <td className="px-5 py-3.5 whitespace-nowrap text-ink-2">
                       {format.date(e.trashedAt)}
                     </td>
@@ -209,7 +225,7 @@ export function TrashPanel() {
                       <IconButton
                         tone="danger"
                         className="ml-2"
-                        label={t('trash.deleteForever', { title: e.title })}
+                        label={t('trash.deleteForever', { title: entryTitle(e) })}
                         onClick={() => {
                           setAsk({ type: 'delete', entry: e })
                         }}
@@ -252,7 +268,7 @@ export function TrashPanel() {
             </>
           }
         >
-          <p className="m-0">{t('trash.conflictBody', { title: ask.entry.title })}</p>
+          <p className="m-0">{t('trash.conflictBody', { title: entryTitle(ask.entry) })}</p>
           <p className="m-0 rounded-md bg-surface-card px-4 py-3.5 text-body-sm text-ink-2">
             {ask.detail}
           </p>
@@ -264,7 +280,7 @@ export function TrashPanel() {
           title={
             ask.type === 'empty'
               ? t('trash.emptyConfirmTitle')
-              : t('trash.deleteTitle', { title: ask.entry.title })
+              : t('trash.deleteTitle', { title: entryTitle(ask.entry) })
           }
           confirmLabel={ask.type === 'empty' ? t('trash.empty') : t('trash.deleteConfirm')}
           busy={remove.isPending || empty.isPending}

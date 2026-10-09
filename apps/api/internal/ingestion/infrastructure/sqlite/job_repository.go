@@ -31,17 +31,21 @@ func formatTime(t time.Time) string { return t.UTC().Format(timeLayout) }
 
 // Create implements domain.JobRepository.
 func (r *JobRepository) Create(ctx context.Context, j *domain.UploadJob) error {
-	var origin sql.NullString
-	if j.OriginConsole != nil {
-		origin = sql.NullString{String: *j.OriginConsole, Valid: true}
-	}
 	return r.q.CreateJob(ctx, sqlcgen.CreateJobParams{
 		ID: string(j.ID), FileName: j.FileName, Size: j.Size, Received: j.Received,
-		Status: string(j.Status), Error: j.Error, OriginConsole: origin, StoragePath: j.StoragePath,
-		Progress: int64(j.Progress), Warning: j.Warning,
-		VolumeSet: j.VolumeSet, VolumeIndex: int64(j.VolumeIndex), MergedInto: string(j.MergedInto),
+		Status: string(j.Status), Error: j.Error, Warning: j.Warning, Progress: int64(j.Progress),
+		Console: j.Console, Title: j.Title, IgdbID: nullInt(j.IGDBID), InvalidReason: string(j.InvalidReason),
+		GroupID: j.GroupID, GroupSize: int64(j.GroupSize), MergedInto: string(j.MergedInto),
+		StoragePath: j.StoragePath, UnassignedOrigin: j.UnassignedOrigin,
 		CreatedAt: formatTime(j.CreatedAt), UpdatedAt: formatTime(j.UpdatedAt),
 	})
+}
+
+func nullInt(v *int64) sql.NullInt64 {
+	if v == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: *v, Valid: true}
 }
 
 // Get implements domain.JobRepository.
@@ -59,10 +63,9 @@ func (r *JobRepository) Get(ctx context.Context, id domain.JobID) (*domain.Uploa
 // Save implements domain.JobRepository.
 func (r *JobRepository) Save(ctx context.Context, j *domain.UploadJob) error {
 	return r.q.SaveJob(ctx, sqlcgen.SaveJobParams{
-		ID: string(j.ID), Received: j.Received, Status: string(j.Status), Error: j.Error,
-		StoragePath: j.StoragePath, Progress: int64(j.Progress), Warning: j.Warning,
-		VolumeSet: j.VolumeSet, VolumeIndex: int64(j.VolumeIndex), MergedInto: string(j.MergedInto),
-		UpdatedAt: formatTime(j.UpdatedAt),
+		ID: string(j.ID), Received: j.Received, Status: string(j.Status), Error: j.Error, Warning: j.Warning,
+		Progress: int64(j.Progress), Console: j.Console, InvalidReason: string(j.InvalidReason),
+		MergedInto: string(j.MergedInto), StoragePath: j.StoragePath, UpdatedAt: formatTime(j.UpdatedAt),
 	})
 }
 
@@ -89,9 +92,9 @@ func (r *JobRepository) Exists(ctx context.Context, id domain.JobID) (bool, erro
 	return r.q.JobExists(ctx, string(id))
 }
 
-// ListWaitingParts implements domain.JobRepository.
-func (r *JobRepository) ListWaitingParts(ctx context.Context, set string) ([]*domain.UploadJob, error) {
-	rows, err := r.q.ListWaitingParts(ctx, set)
+// ListGroup implements domain.JobRepository.
+func (r *JobRepository) ListGroup(ctx context.Context, group string) ([]*domain.UploadJob, error) {
+	rows, err := r.q.ListGroup(ctx, group)
 	if err != nil {
 		return nil, err
 	}
@@ -118,13 +121,17 @@ func toDomain(row sqlcgen.UploadJob) (*domain.UploadJob, error) {
 	}
 	j := &domain.UploadJob{
 		ID: domain.JobID(row.ID), FileName: row.FileName, Size: row.Size, Received: row.Received,
-		Status: domain.Status(row.Status), Error: row.Error, StoragePath: row.StoragePath,
-		Progress: int(row.Progress), Warning: row.Warning, CreatedAt: created, UpdatedAt: updated,
-		VolumeSet: row.VolumeSet, VolumeIndex: int(row.VolumeIndex), MergedInto: domain.JobID(row.MergedInto),
+		Status: domain.Status(row.Status), Error: row.Error, Warning: row.Warning, Progress: int(row.Progress),
+		Spec: domain.Spec{
+			Console: row.Console, Title: row.Title, GroupID: row.GroupID, GroupSize: int(row.GroupSize),
+		},
+		InvalidReason: domain.InvalidReason(row.InvalidReason), MergedInto: domain.JobID(row.MergedInto),
+		StoragePath: row.StoragePath, UnassignedOrigin: row.UnassignedOrigin,
+		CreatedAt: created, UpdatedAt: updated,
 	}
-	if row.OriginConsole.Valid {
-		o := row.OriginConsole.String
-		j.OriginConsole = &o
+	if row.IgdbID.Valid {
+		id := row.IgdbID.Int64
+		j.IGDBID = &id
 	}
 	return j, nil
 }

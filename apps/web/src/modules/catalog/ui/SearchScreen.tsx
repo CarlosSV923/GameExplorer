@@ -108,14 +108,16 @@ export function SearchScreen({ query, gameId }: { query: string; gameId: number 
             <GameDetail
               key={selected.id}
               gameId={selected.id}
-              consoleName={names.get(selected.console) ?? selected.console}
               back={
                 <BackLink to="/buscar" search={{ q: query }} className="lg:hidden">
                   <BackLabel>{t('search.results')}</BackLabel>
                 </BackLink>
               }
-              onTrashed={() => {
+              onGone={() => {
                 void navigate({ to: '/buscar', search: { q: query } })
+              }}
+              onEdited={(r) => {
+                void navigate({ to: '/buscar', search: { q: query, juego: r.gameId } })
               }}
             />
           )

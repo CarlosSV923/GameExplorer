@@ -6,14 +6,14 @@ import { useAction } from '@/shared/input'
 import { BackLink } from '@/shared/routing/links'
 import { BackLabel, Banner, HelpBar, PageHeader } from '@/shared/ui'
 
-import { useUploadQueue } from '../application/queries'
+import { useOpenUploadForm } from '../application/queries'
 import { DropZone, UploadsPanel } from './UploadsPanel'
 
 /** Uploads: the drop zone and the live panel (RF-01, RF-13). */
 export function UploadsScreen() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const queue = useUploadQueue()
+  const openForm = useOpenUploadForm()
 
   useAction('back', () => {
     void navigate({ to: '/' })
@@ -34,7 +34,7 @@ export function UploadsScreen() {
         <DropZone
           title={t('drop.screenTitle')}
           onFiles={(files) => {
-            queue.add(files)
+            openForm({ kind: 'files', files })
           }}
         />
         <UploadsPanel />
@@ -57,12 +57,12 @@ function hasFiles(e: DragEvent): boolean {
 
 /**
  * Dragging files over any screen shows the drop zone and the uploads
- * (DropOverlay.dc.html). Folders cannot be uploaded: they need an archive.
+ * (DropOverlay.dc.html); dropping them opens the upload form. Folders
+ * cannot be uploaded: they need an archive.
  */
 export function DropOverlay({ consoleSlug }: { consoleSlug: string | undefined }) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
-  const queue = useUploadQueue()
+  const openForm = useOpenUploadForm()
   const [active, setActive] = useState(false)
   const [folders, setFolders] = useState(false)
   const depth = useRef(0)
@@ -101,8 +101,7 @@ export function DropOverlay({ consoleSlug }: { consoleSlug: string | undefined }
       }
       setFolders(skipped)
       if (files.length > 0) {
-        queue.add(files, consoleSlug)
-        void navigate({ to: '/subidas' })
+        openForm({ kind: 'files', files, ...(consoleSlug ? { console: consoleSlug } : {}) })
       }
     }
     window.addEventListener('dragenter', enter)
@@ -115,7 +114,7 @@ export function DropOverlay({ consoleSlug }: { consoleSlug: string | undefined }
       window.removeEventListener('dragleave', leave)
       window.removeEventListener('drop', drop)
     }
-  }, [consoleSlug, navigate, queue])
+  }, [consoleSlug, openForm])
 
   return (
     <>

@@ -1,4 +1,4 @@
-import type { UploadJob } from './types'
+import { terminalStatuses, type UploadJob } from './types'
 
 /** An upload this browser is sending (or will send) right now. */
 export interface LocalUpload {
@@ -7,6 +7,9 @@ export interface LocalUpload {
   size: number
   sent: number
   state: 'queued' | 'uploading' | 'error' | 'finished'
+  /** Console slug and game name from the form. */
+  console: string
+  title: string
   /** Known once the server created the upload (the tus id). */
   jobId?: string
   createdAt: number
@@ -22,9 +25,12 @@ export type UploadPhase =
   | 'waitingParts'
   | 'extracting'
   | 'needsPassword'
-  | 'review'
+  | 'confirm'
+  | 'invalid'
   | 'committing'
   | 'done'
+  | 'unassigned'
+  | 'trashed'
   | 'failed'
 
 /** One card of the uploads panel: a local upload, a server job, or both. */
@@ -33,13 +39,16 @@ export interface UploadRow {
   jobId?: string
   localKey?: string
   fileName: string
+  console: string
+  title: string
   size: number
   sent: number
   phase: UploadPhase
   progress?: number
   error?: string | null
   warning?: string | null
-  volumeIndex?: number | null
+  /** Parts of the multi-volume archive (waiting for the others). */
+  groupSize?: number | null
 }
 
 /**
@@ -60,28 +69,20 @@ export function mergeJobs(
 
 /** A job still "uploading" without progress for this long was interrupted. */
 export const staleAfterMs = 15_000
-/** Finished and failed uploads stay in the panel for a day. */
+/** Finished, set aside and failed uploads stay in the panel for a day. */
 export const keepFinishedMs = 24 * 60 * 60 * 1000
 
-function serverPhase(job: UploadJob): UploadPhase {
-  switch (job.status) {
-    case 'uploaded':
-      return 'uploaded'
-    case 'waiting_parts':
-      return 'waitingParts'
-    case 'extracting':
-      return 'extracting'
-    case 'needs_password':
-      return 'needsPassword'
-    case 'review':
-      return 'review'
-    case 'committing':
-      return 'committing'
-    case 'done':
-      return 'done'
-    default:
-      return 'failed'
-  }
+const serverPhases: Partial<Record<UploadJob['status'], UploadPhase>> = {
+  uploaded: 'uploaded',
+  waiting_parts: 'waitingParts',
+  extracting: 'extracting',
+  needs_password: 'needsPassword',
+  confirm: 'confirm',
+  invalid: 'invalid',
+  committing: 'committing',
+  done: 'done',
+  unassigned: 'unassigned',
+  trashed: 'trashed',
 }
 
 /**
@@ -103,8 +104,9 @@ export function buildRows(
   for (const job of sorted) {
     seen.add(job.id)
     if (job.status === 'merged' || job.status === 'cancelled' || dismissed.has(job.id)) continue
-    const finished = job.status === 'done' || job.status === 'failed'
-    if (finished && now - Date.parse(job.updatedAt) > keepFinishedMs) continue
+    if (terminalStatuses.has(job.status) && now - Date.parse(job.updatedAt) > keepFinishedMs) {
+      continue
+    }
 
     const mine = byJob.get(job.id)
     let phase: UploadPhase
@@ -123,20 +125,22 @@ export function buildRows(
           now - Date.parse(job.updatedAt) < staleAfterMs ? 'uploadingElsewhere' : 'interrupted'
       }
     } else {
-      phase = serverPhase(job)
+      phase = serverPhases[job.status] ?? 'failed'
     }
     rows.push({
       key: job.id,
       jobId: job.id,
       ...(mine ? { localKey: mine.key } : {}),
       fileName: job.fileName,
+      console: job.console,
+      title: job.title,
       size: job.size,
       sent,
       phase,
       ...(job.progress === undefined ? {} : { progress: job.progress }),
       error: job.error ?? null,
       warning: job.warning ?? null,
-      volumeIndex: job.volumeIndex ?? null,
+      groupSize: job.groupSize ?? null,
     })
   }
 
@@ -149,6 +153,8 @@ export function buildRows(
       localKey: l.key,
       ...(l.jobId ? { jobId: l.jobId } : {}),
       fileName: l.fileName,
+      console: l.console,
+      title: l.title,
       size: l.size,
       sent: l.sent,
       phase: l.state === 'queued' ? 'queued' : l.state === 'error' ? 'uploadError' : 'uploading',
@@ -156,9 +162,10 @@ export function buildRows(
   return [...pending, ...rows]
 }
 
-const settled: ReadonlySet<UploadPhase> = new Set(['done', 'failed'])
+const settled: ReadonlySet<UploadPhase> = new Set(['done', 'failed', 'unassigned', 'trashed'])
 const waitingForUser: ReadonlySet<UploadPhase> = new Set([
-  'review',
+  'confirm',
+  'invalid',
   'needsPassword',
   'interrupted',
   'uploadError',

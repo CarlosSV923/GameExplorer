@@ -59,31 +59,9 @@ func (h *Handler) SearchGames(ctx context.Context, req httpapi.SearchGamesReques
 	return out, nil
 }
 
-// SearchPlatforms implements httpapi.StrictServerInterface.
-func (h *Handler) SearchPlatforms(ctx context.Context, req httpapi.SearchPlatformsRequestObject) (httpapi.SearchPlatformsResponseObject, error) {
-	platforms, err := h.svc.SearchPlatforms(ctx, req.Params.Q)
-	if err != nil {
-		status, p := h.problem(ctx, err)
-		switch status {
-		case http.StatusBadRequest:
-			return httpapi.SearchPlatforms400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: httpapi.BadRequestApplicationProblemPlusJSONResponse(p)}, nil
-		case http.StatusServiceUnavailable:
-			return httpapi.SearchPlatforms503ApplicationProblemPlusJSONResponse{ServiceUnavailableApplicationProblemPlusJSONResponse: httpapi.ServiceUnavailableApplicationProblemPlusJSONResponse(p)}, nil
-		default:
-			return httpapi.SearchPlatforms502ApplicationProblemPlusJSONResponse{BadGatewayApplicationProblemPlusJSONResponse: httpapi.BadGatewayApplicationProblemPlusJSONResponse(p)}, nil
-		}
-	}
-	out := make(httpapi.SearchPlatforms200JSONResponse, 0, len(platforms))
-	for _, p := range platforms {
-		out = append(out, httpapi.MetadataPlatform{
-			Id:           p.ID,
-			Name:         p.Name,
-			Abbreviation: p.Abbreviation,
-			LogoImageId:  p.LogoImageID,
-			ReleaseYear:  p.ReleaseYear,
-		})
-	}
-	return out, nil
+// GetMetadataStatus implements httpapi.StrictServerInterface.
+func (h *Handler) GetMetadataStatus(_ context.Context, _ httpapi.GetMetadataStatusRequestObject) (httpapi.GetMetadataStatusResponseObject, error) {
+	return httpapi.GetMetadataStatus200JSONResponse{Configured: h.svc.Configured()}, nil
 }
 
 // GetImage implements httpapi.StrictServerInterface.

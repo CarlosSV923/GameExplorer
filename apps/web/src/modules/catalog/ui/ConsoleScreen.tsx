@@ -143,14 +143,19 @@ export function ConsoleScreen({ slug, gameId }: { slug: string; gameId: number |
             <GameDetail
               key={selectedId}
               gameId={selectedId}
-              consoleName={name}
               back={
                 <BackLink to="/consolas/$slug" params={{ slug }} className="lg:hidden">
                   <BackLabel>{t('console.allGames', { name })}</BackLabel>
                 </BackLink>
               }
-              onTrashed={() => {
+              onGone={() => {
                 void navigate({ to: '/consolas/$slug', params: { slug } })
+              }}
+              onEdited={(r) => {
+                void navigate({
+                  to: '/consolas/$slug/$gameId',
+                  params: { slug: r.path.split('/')[0] ?? slug, gameId: String(r.gameId) },
+                })
               }}
             />
           )

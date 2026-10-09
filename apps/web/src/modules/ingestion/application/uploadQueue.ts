@@ -1,9 +1,10 @@
+import type { UploadJob, UploadSpec } from '../domain/types'
 import type { LocalUpload } from '../domain/uploads'
 import type { IngestionPorts, UploadHandle } from './ports'
 
 interface Entry extends LocalUpload {
   file: File | null
-  consoleSlug?: string
+  spec: UploadSpec
   handle?: UploadHandle
 }
 
@@ -47,18 +48,20 @@ export class UploadQueue {
 
   dismissedJobs = (): ReadonlySet<string> => this.dismissed
 
-  /** Queues files; consoleSlug is the console screen they came from. */
-  add(files: readonly File[], consoleSlug?: string) {
-    for (const file of files) {
+  /** Queues files, each with what the form decided for it (RF-03). */
+  add(uploads: readonly { file: File; spec: UploadSpec }[]) {
+    for (const { file, spec } of uploads) {
       this.entries.push({
         key: `local-${String(++this.seq)}`,
         fileName: file.name,
         size: file.size,
         sent: 0,
         state: 'queued',
+        console: spec.console,
+        title: spec.title,
         createdAt: this.now(),
         file,
-        ...(consoleSlug ? { consoleSlug } : {}),
+        spec,
       })
     }
     this.pump()
@@ -68,7 +71,10 @@ export class UploadQueue {
    * Continues an interrupted upload with the file picked again. Returns
    * false when it is not the same file (name and size must match).
    */
-  resume(job: { id: string; fileName: string; size: number }, file: File): boolean {
+  resume(
+    job: Pick<UploadJob, 'id' | 'fileName' | 'size' | 'console' | 'title'>,
+    file: File,
+  ): boolean {
     if (file.name !== job.fileName || file.size !== job.size) return false
     this.entries = this.entries.filter((e) => e.jobId !== job.id)
     this.entries.push({
@@ -77,9 +83,12 @@ export class UploadQueue {
       size: file.size,
       sent: 0,
       state: 'queued',
+      console: job.console,
+      title: job.title,
       jobId: job.id,
       createdAt: this.now(),
       file,
+      spec: { console: job.console, title: job.title },
     })
     this.pump()
     return true
@@ -134,10 +143,7 @@ export class UploadQueue {
     const key = entry.key
     entry.handle = this.ports.upload(
       file,
-      {
-        ...(entry.consoleSlug ? { consoleSlug: entry.consoleSlug } : {}),
-        ...(entry.jobId ? { resumeJobId: entry.jobId } : {}),
-      },
+      { spec: entry.spec, ...(entry.jobId ? { resumeJobId: entry.jobId } : {}) },
       {
         onJobId: (jobId) => {
           this.update(key, { jobId })
@@ -171,12 +177,14 @@ export class UploadQueue {
 
   private emit() {
     this.snapshot = this.entries.map(
-      ({ key, fileName, size, sent, state, jobId, createdAt }): LocalUpload => ({
+      ({ key, fileName, size, sent, state, console, title, jobId, createdAt }): LocalUpload => ({
         key,
         fileName,
         size,
         sent,
         state,
+        console,
+        title,
         createdAt,
         ...(jobId ? { jobId } : {}),
       }),

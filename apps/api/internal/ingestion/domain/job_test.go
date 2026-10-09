@@ -10,15 +10,16 @@ import (
 
 var t0 = time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 
+var spec = domain.Spec{Console: "switch", Title: "Limbo"}
+
 func TestUploadLifecycle(t *testing.T) {
 	t.Parallel()
 
-	origin := "switch"
-	j, err := domain.NewUploadJob("abc", `C:\Users\me\Downloads\INSIDE [0100D2D009028000][v0].nsp`, 100, &origin, t0)
+	j, err := domain.NewUploadJob("abc", `C:\Users\me\Downloads\Limbo [0100A8E005E7C000].nsp`, 100, domain.Spec{Console: "switch", Title: "  Limbo  "}, t0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if j.FileName != "INSIDE [0100D2D009028000][v0].nsp" || j.Status != domain.StatusUploading {
+	if j.FileName != "Limbo [0100A8E005E7C000].nsp" || j.Status != domain.StatusUploading || j.Title != "Limbo" {
 		t.Fatalf("new job = %+v", j)
 	}
 
@@ -27,23 +28,34 @@ func TestUploadLifecycle(t *testing.T) {
 	if j.Received != 40 {
 		t.Fatalf("received = %d, want 40", j.Received)
 	}
-
 	if err := j.MarkUploaded("/staging/abc", t0.Add(3*time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if j.Received != 100 || j.StoragePath != "/staging/abc" || !j.UpdatedAt.Equal(t0.Add(3*time.Second)) {
 		t.Fatalf("uploaded job = %+v", j)
 	}
-	j.RecordProgress(10, t0.Add(4*time.Second))
-	if j.Received != 100 {
-		t.Fatal("progress after upload must not change the job")
-	}
-
 	if err := j.Cancel(t0); err != nil {
 		t.Fatal(err)
 	}
 	if err := j.Fail("boom", t0); !errors.Is(err, domain.ErrInvalidTransition) {
 		t.Fatalf("fail after cancel err = %v", err)
+	}
+}
+
+func TestNewUploadJobNeedsItsForm(t *testing.T) {
+	t.Parallel()
+
+	bad := []domain.Spec{
+		{Title: "Limbo"},
+		{Console: "switch"},
+		{Console: "switch", Title: "   "},
+		{Console: "switch", Title: "Limbo", GroupID: "g"},
+		{Console: "switch", Title: "Limbo", GroupSize: 2},
+	}
+	for _, s := range bad {
+		if _, err := domain.NewUploadJob("x", "a.nsp", 1, s, t0); !errors.Is(err, domain.ErrInvalidSpec) {
+			t.Errorf("spec %+v: err = %v", s, err)
+		}
 	}
 }
 
@@ -53,24 +65,27 @@ func TestStateMachine(t *testing.T) {
 	allowed := [][2]domain.Status{
 		{domain.StatusUploading, domain.StatusUploaded},
 		{domain.StatusUploaded, domain.StatusExtracting},
-		{domain.StatusUploaded, domain.StatusReview}, // a raw (non-archive) file skips extraction
+		{domain.StatusUploaded, domain.StatusConfirm}, // a raw file skips extraction
+		{domain.StatusUploaded, domain.StatusInvalid},
 		{domain.StatusExtracting, domain.StatusNeedsPassword},
 		{domain.StatusNeedsPassword, domain.StatusExtracting},
-		{domain.StatusExtracting, domain.StatusReview},
-		{domain.StatusReview, domain.StatusCommitting},
+		{domain.StatusExtracting, domain.StatusConfirm},
+		{domain.StatusInvalid, domain.StatusConfirm}, // another console
+		{domain.StatusInvalid, domain.StatusUnassigned},
+		{domain.StatusInvalid, domain.StatusTrashed},
+		{domain.StatusConfirm, domain.StatusCommitting},
 		{domain.StatusCommitting, domain.StatusDone},
-		{domain.StatusCommitting, domain.StatusReview}, // commit rolled back
+		{domain.StatusCommitting, domain.StatusConfirm}, // commit rolled back
 	}
 	for _, tr := range allowed {
 		if !tr[0].CanTransitionTo(tr[1]) {
 			t.Errorf("%s → %s should be allowed", tr[0], tr[1])
 		}
 	}
-
 	forbidden := [][2]domain.Status{
-		{domain.StatusUploading, domain.StatusReview},
+		{domain.StatusUploading, domain.StatusConfirm},
+		{domain.StatusConfirm, domain.StatusUnassigned}, // only invalid uploads are set aside
 		{domain.StatusDone, domain.StatusFailed},
-		{domain.StatusCancelled, domain.StatusUploading},
 		{domain.StatusCommitting, domain.StatusCancelled}, // too late to cancel mid-commit
 	}
 	for _, tr := range forbidden {
@@ -78,14 +93,13 @@ func TestStateMachine(t *testing.T) {
 			t.Errorf("%s → %s should be forbidden", tr[0], tr[1])
 		}
 	}
-
-	for _, s := range []domain.Status{domain.StatusDone, domain.StatusFailed, domain.StatusCancelled} {
+	for _, s := range []domain.Status{domain.StatusDone, domain.StatusFailed, domain.StatusCancelled, domain.StatusUnassigned, domain.StatusTrashed} {
 		if !s.Terminal() {
 			t.Errorf("%s should be terminal", s)
 		}
 	}
-	if domain.StatusReview.Terminal() {
-		t.Error("review is not terminal")
+	if domain.StatusInvalid.Terminal() || domain.StatusConfirm.Terminal() {
+		t.Error("confirm and invalid are not terminal")
 	}
 }
 
@@ -96,8 +110,7 @@ func TestCleanFileName(t *testing.T) {
 		"game.rar":       "game.rar",
 		"/etc/passwd":    "passwd",
 		`..\..\evil.nsp`: "evil.nsp",
-		"  Animal Crossing™꞉ New Horizons.nsp  ":  "Animal Crossing™꞉ New Horizons.nsp",
-		"Animal Crossing_ New Horizons [EUR].rar": "Animal Crossing_ New Horizons [EUR].rar",
+		"  Animal Crossing™꞉ New Horizons.nsp  ": "Animal Crossing™꞉ New Horizons.nsp",
 	}
 	for in, want := range ok {
 		got, err := domain.CleanFileName(in)
@@ -112,12 +125,11 @@ func TestCleanFileName(t *testing.T) {
 	}
 }
 
-func TestExtractionLifecycle(t *testing.T) {
+func TestExtractionAndValidation(t *testing.T) {
 	t.Parallel()
 
-	j, _ := domain.NewUploadJob("x", "game.rar", 10, nil, t0)
+	j, _ := domain.NewUploadJob("x", "game.rar", 10, spec, t0)
 	_ = j.MarkUploaded("/up/x", t0)
-
 	if err := j.StartExtraction(t0); err != nil {
 		t.Fatal(err)
 	}
@@ -132,21 +144,30 @@ func TestExtractionLifecycle(t *testing.T) {
 	if err := j.StartExtraction(t0); err != nil || j.Error != "" {
 		t.Fatalf("retry clears the error: %v %+v", err, j)
 	}
-	if err := j.FinishExtraction("atributos no aplicados", t0); err != nil || j.Status != domain.StatusReview || j.Progress != 100 || j.Warning == "" {
-		t.Fatalf("finish: %v %+v", err, j)
+	if err := j.Validated("switch", domain.InvalidNone, t0); err != nil || j.Status != domain.StatusInvalid || j.InvalidReason != domain.InvalidNone {
+		t.Fatalf("invalid: %v %+v", err, j)
+	}
+	if err := j.Validated("wii", "", t0); err != nil || j.Status != domain.StatusConfirm || j.Console != "wii" || j.InvalidReason != "" {
+		t.Fatalf("another console: %v %+v", err, j)
 	}
 }
 
-func TestRawFileGoesStraightToReview(t *testing.T) {
+func TestCommitAndSetAside(t *testing.T) {
 	t.Parallel()
 
-	j, _ := domain.NewUploadJob("x", "game.nsp", 10, nil, t0)
-	if err := j.ReadyForReview(t0); err == nil {
-		t.Fatal("an upload in progress cannot be reviewed")
+	j := &domain.UploadJob{ID: "abc", Status: domain.StatusConfirm, Error: "old"}
+	if err := j.StartCommit(t0); err != nil || j.Status != domain.StatusCommitting || j.Error != "" {
+		t.Fatalf("start = %+v, %v", j, err)
 	}
-	_ = j.MarkUploaded("/up/x", t0)
-	if err := j.ReadyForReview(t0); err != nil || j.Status != domain.StatusReview {
-		t.Fatalf("review: %v %s", err, j.Status)
+	if err := j.AbortCommit("disk full", t0); err != nil || j.Status != domain.StatusConfirm || j.Error != "disk full" {
+		t.Fatalf("abort = %+v, %v", j, err)
+	}
+	if err := j.SetAside(true, t0); !errors.Is(err, domain.ErrInvalidTransition) {
+		t.Fatalf("set aside a confirmable job: %v", err)
+	}
+	j.Status = domain.StatusInvalid
+	if err := j.SetAside(true, t0); err != nil || j.Status != domain.StatusTrashed {
+		t.Fatalf("trash = %+v, %v", j, err)
 	}
 }
 
@@ -171,23 +192,39 @@ func TestDetectArchive(t *testing.T) {
 	}
 }
 
-func TestCommitLifecycle(t *testing.T) {
+func TestValidate(t *testing.T) {
 	t.Parallel()
 
-	j := &domain.UploadJob{ID: "abc", Status: domain.StatusReview, Error: "old"}
-	if err := j.StartCommit(t0); err != nil || j.Status != domain.StatusCommitting || j.Error != "" {
-		t.Fatalf("start = %+v, %v", j, err)
+	known := []string{".nsp", ".xci", ".iso", ".wbfs", ".rvz", ".nkit.iso", ".cso"}
+	sw := domain.ConsoleRule{Slug: "switch", Extensions: []string{".nsp", ".xci"}, MultipleFiles: true}
+	wii := domain.ConsoleRule{Slug: "wii", Extensions: []string{".iso", ".wbfs", ".rvz", ".nkit.iso"}}
+	psp := domain.ConsoleRule{Slug: "psp", Extensions: []string{".iso", ".cso"}}
+	files := func(paths ...string) []domain.StagedFile {
+		out := make([]domain.StagedFile, len(paths))
+		for i, p := range paths {
+			out[i] = domain.StagedFile{Path: p}
+		}
+		return out
 	}
-	if err := j.AbortCommit("disk full", t0); err != nil || j.Status != domain.StatusReview || j.Error != "disk full" {
-		t.Fatalf("abort = %+v, %v", j, err)
+
+	tests := []struct {
+		name   string
+		rule   domain.ConsoleRule
+		files  []domain.StagedFile
+		valid  int
+		reason domain.InvalidReason
+	}{
+		{"switch with junk", sw, files("a/Base.NSP", "a/upd.xci", "readme.txt"), 2, ""},
+		{"switch without game files", sw, files("game.iso"), 0, domain.InvalidNone},
+		{"one wii image", wii, files("Okami (USA).nkit.iso", "info.nfo"), 1, ""},
+		{"two wii images", wii, files("a.iso", "b.wbfs"), 2, domain.InvalidMany},
+		{"nkit is not an iso for psp", psp, files("Okami.nkit.iso"), 0, domain.InvalidNone},
+		{"no files", psp, nil, 0, domain.InvalidNone},
 	}
-	if err := j.StartCommit(t0); err != nil {
-		t.Fatal(err)
-	}
-	if err := j.FinishCommit(t0); err != nil || j.Status != domain.StatusDone {
-		t.Fatalf("finish = %+v, %v", j, err)
-	}
-	if err := j.StartCommit(t0); !errors.Is(err, domain.ErrInvalidTransition) {
-		t.Fatalf("commit after done err = %v", err)
+	for _, tt := range tests {
+		valid, reason := domain.Validate(tt.rule, tt.files, known)
+		if len(valid) != tt.valid || reason != tt.reason {
+			t.Errorf("%s: valid %d %q, want %d %q", tt.name, len(valid), reason, tt.valid, tt.reason)
+		}
 	}
 }

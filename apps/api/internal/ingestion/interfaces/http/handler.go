@@ -42,24 +42,6 @@ func NewHandler(svc *application.Service, passwords PasswordSubmitter, sub Subsc
 	return &Handler{svc: svc, passwords: passwords, sub: sub, shutdown: shutdown}
 }
 
-// ListJobItems implements httpapi.StrictServerInterface.
-func (h *Handler) ListJobItems(ctx context.Context, req httpapi.ListJobItemsRequestObject) (httpapi.ListJobItemsResponseObject, error) {
-	items, err := h.svc.Items(ctx, domain.JobID(req.Id))
-	if errors.Is(err, domain.ErrJobNotFound) {
-		return httpapi.ListJobItems404ApplicationProblemPlusJSONResponse{
-			NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(problem(http.StatusNotFound, "Not Found", "La subida no existe.")),
-		}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	out := make(httpapi.ListJobItems200JSONResponse, 0, len(items))
-	for _, it := range items {
-		out = append(out, itemToAPI(it))
-	}
-	return out, nil
-}
-
 // SubmitJobPassword implements httpapi.StrictServerInterface.
 func (h *Handler) SubmitJobPassword(ctx context.Context, req httpapi.SubmitJobPasswordRequestObject) (httpapi.SubmitJobPasswordResponseObject, error) {
 	if req.Body == nil || req.Body.Password == "" {
@@ -83,32 +65,27 @@ func (h *Handler) SubmitJobPassword(ctx context.Context, req httpapi.SubmitJobPa
 	return httpapi.SubmitJobPassword202JSONResponse(ToAPI(*job)), nil
 }
 
-func itemToAPI(it domain.StagedItem) httpapi.StagedItem {
-	out := httpapi.StagedItem{
-		Path:       it.Path,
-		Shape:      httpapi.StagedItemShape(it.Shape),
-		Parts:      it.Parts,
-		Size:       it.Size,
-		Ignored:    it.Ignored,
-		Consoles:   it.Consoles,
-		Confidence: httpapi.StagedItemConfidence(it.Confidence),
+// AssignUnassigned implements httpapi.StrictServerInterface.
+func (h *Handler) AssignUnassigned(ctx context.Context, req httpapi.AssignUnassignedRequestObject) (httpapi.AssignUnassignedResponseObject, error) {
+	if req.Body == nil {
+		return httpapi.AssignUnassigned400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: badRequest("Falta el cuerpo de la petición.")}, nil
 	}
-	if it.SuggestedKind != "" {
-		k := httpapi.ItemKind(it.SuggestedKind)
-		out.SuggestedKind = &k
+	spec := domain.Spec{Console: req.Body.Console, Title: req.Body.Title, IGDBID: req.Body.IgdbId}
+	job, err := h.svc.Assign(context.WithoutCancel(ctx), req.Id, spec)
+	switch {
+	case err == nil:
+		return httpapi.AssignUnassigned201JSONResponse(ToAPI(*job)), nil
+	case errors.Is(err, application.ErrUnassignedNotFound):
+		return httpapi.AssignUnassigned404ApplicationProblemPlusJSONResponse{
+			NotFoundApplicationProblemPlusJSONResponse: httpapi.NotFoundApplicationProblemPlusJSONResponse(problem(http.StatusNotFound, "Not Found", "El archivo no existe en No asignados.")),
+		}, nil
+	case errors.Is(err, application.ErrInvalidMeta):
+		return httpapi.AssignUnassigned400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: badRequest("Elige una consola y escribe el nombre del juego.")}, nil
 	}
-	optional := func(s string) *string {
-		if s == "" {
-			return nil
-		}
-		return &s
+	if status, p := commitProblem(err); status == http.StatusConflict {
+		return httpapi.AssignUnassigned409ApplicationProblemPlusJSONResponse{ConflictApplicationProblemPlusJSONResponse: httpapi.ConflictApplicationProblemPlusJSONResponse(p)}, nil
 	}
-	out.TitleId, out.VersionCode, out.DisplayVersion = optional(it.TitleID), optional(it.VersionCode), optional(it.DisplayVersion)
-	if it.DiscNumber > 0 {
-		n := it.DiscNumber
-		out.DiscNumber = &n
-	}
-	return out
+	return nil, err
 }
 
 // ListJobs implements httpapi.StrictServerInterface.
@@ -236,15 +213,22 @@ func writeEvent(w http.ResponseWriter, job domain.UploadJob) error {
 // ToAPI maps a job to its HTTP representation.
 func ToAPI(j domain.UploadJob) httpapi.UploadJob {
 	out := httpapi.UploadJob{
-		Id:            string(j.ID),
-		FileName:      j.FileName,
-		Size:          j.Size,
-		Received:      j.Received,
-		Status:        httpapi.JobStatus(j.Status),
-		Progress:      &j.Progress,
-		OriginConsole: j.OriginConsole,
-		CreatedAt:     j.CreatedAt,
-		UpdatedAt:     j.UpdatedAt,
+		Id:             string(j.ID),
+		FileName:       j.FileName,
+		Size:           j.Size,
+		Received:       j.Received,
+		Status:         httpapi.JobStatus(j.Status),
+		Console:        j.Console,
+		Title:          j.Title,
+		IgdbId:         j.IGDBID,
+		Progress:       &j.Progress,
+		CreatedAt:      j.CreatedAt,
+		UpdatedAt:      j.UpdatedAt,
+		FromUnassigned: ptr(j.UnassignedOrigin != ""),
+	}
+	if j.InvalidReason != "" {
+		r := httpapi.InvalidReason(j.InvalidReason)
+		out.InvalidReason = &r
 	}
 	if j.Error != "" {
 		e := j.Error
@@ -254,9 +238,9 @@ func ToAPI(j domain.UploadJob) httpapi.UploadJob {
 		w := j.Warning
 		out.Warning = &w
 	}
-	if j.VolumeIndex > 0 {
-		n := j.VolumeIndex
-		out.VolumeIndex = &n
+	if j.GroupSize > 0 {
+		n := j.GroupSize
+		out.GroupSize = &n
 	}
 	if j.MergedInto != "" {
 		m := string(j.MergedInto)
@@ -264,6 +248,8 @@ func ToAPI(j domain.UploadJob) httpapi.UploadJob {
 	}
 	return out
 }
+
+func ptr[T any](v T) *T { return &v }
 
 func problem(status int, title, detail string) httpapi.Problem {
 	return httpapi.Problem{Status: status, Title: title, Detail: &detail}

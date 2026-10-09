@@ -10,6 +10,8 @@ const job = (over: Partial<UploadJob>): UploadJob => ({
   size: 100,
   received: 40,
   status: 'uploading',
+  console: 'switch',
+  title: 'Mario Kart 8 Deluxe',
   createdAt: at(60_000),
   updatedAt: at(1_000),
   ...over,
@@ -21,13 +23,15 @@ const local = (over: Partial<LocalUpload>): LocalUpload => ({
   size: 100,
   sent: 60,
   state: 'uploading',
+  console: 'switch',
+  title: 'Mario Kart 8 Deluxe',
   createdAt: now - 60_000,
   ...over,
 })
 
 describe('mergeJobs', () => {
   it('keeps the newest version of each job, newest job first', () => {
-    const live = job({ id: 'a', status: 'review', updatedAt: at(1_000), createdAt: at(5_000) })
+    const live = job({ id: 'a', status: 'confirm', updatedAt: at(1_000), createdAt: at(5_000) })
     const stale = job({ id: 'a', status: 'uploaded', updatedAt: at(3_000), createdAt: at(5_000) })
     const other = job({ id: 'b', createdAt: at(1_000) })
     expect(mergeJobs([live], [stale, other])).toEqual([other, live])
@@ -62,27 +66,34 @@ describe('buildRows', () => {
     const rows = buildRows(
       [local({ key: 'q', state: 'queued', sent: 0 })],
       [
-        job({ id: 'a', status: 'review', createdAt: at(10) }),
+        job({ id: 'a', status: 'confirm', createdAt: at(10) }),
         job({ id: 'b', status: 'merged' }),
         job({ id: 'c', status: 'cancelled' }),
         job({ id: 'd', status: 'failed' }),
         job({ id: 'e', status: 'done', updatedAt: at(25 * 3600 * 1000) }),
         job({ id: 'f', status: 'needs_password', createdAt: at(20) }),
+        job({ id: 'g', status: 'trashed', updatedAt: at(25 * 3600 * 1000) }),
+        job({ id: 'h', status: 'invalid', createdAt: at(30) }),
       ],
       now,
       new Set(['d']),
     )
     expect(rows.map((r) => [r.key, r.phase])).toEqual([
       ['q', 'queued'],
-      ['a', 'review'],
+      ['a', 'confirm'],
       ['f', 'needsPassword'],
+      ['h', 'invalid'],
     ])
   })
 
-  it('counts as active everything but finished and failed uploads', () => {
+  it('counts as active everything but finished, set aside and failed uploads', () => {
     const rows = buildRows(
       [],
-      [job({ id: 'a', status: 'done' }), job({ id: 'b', status: 'review' })],
+      [
+        job({ id: 'a', status: 'done' }),
+        job({ id: 'b', status: 'confirm' }),
+        job({ id: 'c', status: 'unassigned' }),
+      ],
       now,
       new Set(),
     )

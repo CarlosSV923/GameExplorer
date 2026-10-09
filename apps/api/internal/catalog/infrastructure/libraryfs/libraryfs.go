@@ -23,17 +23,18 @@ const partialSuffix = ".gameexplorer-partial"
 
 // FS implements application.Files.
 type FS struct {
-	root    string
-	trash   string
-	scratch string
+	root       string
+	trash      string
+	scratch    string
+	unassigned string
 }
 
 var _ application.Files = (*FS)(nil)
 
-// New builds the file system for a library root; trash and scratch must be
-// inside it.
-func New(root, trash, scratch string) *FS {
-	return &FS{root: filepath.Clean(root), trash: filepath.Clean(trash), scratch: filepath.Clean(scratch)}
+// New builds the file system for a library root; trash, scratch and the
+// unassigned folder must be inside it.
+func New(root, trash, scratch, unassigned string) *FS {
+	return &FS{root: filepath.Clean(root), trash: filepath.Clean(trash), scratch: filepath.Clean(scratch), unassigned: filepath.Clean(unassigned)}
 }
 
 // LibraryPath implements application.Files.
@@ -51,9 +52,14 @@ func (f *FS) ScratchPath(elem ...string) string {
 	return filepath.Join(append([]string{f.scratch}, elem...)...)
 }
 
+// UnassignedPath implements application.Files.
+func (f *FS) UnassignedPath(elem ...string) string {
+	return filepath.Join(append([]string{f.unassigned}, elem...)...)
+}
+
 // List implements application.Files.
 func (f *FS) List(dir string) ([]string, error) {
-	if err := f.inside(dir); err != nil {
+	if err := f.readable(dir); err != nil {
 		return nil, err
 	}
 	entries, err := os.ReadDir(dir)
@@ -78,12 +84,17 @@ func (f *FS) RemoveAll(p string) error {
 	return os.RemoveAll(p)
 }
 
-// inside rejects paths outside the library: every path is built by the
-// server, so this is a last line of defence against a naming bug.
-func (f *FS) inside(paths ...string) error {
+// inside rejects paths outside the library, and the root itself: every
+// path is built by the server, so this is a last line of defence against a
+// naming bug. Reads (readable) may look at the root.
+func (f *FS) inside(paths ...string) error { return f.check(false, paths...) }
+
+func (f *FS) readable(paths ...string) error { return f.check(true, paths...) }
+
+func (f *FS) check(rootOK bool, paths ...string) error {
 	for _, p := range paths {
 		rel, err := filepath.Rel(f.root, p)
-		if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || !filepath.IsAbs(p) {
+		if err != nil || (rel == "." && !rootOK) || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || !filepath.IsAbs(p) {
 			return fmt.Errorf("libraryfs: refusing %q outside the library", p)
 		}
 	}
@@ -92,7 +103,7 @@ func (f *FS) inside(paths ...string) error {
 
 // Exists implements application.Files.
 func (f *FS) Exists(p string) (bool, error) {
-	if err := f.inside(p); err != nil {
+	if err := f.readable(p); err != nil {
 		return false, err
 	}
 	_, err := os.Lstat(p)
@@ -214,37 +225,9 @@ func (f *FS) RemoveEmptyDir(dir string) error {
 	return os.Remove(dir)
 }
 
-// ReadFile implements application.Files.
-func (f *FS) ReadFile(p string, limit int64) ([]byte, error) {
-	if err := f.inside(p); err != nil {
-		return nil, err
-	}
-	file, err := os.Open(p) //nolint:gosec // checked by inside()
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	data, err := io.ReadAll(io.LimitReader(file, limit+1))
-	if err != nil {
-		return nil, err
-	}
-	if int64(len(data)) > limit {
-		return nil, fmt.Errorf("%s is larger than %d bytes", filepath.Base(p), limit)
-	}
-	return data, nil
-}
-
-// WriteFile implements application.Files.
-func (f *FS) WriteFile(p string, data []byte) error {
-	if err := f.inside(p); err != nil {
-		return err
-	}
-	return os.WriteFile(p, data, 0o664) //nolint:gosec // library files must stay editable over SMB
-}
-
 // Tree implements application.Files.
 func (f *FS) Tree(p string) ([]application.TreeFile, error) {
-	if err := f.inside(p); err != nil {
+	if err := f.readable(p); err != nil {
 		return nil, err
 	}
 	info, err := os.Lstat(p)

@@ -1,16 +1,13 @@
-import { groupByConsole, itemChip, normalizeExtension, suggestSlug } from './items'
+import { consoles } from '@/test/fakeServices'
+
+import { acceptingConsoles, groupByConsole, itemChip, looksLikeArchive, moveTargets } from './items'
 
 describe('itemChip', () => {
-  it('labels updates and numbered discs', () => {
-    expect(itemChip({ kind: 'update', label: 'v3.0.1' })).toEqual({
+  it('shows the version of updates only', () => {
+    expect(itemChip({ kind: 'update', label: '1.0.4' })).toEqual({
       kind: 'update',
       key: 'kind.update',
-      label: 'v3.0.1',
-    })
-    expect(itemChip({ kind: 'disc', discNumber: 2 })).toEqual({
-      kind: 'disc',
-      key: 'kind.discNumber',
-      number: 2,
+      label: 'v1.0.4',
     })
     expect(itemChip({ kind: 'dlc', label: 'Pass' })).toEqual({ kind: 'dlc', key: 'kind.dlc' })
   })
@@ -19,33 +16,44 @@ describe('itemChip', () => {
 describe('groupByConsole', () => {
   it('keeps the carousel order and puts unknown consoles last', () => {
     const games = [
-      { console: 'ps2', title: 'A' },
+      { console: 'psp', title: 'A' },
       { console: 'n64', title: 'B' },
       { console: 'switch', title: 'C' },
-      { console: 'ps2', title: 'D' },
+      { console: 'psp', title: 'D' },
     ]
-    expect(groupByConsole(games, ['switch', 'ps2'])).toEqual([
+    expect(groupByConsole(games, ['switch', 'psp'])).toEqual([
       { console: 'switch', games: [games[2]] },
-      { console: 'ps2', games: [games[0], games[3]] },
+      { console: 'psp', games: [games[0], games[3]] },
       { console: 'n64', games: [games[1]] },
     ])
   })
 })
 
-describe('console fields', () => {
-  it.each([
-    ['z64', '.z64'],
-    ['.Z64', '.z64'],
-    ['  ..wbfs ', '.wbfs'],
-    ['bad ext', null],
-    ['', null],
-  ])('normalizes extension %j', (raw, want) => {
-    expect(normalizeExtension(raw)).toBe(want)
+describe('extensions', () => {
+  it('picks the longest known extension, custom ones included', () => {
+    expect(acceptingConsoles('Ookami.nkit.iso', consoles).map((c) => c.slug)).toEqual(['wii'])
+    expect(acceptingConsoles('Daxter.ISO', consoles).map((c) => c.slug)).toEqual(['wii', 'psp'])
+    expect(acceptingConsoles('Limbo.xcz', consoles).map((c) => c.slug)).toEqual(['switch'])
+    expect(acceptingConsoles('Mario.z64', consoles)).toEqual([])
   })
 
-  it('suggests a folder from the platform name', () => {
-    expect(suggestSlug('Wii U')).toBe('wiiu')
-    expect(suggestSlug('Nintendo 64')).toBe('nintendo64')
-    expect(suggestSlug('Pokémon mini')).toBe('pokemonmini')
+  it('guesses archives and their volumes from the name', () => {
+    expect(looksLikeArchive('a.part1.rar')).toBe(true)
+    expect(looksLikeArchive('a.7z.001')).toBe(true)
+    expect(looksLikeArchive('a.iso')).toBe(false)
+  })
+})
+
+describe('moveTargets', () => {
+  it('allows only consoles that take every file and kind', () => {
+    const iso = [{ file: 'Daxter.iso', kind: 'game' as const }]
+    expect(
+      moveTargets(iso, 'psp', consoles).map((t) => [t.console.slug, t.blockedBy ?? null]),
+    ).toEqual([
+      ['switch', '.iso'],
+      ['wii', null],
+    ])
+    const nsp = [{ file: 'Limbo [BASE].nsp', kind: 'base' as const }]
+    expect(moveTargets(nsp, 'switch', consoles).every((t) => t.blockedBy === '.nsp')).toBe(true)
   })
 })

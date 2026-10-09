@@ -5,13 +5,13 @@ import type { MetadataPorts } from '../../application/ports'
 
 export function createMetadataHttp(client: ApiClient, baseUrl = '/api'): MetadataPorts {
   return {
-    searchGames: (q, platformId) =>
+    searchGames: (q, platformId, limit = 10) =>
       unwrap(
         client.GET('/metadata/games', {
-          params: { query: { q, limit: 10, ...(platformId === undefined ? {} : { platformId }) } },
+          params: { query: { q, limit, ...(platformId === undefined ? {} : { platformId }) } },
         }),
       ),
-    searchPlatforms: (q) => unwrap(client.GET('/metadata/platforms', { params: { query: { q } } })),
+    status: () => unwrap(client.GET('/metadata/status')),
     imageUrl: (size, imageId) => `${baseUrl}/images/${size}/${encodeURIComponent(imageId)}`,
   }
 }

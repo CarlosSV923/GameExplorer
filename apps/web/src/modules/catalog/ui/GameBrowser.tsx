@@ -64,11 +64,6 @@ export function GameList({
                           {g.title}
                         </span>
                         <span className="flex shrink-0 items-center gap-2 text-caption font-bold text-ink-2">
-                          {g.missingCount > 0 && (
-                            <span className="text-accent">
-                              {t('game.missingShort', { count: g.missingCount })}
-                            </span>
-                          )}
                           {selected && (
                             <span className={chosen ? undefined : 'hidden lg:inline'}>
                               {t('game.itemCount', { count: g.itemCount })}

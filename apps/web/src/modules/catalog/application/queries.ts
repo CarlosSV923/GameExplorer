@@ -6,7 +6,9 @@ import {
   type QueryClient,
 } from '@tanstack/react-query'
 
-import type { ConsoleCreate, ConsoleInput, DuplicateAction } from '../domain/types'
+import { useDebounced } from '@/shared/kernel/hooks'
+
+import type { Console, GameEdit, ItemEdit } from '../domain/types'
 import { useCatalogPorts } from './ports'
 
 export const catalogKeys = {
@@ -15,15 +17,17 @@ export const catalogKeys = {
   consoleGames: (slug: string) => ['games', 'console', slug] as const,
   search: (q: string) => ['games', 'search', q] as const,
   game: (id: number) => ['games', 'detail', id] as const,
+  unassigned: ['unassigned'] as const,
   trash: ['trash'] as const,
-  integrity: ['integrity'] as const,
+  scan: ['scan'] as const,
 }
 
-/** Any library change: counts, lists, details and the trash may move. */
+/** Any library change: counts, lists, details, the unassigned section and the trash may move. */
 export function invalidateLibrary(client: QueryClient) {
   return Promise.all([
     client.invalidateQueries({ queryKey: catalogKeys.consoles }),
     client.invalidateQueries({ queryKey: catalogKeys.games }),
+    client.invalidateQueries({ queryKey: catalogKeys.unassigned }),
     client.invalidateQueries({ queryKey: catalogKeys.trash }),
   ])
 }
@@ -35,38 +39,44 @@ export function useConsoles() {
   return useQuery({ queryKey: catalogKeys.consoles, queryFn: () => consoles.list() })
 }
 
-export function useCreateConsole() {
-  const { consoles } = useCatalogPorts()
+function useConsoleMutation<T>(run: (input: T) => Promise<Console>) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (input: ConsoleCreate) => consoles.create(input),
-    onSuccess: () => client.invalidateQueries({ queryKey: catalogKeys.consoles }),
+    mutationFn: run,
+    onSuccess: (updated) => {
+      client.setQueryData<Console[]>(catalogKeys.consoles, (list) =>
+        list?.map((c) => (c.slug === updated.slug ? updated : c)),
+      )
+    },
   })
 }
 
-export function useUpdateConsole() {
+export function useRenameConsole() {
   const { consoles } = useCatalogPorts()
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, input }: { id: number; input: ConsoleInput }) => consoles.update(id, input),
-    onSuccess: () => invalidateLibrary(client),
-  })
+  return useConsoleMutation(({ slug, name }: { slug: string; name: string }) =>
+    consoles.rename(slug, name),
+  )
 }
 
-export function useDeleteConsole() {
+export function useAddExtension() {
   const { consoles } = useCatalogPorts()
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (id: number) => consoles.remove(id),
-    onSuccess: () => client.invalidateQueries({ queryKey: catalogKeys.consoles }),
-  })
+  return useConsoleMutation(({ slug, extension }: { slug: string; extension: string }) =>
+    consoles.addExtension(slug, extension),
+  )
+}
+
+export function useRemoveExtension() {
+  const { consoles } = useCatalogPorts()
+  return useConsoleMutation(({ slug, extension }: { slug: string; extension: string }) =>
+    consoles.removeExtension(slug, extension),
+  )
 }
 
 export function useReorderConsoles() {
   const { consoles } = useCatalogPorts()
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (ids: number[]) => consoles.reorder(ids),
+    mutationFn: (slugs: string[]) => consoles.reorder(slugs),
     onSuccess: (list) => {
       client.setQueryData(catalogKeys.consoles, list)
     },
@@ -123,59 +133,73 @@ export function useTrashItem() {
   return useLibraryMutation((id: number) => library.trashItem(id))
 }
 
-export function useForgetItem() {
+export function useUnassignGame() {
   const { library } = useCatalogPorts()
-  return useLibraryMutation((id: number) => library.forgetItem(id))
+  return useLibraryMutation((id: number) => library.unassignGame(id))
 }
 
-export function useRematchPlan(
-  gameId: number,
-  igdbGameId: number | undefined,
-  decisions: Readonly<Record<number, DuplicateAction>>,
-) {
+export function useUnassignItem() {
   const { library } = useCatalogPorts()
-  const list = Object.entries(decisions).map(([itemId, onDuplicate]) => ({
-    itemId: Number(itemId),
-    onDuplicate,
-  }))
+  return useLibraryMutation((id: number) => library.unassignItem(id))
+}
+
+/** The preview of a rename or move (RF-24), as the dialog changes. */
+export function useEditPlan(gameId: number, edit: GameEdit | undefined) {
+  const { library } = useCatalogPorts()
+  const debounced = useDebounced(edit, 300)
   return useQuery({
-    queryKey: ['rematch', gameId, igdbGameId, list],
-    queryFn: () => library.planRematch(gameId, { igdbGameId: igdbGameId ?? 0, decisions: list }),
-    enabled: igdbGameId !== undefined,
+    queryKey: ['games', 'edit', gameId, debounced],
+    queryFn: () => library.planEdit(gameId, debounced as GameEdit),
+    enabled: debounced !== undefined,
     placeholderData: keepPreviousData,
     retry: false,
   })
 }
 
-export function useRematch(gameId: number) {
+export function useEditGame(gameId: number) {
   const { library } = useCatalogPorts()
-  return useLibraryMutation(
-    (input: { igdbGameId: number; decisions: Readonly<Record<number, DuplicateAction>> }) =>
-      library.rematch(gameId, {
-        igdbGameId: input.igdbGameId,
-        decisions: Object.entries(input.decisions).map(([itemId, onDuplicate]) => ({
-          itemId: Number(itemId),
-          onDuplicate,
-        })),
-      }),
+  return useLibraryMutation((edit: GameEdit) => library.edit(gameId, edit))
+}
+
+export function useEditItem() {
+  const { library } = useCatalogPorts()
+  return useLibraryMutation(({ id, edit }: { id: number; edit: ItemEdit }) =>
+    library.editItem(id, edit),
   )
 }
 
-export function useLastCheck() {
+export function useLastScan() {
   const { library } = useCatalogPorts()
-  return useQuery({ queryKey: catalogKeys.integrity, queryFn: () => library.lastCheck() })
+  return useQuery({ queryKey: catalogKeys.scan, queryFn: () => library.lastScan() })
 }
 
-export function useCheckLibrary() {
+export function useScanLibrary() {
   const { library } = useCatalogPorts()
   const client = useQueryClient()
   return useMutation({
-    mutationFn: () => library.check(),
+    mutationFn: () => library.scan(),
     onSuccess: async (report) => {
-      client.setQueryData(catalogKeys.integrity, report)
-      await client.invalidateQueries({ queryKey: catalogKeys.games })
+      client.setQueryData(catalogKeys.scan, report)
+      await invalidateLibrary(client)
     },
   })
+}
+
+// ---------- unassigned ----------
+
+export function useUnassigned() {
+  const { unassigned } = useCatalogPorts()
+  return useQuery({ queryKey: catalogKeys.unassigned, queryFn: () => unassigned.list() })
+}
+
+export function useTrashUnassigned() {
+  const { unassigned } = useCatalogPorts()
+  return useLibraryMutation((id: number) => unassigned.trash(id))
+}
+
+export function useDeleteUnassigned() {
+  const { unassigned } = useCatalogPorts()
+  return useLibraryMutation((id: number) => unassigned.remove(id))
 }
 
 // ---------- trash ----------

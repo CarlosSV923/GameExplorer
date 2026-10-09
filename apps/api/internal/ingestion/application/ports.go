@@ -6,7 +6,6 @@ import (
 	"io/fs"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain"
-	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain/detection"
 )
 
 // Extraction errors returned by an Extractor.
@@ -82,11 +81,21 @@ type Staging interface {
 	FreeSpace() (uint64, error)
 	// ReadHeader reads the first n bytes of a file.
 	ReadHeader(path string, n int) ([]byte, error)
+	// Exists reports whether a path exists.
+	Exists(path string) bool
+	// Adopt renames a file into place (same dataset).
+	Adopt(src, dest string) error
 
-	// VolumeDir is where the parts of a multi-volume archive gather.
-	VolumeDir(set string) string
-	// RemoveVolumes deletes every part of a set.
-	RemoveVolumes(set string) error
+	// SourceDir holds the file a job took from the unassigned section,
+	// until the job ends.
+	SourceDir(id domain.JobID) string
+	// RemoveSource deletes it.
+	RemoveSource(id domain.JobID) error
+
+	// VolumeDir is where the parts of a multi-volume group gather.
+	VolumeDir(group string) string
+	// RemoveVolumes deletes every part of a group.
+	RemoveVolumes(group string) error
 	// RemovePart deletes one gathered part.
 	RemovePart(path string) error
 }
@@ -97,7 +106,9 @@ type UploadAdopter interface {
 	Take(ctx context.Context, id domain.JobID, dest string) error
 }
 
-// ProfileSource provides the consoles known to the catalog for detection.
-type ProfileSource interface {
-	Profiles(ctx context.Context) ([]detection.ConsoleProfile, error)
+// Consoles gives ingestion the rules of the catalog's consoles.
+type Consoles interface {
+	// Rules returns each console's rule by slug, and every extension of
+	// every console (to tell .nkit.iso from .iso).
+	Rules(ctx context.Context) (map[string]domain.ConsoleRule, []string, error)
 }

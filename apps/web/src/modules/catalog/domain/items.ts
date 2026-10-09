@@ -1,22 +1,18 @@
-import type { GameSummary, ItemKind, LibraryItem } from './types'
+import { extensionOf } from './naming'
+import type { Console, GameSummary, ItemKind, LibraryItem } from './types'
 
-/** The chip of an item: its kind and, for updates and discs, the label. */
-export function itemChip(item: Pick<LibraryItem, 'kind' | 'label' | 'discNumber'>): {
+/** Slug of the unassigned section in the carousel (never a console). */
+export const unassignedSlug = '_unassigned'
+
+/** The chip of an item: its kind and, for updates, the version. */
+export function itemChip(item: Pick<LibraryItem, 'kind' | 'label'>): {
   kind: ItemKind
-  key: `kind.${ItemKind}` | 'kind.discNumber'
+  key: `kind.${ItemKind}`
   label?: string
-  number?: number
 } {
-  switch (item.kind) {
-    case 'update':
-      return { kind: 'update', key: 'kind.update', ...(item.label ? { label: item.label } : {}) }
-    case 'disc':
-      return item.discNumber
-        ? { kind: 'disc', key: 'kind.discNumber', number: item.discNumber }
-        : { kind: 'disc', key: 'kind.disc' }
-    default:
-      return { kind: item.kind, key: `kind.${item.kind}` }
-  }
+  return item.kind === 'update' && item.label
+    ? { kind: 'update', key: 'kind.update', label: `v${item.label}` }
+    : { kind: item.kind, key: `kind.${item.kind}` }
 }
 
 /** Games of a search grouped by console, in carousel order. */
@@ -39,20 +35,58 @@ export function groupByConsole<T extends Pick<GameSummary, 'console'>>(
     .map(([console, list]) => ({ console, games: list }))
 }
 
-/** Normalizes an extension typed by the user: ".Z64", "z64" → ".z64". */
-export function normalizeExtension(raw: string): string | null {
-  const ext = raw.trim().toLowerCase().replace(/^\.*/, '.')
-  return /^\.[a-z0-9][a-z0-9._-]{0,15}$/.test(ext) ? ext : null
+/** Every extension a console accepts: the fixed ones and the custom ones. */
+export function consoleExtensions(c: Pick<Console, 'extensions' | 'customExtensions'>): string[] {
+  return [...c.extensions, ...c.customExtensions.map((e) => e.extension)]
 }
 
-/** A folder name suggested from a platform: "Wii U" → "wiiu". */
-export function suggestSlug(name: string): string {
-  return name
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '')
-    .slice(0, 32)
+/** Every extension of every console: a file's extension is the longest match among them. */
+export function knownExtensions(consoles: readonly Console[]): string[] {
+  return [...new Set(consoles.flatMap(consoleExtensions))]
 }
 
-export const slugPattern = /^[a-z0-9][a-z0-9_-]{0,31}$/
+/** A file's extension (RF-41): ".nkit.iso" rather than ".iso" when some console knows it. */
+export function fileExtension(name: string, consoles: readonly Console[]): string {
+  return extensionOf(name, knownExtensions(consoles))
+}
+
+/** The consoles that accept a file by its extension. */
+export function acceptingConsoles(name: string, consoles: readonly Console[]): Console[] {
+  const ext = fileExtension(name, consoles)
+  return ext ? consoles.filter((c) => consoleExtensions(c).includes(ext)) : []
+}
+
+/**
+ * Archives the server extracts (zip, 7z, rar and their volumes). The server
+ * recognizes them by their bytes; the forms only guess from the name.
+ */
+export function looksLikeArchive(name: string): boolean {
+  return /\.(zip|7z|rar)(\.\d{1,3})?$/i.test(name)
+}
+
+/** Whether a console takes one file per game (Wii, PSP) rather than base, update and DLC. */
+export function singleFile(c: Pick<Console, 'kinds'>): boolean {
+  return !c.kinds.some((k) => k !== 'game')
+}
+
+/**
+ * The consoles a game can move to (RF-24): every file's extension and kind
+ * must be valid there. Others come with the extension that blocks them.
+ */
+export function moveTargets(
+  items: readonly Pick<LibraryItem, 'file' | 'kind'>[],
+  from: string,
+  consoles: readonly Console[],
+): { console: Console; blockedBy?: string }[] {
+  return consoles
+    .filter((c) => c.slug !== from)
+    .map((c) => {
+      const exts = consoleExtensions(c)
+      const bad = items.find((it) => {
+        const ext = fileExtension(it.file, consoles)
+        return !ext || !exts.includes(ext) || !c.kinds.includes(it.kind)
+      })
+      if (!bad) return { console: c }
+      return { console: c, blockedBy: fileExtension(bad.file, consoles) || bad.file }
+    })
+}

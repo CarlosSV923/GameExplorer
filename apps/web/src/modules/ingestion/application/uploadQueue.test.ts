@@ -18,6 +18,7 @@ function fakePorts() {
 }
 
 const file = (name: string, size = 10) => new File([new Uint8Array(size)], name)
+const spec = { console: 'switch', title: 'Limbo' }
 
 describe('UploadQueue', () => {
   beforeEach(() => {
@@ -27,10 +28,10 @@ describe('UploadQueue', () => {
   it('sends two files at a time and starts the next when one finishes', () => {
     const { ports, started } = fakePorts()
     const queue = new UploadQueue(ports, 2)
-    queue.add([file('a'), file('b'), file('c')], 'switch')
+    queue.add([file('a'), file('b'), file('c')].map((f) => ({ file: f, spec })))
 
     expect(started.map((s) => s.file.name)).toEqual(['a', 'b'])
-    expect(started[0]?.options).toEqual({ consoleSlug: 'switch' })
+    expect(started[0]?.options).toEqual({ spec })
     expect(queue.getSnapshot().map((u) => u.state)).toEqual(['uploading', 'uploading', 'queued'])
     expect(queue.busy()).toBe(true)
 
@@ -46,7 +47,7 @@ describe('UploadQueue', () => {
   it('keeps a failed upload for a retry with the same file', () => {
     const { ports, started } = fakePorts()
     const queue = new UploadQueue(ports, 1)
-    queue.add([file('a')])
+    queue.add([{ file: file('a'), spec }])
     started[0]?.cb.onJobId('job-a')
     started[0]?.cb.onError(new AppError('network'))
     expect(queue.getSnapshot()[0]?.state).toBe('error')
@@ -54,24 +55,27 @@ describe('UploadQueue', () => {
 
     queue.retry(queue.getSnapshot()[0]?.key ?? '')
     expect(started).toHaveLength(2)
-    expect(started[1]?.options).toEqual({ resumeJobId: 'job-a' })
+    expect(started[1]?.options).toEqual({ spec, resumeJobId: 'job-a' })
   })
 
   it('resumes an interrupted job only with the same file', () => {
     const { ports, started } = fakePorts()
     const queue = new UploadQueue(ports)
-    const job = { id: 'job-x', fileName: 'big.rar', size: 10 }
+    const job = { id: 'job-x', fileName: 'big.rar', size: 10, console: 'wii', title: 'Ōkami' }
 
     expect(queue.resume(job, file('other.rar', 10))).toBe(false)
     expect(queue.resume(job, file('big.rar', 9))).toBe(false)
     expect(queue.resume(job, file('big.rar', 10))).toBe(true)
-    expect(started[0]?.options).toEqual({ resumeJobId: 'job-x' })
+    expect(started[0]?.options).toEqual({
+      spec: { console: 'wii', title: 'Ōkami' },
+      resumeJobId: 'job-x',
+    })
   })
 
   it('cancels: stops sending, frees the slot and deletes the server copy', async () => {
     const { ports, started } = fakePorts()
     const queue = new UploadQueue(ports, 1)
-    queue.add([file('a'), file('b')])
+    queue.add([file('a'), file('b')].map((f) => ({ file: f, spec })))
     started[0]?.cb.onJobId('job-a')
 
     await queue.cancel(queue.getSnapshot()[0]?.key ?? '')

@@ -13,6 +13,7 @@ import (
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/application"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain"
+	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain/consoles"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/infrastructure/libraryfs"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/infrastructure/sqlite"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/database"
@@ -55,7 +56,7 @@ func (f *flakyFiles) Move(from, to string) error {
 type fixture struct {
 	root, staging string
 	repo          *sqlite.LibraryRepository
-	consoles      *sqlite.ConsoleRepository
+	consoles      *application.ConsoleService
 	files         application.Files
 }
 
@@ -66,26 +67,33 @@ func newFixture(t *testing.T) fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
+	svc, err := application.NewConsoleService(consoles.All(), sqlite.NewConsoleRepository(db), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	root := t.TempDir()
 	fx := fixture{
 		root:     root,
 		staging:  filepath.Join(root, ".gameexplorer", "staging", "job1"),
 		repo:     sqlite.NewLibraryRepository(db),
-		consoles: sqlite.NewConsoleRepository(db),
-		files:    libraryfs.New(root, filepath.Join(root, ".gameexplorer", "trash"), filepath.Join(root, ".gameexplorer", "ops")),
+		consoles: svc,
+		files: libraryfs.New(root, filepath.Join(root, ".gameexplorer", "trash"), filepath.Join(root, ".gameexplorer", "ops"),
+			filepath.Join(root, "_unassigned")),
 	}
-	write := func(name, content string) {
-		if err := os.MkdirAll(filepath.Dir(filepath.Join(fx.staging, name)), 0o750); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(fx.staging, name), []byte(content), 0o600); err != nil {
-			t.Fatal(err)
-		}
+	for name, content := range map[string]string{"base.nsp": "base", "update.nsp": "update", "dlc.nsp": "dlc"} {
+		write(t, filepath.Join(fx.staging, name), content)
 	}
-	write("ff7.cue", "FILE \"t1.bin\" BINARY\nFILE \"t2.bin\" BINARY\n")
-	write("t1.bin", "one")
-	write("t2.bin", "two")
 	return fx
+}
+
+func write(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func (fx fixture) service(t *testing.T, files application.Files) *application.LibraryService {
@@ -99,36 +107,58 @@ func (fx fixture) serviceAt(t *testing.T, files application.Files, now func() ti
 		slog.New(slog.NewTextHandler(io.Discard, nil)), now)
 }
 
-func (fx fixture) disc() application.StoreRequest {
-	return application.StoreRequest{Source: "job1", Console: "psx", IGDBGameID: 427, Items: []application.NewItem{{
-		Ref: "ff7.cue", Shape: domain.ShapeDisc, Root: fx.staging, Parts: []string{"ff7.cue", "t1.bin", "t2.bin"},
-		Size: 6, Kind: domain.KindDisc, DiscNumber: 1,
-	}}}
+// pack stores three Switch files as Final Fantasy VII.
+func (fx fixture) pack() application.StoreRequest {
+	id := int64(427)
+	return application.StoreRequest{Source: "job1", Console: "switch", Name: application.GameName{IGDBID: &id}, Files: []application.NewFile{
+		{Ref: "base.nsp", Root: fx.staging, Path: "base.nsp", Size: 4, Kind: domain.KindBase},
+		{Ref: "update.nsp", Root: fx.staging, Path: "update.nsp", Size: 6, Kind: domain.KindUpdate, Label: "v1.0.2"},
+		{Ref: "dlc.nsp", Root: fx.staging, Path: "dlc.nsp", Size: 3, Kind: domain.KindDLC, Label: "Extra"},
+	}}
+}
+
+func dirNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, _ := os.ReadDir(dir)
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
 }
 
 // assertUntouched checks that the staging area is as uploaded and the
 // library has no game folder and no journal.
 func (fx fixture) assertUntouched(t *testing.T) {
 	t.Helper()
-	entries, _ := os.ReadDir(fx.staging)
-	var names []string
-	for _, e := range entries {
-		names = append(names, e.Name())
+	if got, want := dirNames(t, fx.staging), []string{"base.nsp", "dlc.nsp", "update.nsp"}; !slices.Equal(got, want) {
+		t.Fatalf("staging = %v, want %v", got, want)
 	}
-	if want := []string{"ff7.cue", "t1.bin", "t2.bin"}; !slices.Equal(names, want) {
-		t.Fatalf("staging = %v, want %v", names, want)
-	}
-	if b, _ := os.ReadFile(filepath.Join(fx.staging, "ff7.cue")); string(b) != "FILE \"t1.bin\" BINARY\nFILE \"t2.bin\" BINARY\n" {
-		t.Fatalf("original cue changed: %q", b)
-	}
-	if _, err := os.Stat(filepath.Join(fx.root, "psx")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(fx.root, "switch")); !os.IsNotExist(err) {
 		t.Fatalf("console folder left behind: %v", err)
 	}
 	if ops, _ := fx.repo.Operations(t.Context()); len(ops) != 0 {
 		t.Fatalf("journal not cleared: %+v", ops)
 	}
 	if has, _ := fx.repo.HasItemsFrom(t.Context(), "job1"); has {
-		t.Fatal("items recorded for a failed commit")
+		t.Fatal("files recorded for a failed commit")
+	}
+}
+
+func TestStoreNamesFilesForTheirKind(t *testing.T) {
+	t.Parallel()
+	fx := newFixture(t)
+	res, err := fx.service(t, fx.files).Store(t.Context(), fx.pack())
+	if err != nil || res.Stored != 3 || res.Path != "switch/Final Fantasy VII" {
+		t.Fatalf("store = %+v, %v", res, err)
+	}
+	want := []string{"Final Fantasy VII [BASE].nsp", "Final Fantasy VII [DLC Extra].nsp", "Final Fantasy VII [UPDATE v1.0.2].nsp"}
+	if got := dirNames(t, filepath.Join(fx.root, "switch", "Final Fantasy VII")); !slices.Equal(got, want) {
+		t.Fatalf("files = %v", got)
+	}
+	g, _ := fx.repo.GameByID(t.Context(), res.GameID)
+	if *g.IGDBID != 427 || g.Items[1].Label != "1.0.2" {
+		t.Fatalf("game = %+v (versions are stored without v)", g)
 	}
 }
 
@@ -137,14 +167,13 @@ func TestStoreUndoesEveryMoveWhenOneFails(t *testing.T) {
 	fx := newFixture(t)
 	svc := fx.service(t, &flakyFiles{Files: fx.files, failOn: map[int]bool{3: true}})
 
-	if _, err := svc.Store(t.Context(), fx.disc()); !errors.Is(err, errDiskGone) {
+	if _, err := svc.Store(t.Context(), fx.pack()); !errors.Is(err, errDiskGone) {
 		t.Fatalf("err = %v", err)
 	}
 	fx.assertUntouched(t)
 
 	// The same request succeeds once the disk is back.
-	res, err := fx.service(t, fx.files).Store(t.Context(), fx.disc())
-	if err != nil || res.Stored != 1 || res.Path != "psx/Final Fantasy VII" {
+	if res, err := fx.service(t, fx.files).Store(t.Context(), fx.pack()); err != nil || res.Stored != 3 {
 		t.Fatalf("retry = %+v, %v", res, err)
 	}
 }
@@ -155,7 +184,7 @@ func TestStoreKeepsTheJournalWhenUndoFails(t *testing.T) {
 	// Move 2 fails, then undoing move 1 fails too.
 	svc := fx.service(t, &flakyFiles{Files: fx.files, failOn: map[int]bool{2: true, 3: true}})
 
-	if _, err := svc.Store(t.Context(), fx.disc()); !errors.Is(err, application.ErrUndoFailed) {
+	if _, err := svc.Store(t.Context(), fx.pack()); !errors.Is(err, application.ErrUndoFailed) {
 		t.Fatalf("err = %v", err)
 	}
 	if ops, _ := fx.repo.Operations(t.Context()); len(ops) != 1 {
@@ -174,13 +203,12 @@ func TestRecoverUndoesACommitInterruptedByACrash(t *testing.T) {
 
 	func() {
 		defer func() { _ = recover() }()
-		_, _ = svc.Store(t.Context(), fx.disc())
+		_, _ = svc.Store(t.Context(), fx.pack())
 		t.Fatal("expected the simulated crash")
 	}()
-	if _, err := os.Stat(filepath.Join(fx.root, "psx", "Final Fantasy VII", "Final Fantasy VII (Disc 1).cue")); err != nil {
+	if _, err := os.Stat(filepath.Join(fx.root, "switch", "Final Fantasy VII", "Final Fantasy VII [BASE].nsp")); err != nil {
 		t.Fatalf("the crash should leave moved files behind: %v", err)
 	}
-
 	if n, err := fx.service(t, fx.files).Recover(t.Context()); n != 1 || err != nil {
 		t.Fatalf("recover = %d, %v", n, err)
 	}
@@ -190,39 +218,38 @@ func TestRecoverUndoesACommitInterruptedByACrash(t *testing.T) {
 func TestStoreRefusesFilesPutThereOverSMB(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t)
-	svc := fx.service(t, fx.files)
-	if _, err := svc.Store(t.Context(), fx.disc()); err != nil {
-		t.Fatal(err)
-	}
+	write(t, filepath.Join(fx.root, "switch", "Final Fantasy VII", "Final Fantasy VII [DLC Extra].nsp"), "mine")
 
-	// A disc 2 whose cue name someone already created by hand.
-	gameDir := filepath.Join(fx.root, "psx", "Final Fantasy VII")
-	if err := os.WriteFile(filepath.Join(gameDir, "Final Fantasy VII (Disc 2).cue"), []byte("mine"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(fx.staging, "d2.iso"), []byte("disc two"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	req := application.StoreRequest{Source: "job2", Console: "psx", IGDBGameID: 427, Items: []application.NewItem{{
-		Ref: "d2.iso", Shape: domain.ShapeFile, Root: fx.staging, Parts: []string{"d2.iso"}, Kind: domain.KindDisc, DiscNumber: 2,
-	}}}
-	// Same stem, other extension: no clash.
-	if _, err := svc.Store(t.Context(), req); err != nil {
-		t.Fatalf("iso next to a foreign cue: %v", err)
-	}
-
-	if err := os.WriteFile(filepath.Join(gameDir, "Final Fantasy VII (Disc 3).iso"), []byte("mine"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(fx.staging, "d3.iso"), []byte("disc three"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	req.Items[0].Ref, req.Items[0].Parts, req.Items[0].DiscNumber = "d3.iso", []string{"d3.iso"}, 3
 	var rej *application.Rejection
-	if _, err := svc.Store(t.Context(), req); !errors.As(err, &rej) || rej.Reason != application.RejectConflict {
+	if _, err := fx.service(t, fx.files).Store(t.Context(), fx.pack()); !errors.As(err, &rej) || rej.Reason != application.RejectConflict {
 		t.Fatalf("err = %v, want a conflict", err)
 	}
-	if b, _ := os.ReadFile(filepath.Join(gameDir, "Final Fantasy VII (Disc 3).iso")); string(b) != "mine" {
+	if got := dirNames(t, fx.staging); len(got) != 3 {
+		t.Fatalf("staging = %v", got)
+	}
+	if b, _ := os.ReadFile(filepath.Join(fx.root, "switch", "Final Fantasy VII", "Final Fantasy VII [DLC Extra].nsp")); string(b) != "mine" {
 		t.Fatal("a file created over SMB was overwritten")
+	}
+}
+
+func TestStoreRejectsWhatTheConsoleDoesNotTake(t *testing.T) {
+	t.Parallel()
+	fx := newFixture(t)
+	svc := fx.service(t, fx.files)
+	cases := map[string]application.StoreRequest{
+		"no name":         {Console: "switch", Files: []application.NewFile{{Ref: "base.nsp", Root: fx.staging, Path: "base.nsp", Kind: domain.KindBase}}},
+		"unknown console": {Console: "ps2", Name: application.GameName{Title: "X"}, Files: []application.NewFile{{Ref: "base.nsp", Root: fx.staging, Path: "base.nsp"}}},
+		"wrong extension": {Console: "wii", Name: application.GameName{Title: "X"}, Files: []application.NewFile{{Ref: "base.nsp", Root: fx.staging, Path: "base.nsp"}}},
+		"no kind":         {Console: "switch", Name: application.GameName{Title: "X"}, Files: []application.NewFile{{Ref: "base.nsp", Root: fx.staging, Path: "base.nsp"}}},
+		"same name twice": {Console: "switch", Name: application.GameName{Title: "X"}, Files: []application.NewFile{
+			{Ref: "base.nsp", Root: fx.staging, Path: "base.nsp", Kind: domain.KindBase},
+			{Ref: "dlc.nsp", Root: fx.staging, Path: "dlc.nsp", Kind: domain.KindBase},
+		}},
+	}
+	for name, req := range cases {
+		var rej *application.Rejection
+		if _, err := svc.Plan(t.Context(), req); !errors.As(err, &rej) || rej.Reason != application.RejectInvalid {
+			t.Errorf("%s: err = %v, want invalid", name, err)
+		}
 	}
 }

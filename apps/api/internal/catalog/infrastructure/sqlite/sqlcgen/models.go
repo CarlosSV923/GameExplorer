@@ -8,25 +8,25 @@ import (
 	"database/sql"
 )
 
-type Console struct {
-	ID             int64
-	Slug           string
-	DisplayName    string
-	IgdbPlatformID sql.NullInt64
-	ReleaseYear    sql.NullInt64
-	LogoImageID    sql.NullString
-	Extensions     string
-	DetectorKey    sql.NullString
-	SortOrder      int64
-	CreatedAt      string
+type ConsoleExtension struct {
+	Slug      string
+	Extension string
+}
+
+type ConsoleSetting struct {
+	Slug        string
+	DisplayName sql.NullString
+	SortOrder   int64
+	LogoImageID sql.NullString
+	ReleaseYear sql.NullInt64
 }
 
 type Game struct {
 	ID           int64
-	ConsoleID    int64
-	IgdbID       int64
+	Console      string
 	Title        string
 	Folder       string
+	IgdbID       sql.NullInt64
 	ReleaseYear  sql.NullInt64
 	CoverImageID sql.NullString
 	Summary      sql.NullString
@@ -40,15 +40,11 @@ type GameItem struct {
 	GameID       int64
 	Kind         string
 	Label        string
-	DiscNumber   int64
-	Shape        string
-	Files        string
+	File         string
 	Size         int64
-	TitleID      string
 	SourceJob    string
 	CreatedAt    string
 	TrashEntryID sql.NullInt64
-	MissingSince sql.NullString
 }
 
 type LibraryOperation struct {
@@ -59,45 +55,55 @@ type LibraryOperation struct {
 	CreatedAt   string
 }
 
-type StagedItem struct {
-	JobID          string
-	Path           string
-	Shape          string
-	Parts          string
-	Size           int64
-	Ignored        int64
-	Consoles       string
-	Confidence     string
-	SuggestedKind  string
-	TitleID        string
-	VersionCode    string
-	DisplayVersion string
-	DiscNumber     int64
+type ScanPending struct {
+	Path    string
+	Size    int64
+	ModTime string
+}
+
+type StagedFile struct {
+	JobID string
+	Path  string
+	Size  int64
 }
 
 type TrashEntry struct {
 	ID        int64
-	GameID    int64
+	GameID    sql.NullInt64
 	WholeGame int64
 	Reason    string
 	Dir       string
 	TrashedAt string
 }
 
+type UnassignedFile struct {
+	ID           int64
+	Path         string
+	Origin       string
+	Reason       string
+	Size         int64
+	ArrivedAt    string
+	TrashEntryID sql.NullInt64
+}
+
 type UploadJob struct {
-	ID            string
-	FileName      string
-	Size          int64
-	Received      int64
-	Status        string
-	Error         string
-	OriginConsole sql.NullString
-	StoragePath   string
-	CreatedAt     string
-	UpdatedAt     string
-	Progress      int64
-	Warning       string
-	VolumeSet     string
-	VolumeIndex   int64
-	MergedInto    string
+	ID               string
+	FileName         string
+	Size             int64
+	Received         int64
+	Status           string
+	Error            string
+	Warning          string
+	Progress         int64
+	Console          string
+	Title            string
+	IgdbID           sql.NullInt64
+	InvalidReason    string
+	GroupID          string
+	GroupSize        int64
+	MergedInto       string
+	StoragePath      string
+	UnassignedOrigin string
+	CreatedAt        string
+	UpdatedAt        string
 }

@@ -3,7 +3,7 @@
 > Fuente de verdad de los requisitos. Si una decisión no está aquí, se consulta y se documenta antes de implementarla.
 > Estado de trabajo: [`tasks.md`](./tasks.md). Mockups: https://claude.ai/artifact/CNf4mdh7jjnMfnjeNFXe56
 >
-> **Ajuste de alcance (2026-10-08, Fase 10).** Tras probar con archivos reales se simplificó el sistema: tres consolas definidas en código (Switch, Wii, PSP), sin detección automática de consola ni de nombre (el usuario lo indica), IGDB opcional (solo sugiere nombres y aporta portadas), sección **No asignados** y escaneo de lo que llega por Samba. Hasta terminar la Fase 10, el código implementa todavía el alcance anterior (fases 1–9).
+> **Ajuste de alcance (2026-10-08, Fase 10).** Tras probar con archivos reales se simplificó el sistema: tres consolas definidas en código (Switch, Wii, PSP), sin detección automática de consola ni de nombre (el usuario lo indica), IGDB opcional (solo sugiere nombres y aporta portadas), sección **No asignados** y escaneo de lo que llega por Samba. Implementado en la Fase 10.
 
 ## 1. Problema y objetivo
 

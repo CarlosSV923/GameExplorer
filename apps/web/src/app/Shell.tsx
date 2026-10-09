@@ -1,7 +1,14 @@
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
-import { useJobFeed, useUploadQueue } from '@/modules/ingestion/application/queries'
+import { useCarousel } from '@/modules/catalog/application/carousel'
+import {
+  UploadFormContext,
+  useJobFeed,
+  useUploadQueue,
+  type UploadFormRequest,
+} from '@/modules/ingestion/application/queries'
+import { UploadFormDialog } from '@/modules/ingestion/ui/UploadFormDialog'
 import { DropOverlay } from '@/modules/ingestion/ui/UploadsScreen'
 import { HealthBanner } from '@/modules/system/ui/HealthBanner'
 import { useAction } from '@/shared/input'
@@ -11,21 +18,46 @@ function visible(el: HTMLElement): boolean {
 }
 
 /**
+ * The console a drop preselects (RF-03): the console screen's, or the one
+ * in the middle of the carousel; none elsewhere.
+ */
+function useScreenConsole(): string | undefined {
+  const carousel = useCarousel()
+  const { slug, home, selected } = useRouterState({
+    select: (s) => {
+      let slug: string | undefined
+      for (const m of s.matches) {
+        const params = m.params as { slug?: string }
+        if (params.slug) slug = params.slug
+      }
+      const search = s.location.search as { consola?: unknown }
+      return {
+        slug,
+        home: s.location.pathname === '/',
+        selected: typeof search.consola === 'string' ? search.consola : undefined,
+      }
+    },
+  })
+  if (slug) return slug
+  if (!home) return undefined
+  const entry = carousel.entries.find((e) => e.slug === selected) ?? carousel.entries[0]
+  return entry && !entry.unassigned ? entry.slug : undefined
+}
+
+/**
  * Around every signed-in screen: the health alert, the live job feed, the
- * drop overlay and the actions that work everywhere (Menu, Y, RT).
+ * drop overlay, the upload form and the actions that work everywhere
+ * (Menu, Y, RT).
  */
 export function Shell() {
   const navigate = useNavigate()
   const queue = useUploadQueue()
-  const slug = useRouterState({
-    select: (s) => {
-      for (const m of s.matches) {
-        const params = m.params as { slug?: string }
-        if (params.slug) return params.slug
-      }
-      return undefined
-    },
-  })
+  const screenConsole = useScreenConsole()
+  const [form, setForm] = useState<{ request: UploadFormRequest; key: number } | null>(null)
+  // A new request (another drop) starts a fresh form.
+  const openForm = useCallback((request: UploadFormRequest) => {
+    setForm((f) => ({ request, key: (f?.key ?? 0) + 1 }))
+  }, [])
 
   useJobFeed(true)
 
@@ -69,10 +101,23 @@ export function Shell() {
   })
 
   return (
-    <>
+    <UploadFormContext value={openForm}>
       <HealthBanner />
       <Outlet />
-      <DropOverlay consoleSlug={slug} />
-    </>
+      <DropOverlay consoleSlug={screenConsole} />
+      {form && (
+        <UploadFormDialog
+          key={form.key}
+          request={form.request}
+          onClose={() => {
+            setForm(null)
+          }}
+          onDone={() => {
+            setForm(null)
+            void navigate({ to: '/subidas' })
+          }}
+        />
+      )}
+    </UploadFormContext>
   )
 }

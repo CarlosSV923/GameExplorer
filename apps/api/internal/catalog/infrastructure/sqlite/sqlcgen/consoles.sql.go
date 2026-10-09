@@ -10,99 +10,129 @@ import (
 	"database/sql"
 )
 
-const consoleHasGames = `-- name: ConsoleHasGames :one
-SELECT EXISTS (SELECT 1 FROM games WHERE console_id = ?)
+const addConsoleExtension = `-- name: AddConsoleExtension :exec
+INSERT OR IGNORE INTO console_extensions (slug, extension) VALUES (?, ?)
 `
 
-// Any game, even one whose items are all in the trash.
-func (q *Queries) ConsoleHasGames(ctx context.Context, consoleID int64) (bool, error) {
-	row := q.db.QueryRowContext(ctx, consoleHasGames, consoleID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
+type AddConsoleExtensionParams struct {
+	Slug      string
+	Extension string
 }
 
-const deleteConsole = `-- name: DeleteConsole :exec
-DELETE FROM consoles WHERE id = ?
-`
-
-func (q *Queries) DeleteConsole(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteConsole, id)
+func (q *Queries) AddConsoleExtension(ctx context.Context, arg AddConsoleExtensionParams) error {
+	_, err := q.db.ExecContext(ctx, addConsoleExtension, arg.Slug, arg.Extension)
 	return err
 }
 
-const insertConsole = `-- name: InsertConsole :one
-INSERT INTO consoles (slug, display_name, igdb_platform_id, release_year, logo_image_id, extensions, sort_order)
-VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM consoles))
-RETURNING id
+const countGamesByConsole = `-- name: CountGamesByConsole :many
+SELECT g.console, COUNT(DISTINCT g.id) AS games
+FROM games g
+JOIN game_items i ON i.game_id = g.id AND i.trash_entry_id IS NULL
+GROUP BY g.console
 `
 
-type InsertConsoleParams struct {
-	Slug           string
-	DisplayName    string
-	IgdbPlatformID sql.NullInt64
-	ReleaseYear    sql.NullInt64
-	LogoImageID    sql.NullString
-	Extensions     string
+type CountGamesByConsoleRow struct {
+	Console string
+	Games   int64
 }
 
-func (q *Queries) InsertConsole(ctx context.Context, arg InsertConsoleParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, insertConsole,
-		arg.Slug,
-		arg.DisplayName,
-		arg.IgdbPlatformID,
-		arg.ReleaseYear,
-		arg.LogoImageID,
-		arg.Extensions,
-	)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
-}
-
-const listConsoles = `-- name: ListConsoles :many
-SELECT id, slug, display_name, igdb_platform_id, release_year, logo_image_id, extensions, detector_key, sort_order,
-       (SELECT COUNT(DISTINCT g.id)
-        FROM games g
-        JOIN game_items i ON i.game_id = g.id AND i.trash_entry_id IS NULL
-        WHERE g.console_id = consoles.id) AS game_count
-FROM consoles
-ORDER BY sort_order, id
-`
-
-type ListConsolesRow struct {
-	ID             int64
-	Slug           string
-	DisplayName    string
-	IgdbPlatformID sql.NullInt64
-	ReleaseYear    sql.NullInt64
-	LogoImageID    sql.NullString
-	Extensions     string
-	DetectorKey    sql.NullString
-	SortOrder      int64
-	GameCount      int64
-}
-
-func (q *Queries) ListConsoles(ctx context.Context) ([]ListConsolesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listConsoles)
+// Games with at least one file outside the trash.
+func (q *Queries) CountGamesByConsole(ctx context.Context) ([]CountGamesByConsoleRow, error) {
+	rows, err := q.db.QueryContext(ctx, countGamesByConsole)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListConsolesRow
+	var items []CountGamesByConsoleRow
 	for rows.Next() {
-		var i ListConsolesRow
+		var i CountGamesByConsoleRow
+		if err := rows.Scan(&i.Console, &i.Games); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listConsoleExtensions = `-- name: ListConsoleExtensions :many
+SELECT slug, extension FROM console_extensions ORDER BY slug, rowid
+`
+
+func (q *Queries) ListConsoleExtensions(ctx context.Context) ([]ConsoleExtension, error) {
+	rows, err := q.db.QueryContext(ctx, listConsoleExtensions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ConsoleExtension
+	for rows.Next() {
+		var i ConsoleExtension
+		if err := rows.Scan(&i.Slug, &i.Extension); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listConsoleItemFiles = `-- name: ListConsoleItemFiles :many
+SELECT i.file FROM game_items i JOIN games g ON g.id = i.game_id WHERE g.console = ?
+`
+
+func (q *Queries) ListConsoleItemFiles(ctx context.Context, console string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listConsoleItemFiles, console)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var file string
+		if err := rows.Scan(&file); err != nil {
+			return nil, err
+		}
+		items = append(items, file)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listConsoleSettings = `-- name: ListConsoleSettings :many
+SELECT slug, display_name, sort_order, logo_image_id, release_year FROM console_settings
+`
+
+func (q *Queries) ListConsoleSettings(ctx context.Context) ([]ConsoleSetting, error) {
+	rows, err := q.db.QueryContext(ctx, listConsoleSettings)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ConsoleSetting
+	for rows.Next() {
+		var i ConsoleSetting
 		if err := rows.Scan(
-			&i.ID,
 			&i.Slug,
 			&i.DisplayName,
-			&i.IgdbPlatformID,
-			&i.ReleaseYear,
-			&i.LogoImageID,
-			&i.Extensions,
-			&i.DetectorKey,
 			&i.SortOrder,
-			&i.GameCount,
+			&i.LogoImageID,
+			&i.ReleaseYear,
 		); err != nil {
 			return nil, err
 		}
@@ -117,55 +147,63 @@ func (q *Queries) ListConsoles(ctx context.Context) ([]ListConsolesRow, error) {
 	return items, nil
 }
 
-const setConsoleOrder = `-- name: SetConsoleOrder :exec
-UPDATE consoles SET sort_order = ? WHERE id = ?
+const removeConsoleExtension = `-- name: RemoveConsoleExtension :exec
+DELETE FROM console_extensions WHERE slug = ? AND extension = ?
 `
 
-type SetConsoleOrderParams struct {
-	SortOrder int64
-	ID        int64
+type RemoveConsoleExtensionParams struct {
+	Slug      string
+	Extension string
 }
 
-func (q *Queries) SetConsoleOrder(ctx context.Context, arg SetConsoleOrderParams) error {
-	_, err := q.db.ExecContext(ctx, setConsoleOrder, arg.SortOrder, arg.ID)
+func (q *Queries) RemoveConsoleExtension(ctx context.Context, arg RemoveConsoleExtensionParams) error {
+	_, err := q.db.ExecContext(ctx, removeConsoleExtension, arg.Slug, arg.Extension)
 	return err
 }
 
-const updateConsole = `-- name: UpdateConsole :exec
-UPDATE consoles SET slug = ?, display_name = ?, extensions = ? WHERE id = ?
+const setConsoleDisplayName = `-- name: SetConsoleDisplayName :exec
+UPDATE console_settings SET display_name = ? WHERE slug = ?
 `
 
-type UpdateConsoleParams struct {
+type SetConsoleDisplayNameParams struct {
+	DisplayName sql.NullString
 	Slug        string
-	DisplayName string
-	Extensions  string
-	ID          int64
 }
 
-func (q *Queries) UpdateConsole(ctx context.Context, arg UpdateConsoleParams) error {
-	_, err := q.db.ExecContext(ctx, updateConsole,
-		arg.Slug,
-		arg.DisplayName,
-		arg.Extensions,
-		arg.ID,
-	)
+func (q *Queries) SetConsoleDisplayName(ctx context.Context, arg SetConsoleDisplayNameParams) error {
+	_, err := q.db.ExecContext(ctx, setConsoleDisplayName, arg.DisplayName, arg.Slug)
 	return err
 }
 
-const updateConsolePlatformMetadata = `-- name: UpdateConsolePlatformMetadata :exec
-UPDATE consoles
+const setConsolePlatformMetadata = `-- name: SetConsolePlatformMetadata :exec
+UPDATE console_settings
 SET logo_image_id = ?1,
     release_year  = COALESCE(?2, release_year)
-WHERE id = ?3
+WHERE slug = ?3
 `
 
-type UpdateConsolePlatformMetadataParams struct {
+type SetConsolePlatformMetadataParams struct {
 	LogoImageID sql.NullString
 	ReleaseYear sql.NullInt64
-	ID          int64
+	Slug        string
 }
 
-func (q *Queries) UpdateConsolePlatformMetadata(ctx context.Context, arg UpdateConsolePlatformMetadataParams) error {
-	_, err := q.db.ExecContext(ctx, updateConsolePlatformMetadata, arg.LogoImageID, arg.ReleaseYear, arg.ID)
+func (q *Queries) SetConsolePlatformMetadata(ctx context.Context, arg SetConsolePlatformMetadataParams) error {
+	_, err := q.db.ExecContext(ctx, setConsolePlatformMetadata, arg.LogoImageID, arg.ReleaseYear, arg.Slug)
+	return err
+}
+
+const upsertConsoleOrder = `-- name: UpsertConsoleOrder :exec
+INSERT INTO console_settings (slug, sort_order) VALUES (?, ?)
+ON CONFLICT (slug) DO UPDATE SET sort_order = excluded.sort_order
+`
+
+type UpsertConsoleOrderParams struct {
+	Slug      string
+	SortOrder int64
+}
+
+func (q *Queries) UpsertConsoleOrder(ctx context.Context, arg UpsertConsoleOrderParams) error {
+	_, err := q.db.ExecContext(ctx, upsertConsoleOrder, arg.Slug, arg.SortOrder)
 	return err
 }

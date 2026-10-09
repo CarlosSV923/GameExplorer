@@ -43,3 +43,31 @@ func ParseVolume(fileName string) (Volume, bool) {
 func IsLegacyRarVolume(fileName string) bool {
 	return legacyRarStyle.MatchString(fileName)
 }
+
+// FirstVolume checks that the file names are every part of one
+// multi-volume archive (same set, parts 1..n) and returns the position of
+// the first volume (RF-03a).
+func FirstVolume(names []string) (int, bool) {
+	if len(names) == 0 {
+		return 0, false
+	}
+	first, set := -1, ""
+	seen := map[int]bool{}
+	for i, n := range names {
+		v, ok := ParseVolume(n)
+		if !ok || (set != "" && v.Set != set) || seen[v.Index] {
+			return 0, false
+		}
+		set = v.Set
+		seen[v.Index] = true
+		if v.Index == 1 {
+			first = i
+		}
+	}
+	for i := 1; i <= len(names); i++ {
+		if !seen[i] {
+			return 0, false
+		}
+	}
+	return first, true
+}

@@ -1,11 +1,11 @@
 import { createPortContext } from '@/shared/kernel/ports'
 
-import type { ImageSize, MetadataGame, MetadataPlatform } from '../domain/types'
+import type { ImageSize, MetadataGame, MetadataStatus } from '../domain/types'
 
 export interface MetadataPorts {
   /** Rejects with `igdbUnconfigured` or `igdbUnavailable` when IGDB cannot answer. */
-  searchGames(query: string, platformId?: number): Promise<MetadataGame[]>
-  searchPlatforms(query: string): Promise<MetadataPlatform[]>
+  searchGames(query: string, platformId?: number, limit?: number): Promise<MetadataGame[]>
+  status(): Promise<MetadataStatus>
   /** Where to load an IGDB image from (the API's local cache, or the demo). */
   imageUrl(size: ImageSize, imageId: string): string
 }

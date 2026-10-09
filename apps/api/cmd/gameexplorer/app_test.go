@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	identityinfra "github.com/CarlosSV923/GameExplorer/apps/api/internal/identity/infrastructure"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/platform/config"
@@ -29,6 +30,7 @@ func newTestServer(t *testing.T, mutate func(*config.Config)) *httptest.Server {
 		SessionTTL:         config.Config{}.SessionTTL + 3600e9,
 		ExtractConcurrency: 1,
 		TrashRetentionDays: 30,
+		ScanInterval:       time.Hour,
 	}
 	if mutate != nil {
 		mutate(&cfg)
@@ -175,7 +177,7 @@ func TestLoginFlow(t *testing.T) {
 		Slug        string `json:"slug"`
 		DisplayName string `json:"displayName"`
 	}](t, do(t, http.MethodGet, srv.URL+"/api/consoles", "", cookie))
-	if len(consoles) != 6 || consoles[0].Slug != "switch" || consoles[0].DisplayName != "Nintendo Switch" {
+	if len(consoles) != 3 || consoles[0].Slug != "switch" || consoles[0].DisplayName != "Nintendo Switch" {
 		t.Fatalf("consoles = %+v", consoles)
 	}
 
@@ -227,7 +229,7 @@ func TestBadRequestsAndUnknownRoutes(t *testing.T) {
 	if res.StatusCode != http.StatusNotFound || res.Header.Get("Content-Type") != "application/problem+json" {
 		t.Errorf("unknown API route = %d %q", res.StatusCode, res.Header.Get("Content-Type"))
 	}
-	res = do(t, http.MethodGet, srv.URL+"/consoles/ps2", "")
+	res = do(t, http.MethodGet, srv.URL+"/consolas/psp", "")
 	if res.StatusCode != http.StatusOK || !strings.HasPrefix(res.Header.Get("Content-Type"), "text/html") {
 		t.Errorf("SPA route = %d %q", res.StatusCode, res.Header.Get("Content-Type"))
 	}

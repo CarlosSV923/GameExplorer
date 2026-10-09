@@ -17,6 +17,6 @@ type JobRepository interface {
 	ListStale(ctx context.Context, status Status, before time.Time) ([]*UploadJob, error)
 	// Exists reports whether a job with this id exists.
 	Exists(ctx context.Context, id JobID) (bool, error)
-	// ListWaitingParts returns the parts of a volume set still waiting.
-	ListWaitingParts(ctx context.Context, set string) ([]*UploadJob, error)
+	// ListGroup returns the jobs of a multi-volume group, oldest first.
+	ListGroup(ctx context.Context, group string) ([]*UploadJob, error)
 }

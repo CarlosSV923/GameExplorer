@@ -2,16 +2,42 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import { ConsolesPanel } from '@/modules/catalog/ui/ConsolesPanel'
-import { IntegrityCard } from '@/modules/catalog/ui/IntegrityCard'
+import { ScanCard } from '@/modules/catalog/ui/ScanCard'
 import { TrashPanel } from '@/modules/catalog/ui/TrashPanel'
 import { useLogout } from '@/modules/identity/application/queries'
 import { UploadsIndicator } from '@/modules/ingestion/ui/UploadButton'
+import { useMetadataStatus } from '@/modules/metadata/application/queries'
 import { LanguageToggle } from '@/shared/i18n/LanguageToggle'
 import { useAction } from '@/shared/input'
 import { BackLink } from '@/shared/routing/links'
 import { BackLabel, Button, cx, HelpBar, LogoutIcon, PageHeader } from '@/shared/ui'
 
 import { settingsTabs, type SettingsTab } from './settingsTabs'
+
+/** IGDB is optional (RF-54): what it adds, or how to turn it on. */
+function Igdb() {
+  const { t } = useTranslation()
+  const status = useMetadataStatus()
+  if (!status.data) return null
+  return (
+    <section
+      aria-labelledby="igdb-title"
+      className="flex flex-col gap-2 rounded-lg border border-line px-5 py-4.5"
+    >
+      <h2 id="igdb-title" className="m-0 flex flex-wrap items-center gap-3 text-body-lg font-bold">
+        {t('settings.igdbTitle')}
+        {!status.data.configured && (
+          <span className="rounded-full border border-control px-2.5 py-0.5 text-chip font-bold text-ink-2">
+            {t('settings.igdbOff')}
+          </span>
+        )}
+      </h2>
+      <p className="m-0 text-body-sm leading-normal text-ink-2">
+        {status.data.configured ? t('settings.igdbOn') : t('settings.igdbHowTo')}
+      </p>
+    </section>
+  )
+}
 
 function General() {
   const { t } = useTranslation()
@@ -23,7 +49,8 @@ function General() {
         <span className="text-body-lg font-bold">{t('settings.language')}</span>
         <LanguageToggle long />
       </div>
-      <IntegrityCard />
+      <ScanCard />
+      <Igdb />
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4 rounded-lg border border-line px-5 py-4.5">
         <span className="flex flex-col gap-1">
           <span className="text-body-lg font-bold">{t('settings.session')}</span>
@@ -44,7 +71,7 @@ function General() {
           {t('settings.logout')}
         </Button>
       </div>
-      <p className="m-0 text-body-sm text-ink-3">{t('settings.igdb')}</p>
+      <p className="m-0 text-body-sm text-ink-3">{t('settings.legal')}</p>
     </div>
   )
 }

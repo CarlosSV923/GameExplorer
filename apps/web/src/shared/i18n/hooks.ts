@@ -20,6 +20,9 @@ export function useFormat() {
       date: (iso: string) => formatDate(new Date(iso), language),
       relative: (iso: string, now: number) => formatRelative(new Date(iso), now, language),
       daysUntil: (iso: string, now: number) => daysUntil(new Date(iso), now),
+      /** "Wii o PSP" / "Wii or PSP". */
+      orList: (items: readonly string[]) =>
+        new Intl.ListFormat(language, { type: 'disjunction' }).format(items),
     }),
     [language, t],
   )

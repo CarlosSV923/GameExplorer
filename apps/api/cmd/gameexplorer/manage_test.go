@@ -2,472 +2,328 @@ package main
 
 import (
 	"net/http"
-	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 )
 
-type trashJSON struct {
-	ID        int64     `json:"id"`
-	GameID    int64     `json:"gameId"`
-	Title     string    `json:"title"`
-	WholeGame bool      `json:"wholeGame"`
-	Reason    string    `json:"reason"`
-	TrashedAt time.Time `json:"trashedAt"`
-	ExpiresAt time.Time `json:"expiresAt"`
-	Size      int64     `json:"size"`
-	Items     []struct {
-		ID    int64    `json:"id"`
-		Files []string `json:"files"`
-	} `json:"items"`
-}
-
-type itemDetailJSON struct {
-	ID           int64      `json:"id"`
-	Kind         string     `json:"kind"`
-	Files        []string   `json:"files"`
-	MissingSince *time.Time `json:"missingSince"`
-}
-
-type gameJSON struct {
-	ID           int64            `json:"id"`
-	Title        string           `json:"title"`
-	Path         string           `json:"path"`
-	MissingCount int              `json:"missingCount"`
-	Items        []itemDetailJSON `json:"items"`
-}
-
-func gameOf(t *testing.T, srv *httptest.Server, id int64) (gameJSON, int) {
-	t.Helper()
-	cookie := login(t, srv)
-	res := get(t, srv, cookie, "/api/games/"+strconv.FormatInt(id, 10))
-	if res.StatusCode != http.StatusOK {
-		return gameJSON{}, res.StatusCode
-	}
-	return decode[gameJSON](t, res), res.StatusCode
-}
-
-func trashList(t *testing.T, srv *httptest.Server, cookie *http.Cookie) []trashJSON {
-	t.Helper()
-	return decode[[]trashJSON](t, get(t, srv, cookie, "/api/trash"))
-}
-
-func call(t *testing.T, srv *httptest.Server, cookie *http.Cookie, method, path, body string) *http.Response {
-	t.Helper()
-	return do(t, method, srv.URL+path, body, cookie)
-}
-
-func id(n int64) string { return strconv.FormatInt(n, 10) }
-
-func TestTrashAnItemAndRestoreIt(t *testing.T) {
+func TestTrashAndRestore(t *testing.T) {
 	t.Parallel()
 	srv, cookie, library := libraryServer(t)
-	game := store(t, srv, cookie, 26764, "mk8.nsp", "base", map[string]any{"kind": "base"})
-	store(t, srv, cookie, 26764, "mk8u.nsp", "update", map[string]any{"kind": "update", "label": "v3.0.1"})
-	dir := filepath.Join(library, "switch", "Mario Kart 8 Deluxe")
-	g, _ := gameOf(t, srv, game)
-	update := g.Items[1]
+	game := store(t, srv, cookie, "switch", "Limbo", "b.nsp", "base", map[string]any{"kind": "base"})
+	store(t, srv, cookie, "switch", "Limbo", "u.nsp", "update", map[string]any{"kind": "update", "label": "2"})
+	g, _ := gameOf(t, srv, cookie, game)
 
-	if res := call(t, srv, cookie, http.MethodPost, "/api/items/"+id(update.ID)+"/trash", ""); res.StatusCode != http.StatusNoContent {
-		t.Fatalf("trash item = %d %s", res.StatusCode, problemDetail(t, res))
+	// One file.
+	wantStatus(t, post(t, srv, cookie, "/api/items/"+id(g.Items[1].ID)+"/trash", ""), http.StatusNoContent, "trash item")
+	if exists(filepath.Join(library, "switch", "Limbo", "Limbo [UPDATE v2].nsp")) {
+		t.Fatal("trashed file still in the game folder")
 	}
-	if _, err := os.Stat(filepath.Join(dir, update.Files[0])); !os.IsNotExist(err) {
-		t.Fatalf("trashed file still in the game folder: %v", err)
+	trash := trashList(t, srv, cookie)
+	if len(trash) != 1 || trash[0].Kind != "game" || trash[0].Title != "Limbo" || trash[0].WholeGame ||
+		trash[0].ExpiresAt.Sub(trash[0].TrashedAt) != 30*24*time.Hour {
+		t.Fatalf("trash = %+v", trash)
 	}
-	if g, _ := gameOf(t, srv, game); len(g.Items) != 1 || g.Items[0].Kind != "base" {
-		t.Fatalf("detail after trash = %+v", g.Items)
-	}
-	entries := trashList(t, srv, cookie)
-	if len(entries) != 1 || entries[0].Reason != "deleted" || entries[0].WholeGame || entries[0].Size != int64(len("update")) ||
-		entries[0].ExpiresAt.Sub(entries[0].TrashedAt) != 30*24*time.Hour || entries[0].Title != "Mario Kart 8 Deluxe" {
-		t.Fatalf("trash = %+v", entries)
-	}
-	if res := call(t, srv, cookie, http.MethodPost, "/api/items/"+id(update.ID)+"/trash", ""); res.StatusCode != http.StatusNotFound {
-		t.Fatalf("trashing twice = %d, want 404", res.StatusCode)
+	wantStatus(t, post(t, srv, cookie, "/api/trash/"+id(trash[0].ID)+"/restore", ""), http.StatusOK, "restore")
+	if !exists(filepath.Join(library, "switch", "Limbo", "Limbo [UPDATE v2].nsp")) {
+		t.Fatal("restored file missing")
 	}
 
-	res := call(t, srv, cookie, http.MethodPost, "/api/trash/"+id(entries[0].ID)+"/restore", "")
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("restore = %d %s", res.StatusCode, problemDetail(t, res))
+	// The whole game: its folder and the console folder go when empty (RF-25).
+	wantStatus(t, post(t, srv, cookie, "/api/games/"+id(game)+"/trash", ""), http.StatusNoContent, "trash game")
+	if exists(filepath.Join(library, "switch")) {
+		t.Fatal("empty console folder left behind")
 	}
-	if got := readFile(t, filepath.Join(dir, update.Files[0])); got != "update" {
-		t.Fatalf("restored file = %q", got)
+	if _, status := gameOf(t, srv, cookie, game); status != http.StatusNotFound {
+		t.Fatalf("trashed game = %d, want 404", status)
 	}
-	if len(trashList(t, srv, cookie)) != 0 {
-		t.Fatal("the entry must leave the trash")
-	}
-	if names, _ := os.ReadDir(trashDir(library)); len(names) != 0 {
-		t.Fatalf("trash folder not cleaned: %v", names)
-	}
-}
-
-func TestTrashAWholeGame(t *testing.T) {
-	t.Parallel()
-	srv, cookie, library := libraryServer(t)
-	game := store(t, srv, cookie, 26764, "mk8.nsp", "base", map[string]any{"kind": "base"})
-	store(t, srv, cookie, 26764, "mk8u.nsp", "update", map[string]any{"kind": "update", "label": "v3.0.1"})
-	dir := filepath.Join(library, "switch", "Mario Kart 8 Deluxe")
-
-	if res := call(t, srv, cookie, http.MethodPost, "/api/games/"+id(game)+"/trash", ""); res.StatusCode != http.StatusNoContent {
-		t.Fatalf("trash game = %d %s", res.StatusCode, problemDetail(t, res))
-	}
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
-		t.Fatalf("empty game folder must go: %v", err)
-	}
-	if _, status := gameOf(t, srv, game); status != http.StatusNotFound {
-		t.Fatalf("trashed game detail = %d, want 404", status)
-	}
-	if games := decode[[]gameSummaryJSON](t, get(t, srv, cookie, "/api/consoles/switch/games")); len(games) != 0 {
-		t.Fatalf("switch games = %+v", games)
-	}
-	entries := trashList(t, srv, cookie)
-	if len(entries) != 1 || !entries[0].WholeGame || len(entries[0].Items) != 2 {
-		t.Fatalf("trash = %+v", entries)
+	trash = trashList(t, srv, cookie)
+	if len(trash) != 1 || !trash[0].WholeGame || len(trash[0].Items) != 2 {
+		t.Fatalf("trash = %+v", trash)
 	}
 
-	if res := call(t, srv, cookie, http.MethodPost, "/api/trash/"+id(entries[0].ID)+"/restore", "{}"); res.StatusCode != http.StatusOK {
-		t.Fatalf("restore = %d %s", res.StatusCode, problemDetail(t, res))
-	}
-	if g, _ := gameOf(t, srv, game); len(g.Items) != 2 {
-		t.Fatalf("restored game = %+v", g)
-	}
-	if readFile(t, filepath.Join(dir, "Mario Kart 8 Deluxe.nsp")) != "base" {
-		t.Fatal("base not restored")
-	}
-}
-
-func TestRestoreIntoAnOccupiedPlaceNeedsReplace(t *testing.T) {
-	t.Parallel()
-	srv, cookie, library := libraryServer(t)
-	game := store(t, srv, cookie, 26764, "first.nsp", "first", map[string]any{"kind": "base"})
-	g, _ := gameOf(t, srv, game)
-	call(t, srv, cookie, http.MethodPost, "/api/items/"+id(g.Items[0].ID)+"/trash", "")
-	// A new base game is not a duplicate of the trashed one.
-	store(t, srv, cookie, 26764, "second.nsp", "second", map[string]any{"kind": "base"})
-	entry := trashList(t, srv, cookie)[0]
-
-	res := call(t, srv, cookie, http.MethodPost, "/api/trash/"+id(entry.ID)+"/restore", "")
-	if detail := problemDetail(t, res); res.StatusCode != http.StatusConflict || !strings.Contains(detail, "Mario Kart 8 Deluxe.nsp") {
-		t.Fatalf("restore over a duplicate = %d %s", res.StatusCode, detail)
-	}
-	res = call(t, srv, cookie, http.MethodPost, "/api/trash/"+id(entry.ID)+"/restore", `{"onConflict":"replace"}`)
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("restore with replace = %d %s", res.StatusCode, problemDetail(t, res))
-	}
-	if got := readFile(t, filepath.Join(library, "switch", "Mario Kart 8 Deluxe", "Mario Kart 8 Deluxe.nsp")); got != "first" {
-		t.Fatalf("library has %q, want the restored item", got)
-	}
-	entries := trashList(t, srv, cookie)
-	if len(entries) != 1 || entries[0].Reason != "replaced" || entries[0].Size != int64(len("second")) {
-		t.Fatalf("trash = %+v, want the swapped-out item", entries)
-	}
-}
-
-func TestDeleteFromTheTrashForGood(t *testing.T) {
-	t.Parallel()
-	srv, cookie, library := libraryServer(t)
-	mk8 := store(t, srv, cookie, 26764, "mk8.nsp", "base", map[string]any{"kind": "base"})
-	totk := store(t, srv, cookie, 119388, "totk.nsp", "zelda", map[string]any{"kind": "base"})
-	call(t, srv, cookie, http.MethodPost, "/api/games/"+id(mk8)+"/trash", "")
-	call(t, srv, cookie, http.MethodPost, "/api/games/"+id(totk)+"/trash", "")
-	entries := trashList(t, srv, cookie)
-	if len(entries) != 2 {
-		t.Fatalf("trash = %+v", entries)
+	// A copy stored meanwhile takes the place: restoring needs replace.
+	store(t, srv, cookie, "switch", "Limbo", "b2.nsp", "new base", map[string]any{"kind": "base"})
+	wantStatus(t, post(t, srv, cookie, "/api/trash/"+id(trash[0].ID)+"/restore", ""), http.StatusConflict, "restore into a taken place")
+	wantStatus(t, post(t, srv, cookie, "/api/trash/"+id(trash[0].ID)+"/restore", `{"onConflict":"replace"}`), http.StatusOK, "restore with replace")
+	if got := readFile(t, filepath.Join(library, "switch", "Limbo", "Limbo [BASE].nsp")); got != "base" {
+		t.Fatalf("restored base = %q", got)
 	}
 
-	if res := call(t, srv, cookie, http.MethodDelete, "/api/trash/"+id(entries[0].ID), ""); res.StatusCode != http.StatusNoContent {
-		t.Fatalf("delete entry = %d", res.StatusCode)
-	}
-	if res := call(t, srv, cookie, http.MethodDelete, "/api/trash/"+id(entries[0].ID), ""); res.StatusCode != http.StatusNotFound {
-		t.Fatalf("delete twice = %d, want 404", res.StatusCode)
-	}
-	if res := call(t, srv, cookie, http.MethodDelete, "/api/trash", ""); res.StatusCode != http.StatusNoContent {
-		t.Fatalf("empty trash = %d", res.StatusCode)
-	}
+	// Deleted for good.
+	trash = trashList(t, srv, cookie)
+	wantStatus(t, call(t, srv, cookie, http.MethodDelete, "/api/trash/"+id(trash[0].ID), ""), http.StatusNoContent, "delete entry")
+	wantStatus(t, call(t, srv, cookie, http.MethodDelete, "/api/trash", ""), http.StatusNoContent, "empty trash")
 	if len(trashList(t, srv, cookie)) != 0 {
 		t.Fatal("trash not empty")
 	}
-	if names, _ := os.ReadDir(trashDir(library)); len(names) != 0 {
-		t.Fatalf("trash files left: %v", names)
+	if entries, _ := os.ReadDir(filepath.Join(library, ".gameexplorer", "trash")); len(entries) != 0 {
+		t.Fatalf("trash files left = %v", entries)
 	}
-	// The games had nothing else: they are gone, and could be stored again.
-	store(t, srv, cookie, 26764, "mk8.nsp", "again", map[string]any{"kind": "base"})
 }
 
-func TestRematchRenamesFolderAndFiles(t *testing.T) {
+func TestEditRenamesMovesAndMerges(t *testing.T) {
 	t.Parallel()
 	srv, cookie, library := libraryServer(t)
-	game := store(t, srv, cookie, 26764, "mk8.nsp", "base", map[string]any{"kind": "base"})
-	store(t, srv, cookie, 26764, "mk8u.nsp", "update", map[string]any{"kind": "update", "label": "v3.0.1"})
-	oldDir := filepath.Join(library, "switch", "Mario Kart 8 Deluxe")
-	// A file added over SMB travels with the folder.
-	if err := os.WriteFile(filepath.Join(oldDir, "notes.txt"), []byte("mine"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	daxter := store(t, srv, cookie, "psp", "Daxter", "d.iso", "daxter", map[string]any{})
 
-	plan := decode[struct {
-		Folder    string `json:"folder"`
-		MergeInto *int64 `json:"mergeInto"`
-		Items     []struct {
-			Files  []string `json:"files"`
-			Action string   `json:"action"`
-		} `json:"items"`
-	}](t, call(t, srv, cookie, http.MethodPost, "/api/games/"+id(game)+"/rematch/plan", `{"igdbGameId":119388}`))
-	if plan.Folder != "The Legend of Zelda - Tears of the Kingdom" || plan.MergeInto != nil || len(plan.Items) != 2 ||
-		plan.Items[1].Files[0] != "The Legend of Zelda - Tears of the Kingdom [Update v3.0.1].nsp" {
-		t.Fatalf("plan = %+v", plan)
+	// Rename to an IGDB game: folder and file follow; the game is linked.
+	res := post(t, srv, cookie, "/api/games/"+id(daxter)+"/edit", `{"console":"psp","title":"x","igdbId":427}`)
+	wantStatus(t, res, http.StatusOK, "rename")
+	if !exists(filepath.Join(library, "psp", "Final Fantasy VII", "Final Fantasy VII.iso")) || exists(filepath.Join(library, "psp", "Daxter")) {
+		t.Fatal("rename did not move folder and file")
 	}
-
-	res := call(t, srv, cookie, http.MethodPost, "/api/games/"+id(game)+"/rematch", `{"igdbGameId":119388}`)
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("rematch = %d %s", res.StatusCode, problemDetail(t, res))
-	}
-	newDir := filepath.Join(library, "switch", "The Legend of Zelda - Tears of the Kingdom")
-	entries, _ := os.ReadDir(newDir)
-	var names []string
-	for _, e := range entries {
-		names = append(names, e.Name())
-	}
-	want := []string{"The Legend of Zelda - Tears of the Kingdom [Update v3.0.1].nsp", "The Legend of Zelda - Tears of the Kingdom.nsp", "notes.txt"}
-	if !slices.Equal(names, want) {
-		t.Fatalf("files = %q, want %q", names, want)
-	}
-	if _, err := os.Stat(oldDir); !os.IsNotExist(err) {
-		t.Fatalf("old folder still there: %v", err)
-	}
-	if g, _ := gameOf(t, srv, game); g.Title != "The Legend of Zelda: Tears of the Kingdom" || g.Path != "switch/The Legend of Zelda - Tears of the Kingdom" {
+	g, _ := gameOf(t, srv, cookie, daxter)
+	if g.Title != "Final Fantasy VII" || g.IgdbID == nil || *g.IgdbID != 427 {
 		t.Fatalf("game = %+v", g)
 	}
-}
 
-func TestRematchIntoAGameInTheLibraryMerges(t *testing.T) {
-	t.Parallel()
-	srv, cookie, library := libraryServer(t)
-	zelda := store(t, srv, cookie, 119388, "totk.nsp", "zelda base", map[string]any{"kind": "base"})
-	mk8 := store(t, srv, cookie, 26764, "mk8.nsp", "wrong base", map[string]any{"kind": "base"})
-	store(t, srv, cookie, 26764, "mk8u.nsp", "update", map[string]any{"kind": "update", "label": "v1.1.0"})
-	g, _ := gameOf(t, srv, mk8)
-	base := g.Items[0]
+	// Move to Wii (.iso is valid there); a name of the user's own unlinks it.
+	res = post(t, srv, cookie, "/api/games/"+id(daxter)+"/edit", `{"console":"wii","title":"Daxter"}`)
+	wantStatus(t, res, http.StatusOK, "move")
+	if !exists(filepath.Join(library, "wii", "Daxter", "Daxter.iso")) || exists(filepath.Join(library, "psp")) {
+		t.Fatal("move did not land in wii/ (and psp/ must go when empty)")
+	}
+	if g, _ = gameOf(t, srv, cookie, daxter); g.Console != "wii" || g.IgdbID != nil {
+		t.Fatalf("game = %+v", g)
+	}
 
+	// A Switch game cannot move to a console that does not take .nsp.
+	limbo := store(t, srv, cookie, "switch", "Limbo", "l.nsp", "limbo", map[string]any{"kind": "base"})
+	wantStatus(t, post(t, srv, cookie, "/api/games/"+id(limbo)+"/edit", `{"console":"wii","title":"Limbo"}`), http.StatusBadRequest, "move nsp to wii")
+
+	// Renaming onto another game of the console merges; collisions need decisions.
+	other := store(t, srv, cookie, "wii", "Jak", "j.iso", "jak", map[string]any{})
 	plan := decode[struct {
 		MergeInto *int64 `json:"mergeInto"`
 		Items     []struct {
-			Action string `json:"action"`
+			Action string   `json:"action"`
+			Item   itemJSON `json:"item"`
 		} `json:"items"`
-	}](t, call(t, srv, cookie, http.MethodPost, "/api/games/"+id(mk8)+"/rematch/plan", `{"igdbGameId":119388}`))
-	if plan.MergeInto == nil || *plan.MergeInto != zelda || plan.Items[0].Action != "undecided" || plan.Items[1].Action != "store" {
+	}](t, post(t, srv, cookie, "/api/games/"+id(other)+"/edit/plan", `{"console":"wii","title":"daxter"}`))
+	if plan.MergeInto == nil || *plan.MergeInto != daxter || plan.Items[0].Action != "undecided" {
 		t.Fatalf("plan = %+v", plan)
 	}
-	if res := call(t, srv, cookie, http.MethodPost, "/api/games/"+id(mk8)+"/rematch", `{"igdbGameId":119388}`); res.StatusCode != http.StatusConflict {
-		t.Fatalf("undecided merge = %d, want 409", res.StatusCode)
+	wantStatus(t, post(t, srv, cookie, "/api/games/"+id(other)+"/edit", `{"console":"wii","title":"daxter"}`), http.StatusConflict, "undecided merge")
+	body := jsonBody(t, map[string]any{"console": "wii", "title": "daxter", "decisions": []map[string]any{{"itemId": plan.Items[0].Item.ID, "onDuplicate": "replace"}}})
+	res = post(t, srv, cookie, "/api/games/"+id(other)+"/edit", body)
+	wantStatus(t, res, http.StatusOK, "merge")
+	if got := readFile(t, filepath.Join(library, "wii", "Daxter", "Daxter.iso")); got != "jak" {
+		t.Fatalf("merged file = %q", got)
 	}
-
-	body := `{"igdbGameId":119388,"decisions":[{"itemId":` + id(base.ID) + `,"onDuplicate":"skip"}]}`
-	res := decode[struct {
-		GameID int64 `json:"gameId"`
-		Merged bool  `json:"merged"`
-	}](t, call(t, srv, cookie, http.MethodPost, "/api/games/"+id(mk8)+"/rematch", body))
-	if res.GameID != zelda || !res.Merged {
-		t.Fatalf("rematch = %+v", res)
-	}
-	dir := filepath.Join(library, "switch", "The Legend of Zelda - Tears of the Kingdom")
-	if readFile(t, filepath.Join(dir, "The Legend of Zelda - Tears of the Kingdom.nsp")) != "zelda base" ||
-		readFile(t, filepath.Join(dir, "The Legend of Zelda - Tears of the Kingdom [Update v1.1.0].nsp")) != "update" {
-		t.Fatal("merged files are wrong")
-	}
-	if _, status := gameOf(t, srv, mk8); status != http.StatusNotFound {
-		t.Fatalf("merged game still exists: %d", status)
-	}
-	if _, err := os.Stat(filepath.Join(library, "switch", "Mario Kart 8 Deluxe")); !os.IsNotExist(err) {
-		t.Fatalf("old folder still there: %v", err)
-	}
-	entries := trashList(t, srv, cookie)
-	if len(entries) != 1 || entries[0].GameID != zelda || entries[0].Size != int64(len("wrong base")) {
-		t.Fatalf("trash = %+v, want the skipped base under the merged game", entries)
+	if _, status := gameOf(t, srv, cookie, other); status != http.StatusNotFound {
+		t.Fatal("merged game must be gone")
 	}
 }
 
-func TestRematchRewritesDiscSheets(t *testing.T) {
+func TestEditAFileOfSwitch(t *testing.T) {
 	t.Parallel()
-	require7zz(t)
 	srv, cookie, library := libraryServer(t)
-	jobID := upload(t, srv, cookie, "ff7.zip", zipOf(t, map[string]string{
-		"ff7.cue": "FILE \"a.bin\" BINARY\nFILE \"b.bin\" AUDIO\n", "a.bin": "data", "b.bin": "audio",
-	}))
-	waitStatus(t, srv, cookie, jobID, "review")
-	game := decode[commitJSON](t, post(t, srv.URL, cookie, jobID, "commit",
-		commitBody(t, "psx", 427, map[string]any{"path": "ff7.cue", "kind": "disc", "discNumber": 1}))).GameID
+	game := store(t, srv, cookie, "switch", "Limbo", "u.nsp", "update", map[string]any{"kind": "update", "label": "1.0"})
+	store(t, srv, cookie, "switch", "Limbo", "u2.nsp", "update2", map[string]any{"kind": "update", "label": "2.0"})
+	g, _ := gameOf(t, srv, cookie, game)
 
-	if res := call(t, srv, cookie, http.MethodPost, "/api/games/"+id(game)+"/rematch", `{"igdbGameId":26764}`); res.StatusCode != http.StatusOK {
-		t.Fatalf("rematch = %d %s", res.StatusCode, problemDetail(t, res))
+	res := call(t, srv, cookie, http.MethodPatch, "/api/items/"+id(g.Items[0].ID), `{"kind":"dlc","label":"Fuga Maestra"}`)
+	wantStatus(t, res, http.StatusOK, "edit item")
+	if !exists(filepath.Join(library, "switch", "Limbo", "Limbo [DLC Fuga Maestra].nsp")) {
+		t.Fatal("file not renamed")
 	}
-	dir := filepath.Join(library, "psx", "Mario Kart 8 Deluxe")
-	want := "FILE \"Mario Kart 8 Deluxe (Disc 1) (Track 1).bin\" BINARY\nFILE \"Mario Kart 8 Deluxe (Disc 1) (Track 2).bin\" AUDIO\n"
-	if got := readFile(t, filepath.Join(dir, "Mario Kart 8 Deluxe (Disc 1).cue")); got != want {
-		t.Fatalf("cue =\n%s", got)
+	// Becoming the other update collides: replace sends that one to the trash.
+	g, _ = gameOf(t, srv, cookie, game)
+	dlc := g.Items[len(g.Items)-1].ID
+	wantStatus(t, call(t, srv, cookie, http.MethodPatch, "/api/items/"+id(dlc), `{"kind":"update","label":"2.0"}`), http.StatusConflict, "collision")
+	wantStatus(t, call(t, srv, cookie, http.MethodPatch, "/api/items/"+id(dlc), `{"kind":"update","label":"v2.0","onDuplicate":"replace"}`), http.StatusOK, "replace")
+	if got := readFile(t, filepath.Join(library, "switch", "Limbo", "Limbo [UPDATE v2.0].nsp")); got != "update" {
+		t.Fatalf("file = %q", got)
 	}
-	if readFile(t, filepath.Join(dir, "Mario Kart 8 Deluxe (Disc 1) (Track 2).bin")) != "audio" {
-		t.Fatal("track 2 not renamed")
+	if len(trashList(t, srv, cookie)) != 1 {
+		t.Fatal("replaced file must be in the trash")
 	}
-	if entries, _ := os.ReadDir(dir); len(entries) != 3 {
-		t.Fatalf("leftovers in the game folder: %v", entries)
-	}
+	wantStatus(t, call(t, srv, cookie, http.MethodPatch, "/api/items/"+id(dlc), `{"kind":"game"}`), http.StatusBadRequest, "kind of another console")
 }
 
-func TestIntegrityCheckMarksMissingItems(t *testing.T) {
+func TestUnassignedSection(t *testing.T) {
 	t.Parallel()
 	srv, cookie, library := libraryServer(t)
-	game := store(t, srv, cookie, 26764, "mk8.nsp", "base", map[string]any{"kind": "base"})
-	store(t, srv, cookie, 26764, "mk8u.nsp", "update", map[string]any{"kind": "update", "label": "v3.0.1"})
-	dir := filepath.Join(library, "switch", "Mario Kart 8 Deluxe")
-	g, _ := gameOf(t, srv, game)
-	base, update := g.Items[0], g.Items[1]
+	game := store(t, srv, cookie, "psp", "Daxter", "d.iso", "daxter", map[string]any{})
 
-	check := func() struct{ Checked, Missing, Found int } {
-		t.Helper()
-		return decode[struct{ Checked, Missing, Found int }](t, call(t, srv, cookie, http.MethodPost, "/api/library/check", ""))
+	// A game moved to the section keeps its place as a path.
+	wantStatus(t, post(t, srv, cookie, "/api/games/"+id(game)+"/unassign", ""), http.StatusNoContent, "unassign")
+	files := unassignedList(t, srv, cookie)
+	if len(files) != 1 || files[0].Path != "psp/Daxter/Daxter.iso" || files[0].Reason != "manual" ||
+		len(files[0].Consoles) != 2 || files[0].Archive {
+		t.Fatalf("unassigned = %+v", files)
 	}
-	last := func() *struct {
-		CheckedAt    time.Time
-		MissingTotal int
-	} {
-		t.Helper()
-		return decode[struct {
-			LastCheck *struct {
-				CheckedAt    time.Time
-				MissingTotal int
+	if exists(filepath.Join(library, "psp")) {
+		t.Fatal("empty folders left behind")
+	}
+	res := get(t, srv, cookie, "/api/unassigned/"+id(files[0].ID)+"/download")
+	if res.StatusCode != http.StatusOK || body(t, res) != "daxter" {
+		t.Fatalf("download = %d", res.StatusCode)
+	}
+
+	// Assigning it starts a job; it lands in Wii with a new name.
+	res = post(t, srv, cookie, "/api/unassigned/"+id(files[0].ID)+"/assign", `{"console":"wii","title":"Jak"}`)
+	wantStatus(t, res, http.StatusCreated, "assign")
+	job := decode[jobJSON](t, res)
+	if !job.FromUnassigned {
+		t.Fatalf("job = %+v", job)
+	}
+	waitStatus(t, srv, cookie, job.ID, "confirm")
+	if len(unassignedList(t, srv, cookie)) != 0 {
+		t.Fatal("assigned file must leave the section")
+	}
+	// Cancelling gives it back.
+	wantStatus(t, post(t, srv, cookie, "/api/jobs/"+job.ID+"/cancel", ""), http.StatusOK, "cancel")
+	files = unassignedList(t, srv, cookie)
+	if len(files) != 1 || files[0].Path != "psp/Daxter/Daxter.iso" {
+		t.Fatalf("unassigned after cancel = %+v", files)
+	}
+
+	// Assign again and store it.
+	res = post(t, srv, cookie, "/api/unassigned/"+id(files[0].ID)+"/assign", `{"console":"wii","title":"Jak"}`)
+	job = decode[jobJSON](t, res)
+	waitStatus(t, srv, cookie, job.ID, "confirm")
+	wantStatus(t, post(t, srv, cookie, "/api/jobs/"+job.ID+"/commit", commitBody(t, map[string]any{"path": "Daxter.iso"})), http.StatusOK, "commit")
+	if got := readFile(t, filepath.Join(library, "wii", "Jak", "Jak.iso")); got != "daxter" {
+		t.Fatalf("stored = %q", got)
+	}
+
+	// Trash and delete.
+	writeFile(t, filepath.Join(library, "_unassigned", "a.z64"), "n64")
+	writeFile(t, filepath.Join(library, "_unassigned", "b.rar"), "rar")
+	wantStatus(t, post(t, srv, cookie, "/api/library/scan", ""), http.StatusOK, "scan")
+	files = unassignedList(t, srv, cookie)
+	if len(files) != 2 {
+		t.Fatalf("unassigned = %+v", files)
+	}
+	for _, f := range files {
+		switch f.Name {
+		case "a.z64":
+			if len(f.Consoles) != 0 || f.Archive {
+				t.Errorf("a.z64 = %+v", f)
 			}
-		}](t, get(t, srv, cookie, "/api/library/check")).LastCheck
+			wantStatus(t, post(t, srv, cookie, "/api/unassigned/"+id(f.ID)+"/trash", ""), http.StatusNoContent, "trash")
+		case "b.rar":
+			if !f.Archive {
+				t.Errorf("b.rar = %+v", f)
+			}
+			wantStatus(t, call(t, srv, cookie, http.MethodDelete, "/api/unassigned/"+id(f.ID), ""), http.StatusNoContent, "delete")
+		}
 	}
-	if rep := check(); rep.Checked != 2 || rep.Missing != 0 {
-		t.Fatalf("clean check = %+v", rep)
+	if len(unassignedList(t, srv, cookie)) != 0 || exists(filepath.Join(library, "_unassigned", "b.rar")) {
+		t.Fatal("section not empty")
 	}
-	if l := last(); l == nil || l.CheckedAt.IsZero() || l.MissingTotal != 0 {
-		t.Fatalf("last check = %+v", l)
-	}
-
-	// Deleted over SMB.
-	_ = os.Remove(filepath.Join(dir, update.Files[0]))
-	_ = os.Rename(filepath.Join(dir, base.Files[0]), filepath.Join(library, "elsewhere.nsp"))
-	if rep := check(); rep.Missing != 2 {
-		t.Fatalf("check = %+v", rep)
-	}
-	if g, _ := gameOf(t, srv, game); g.MissingCount != 2 || g.Items[1].MissingSince == nil {
-		t.Fatalf("detail = %+v", g)
-	}
-
-	// The base comes back; the update is forgotten.
-	_ = os.Rename(filepath.Join(library, "elsewhere.nsp"), filepath.Join(dir, base.Files[0]))
-	if rep := check(); rep.Found != 1 {
-		t.Fatalf("check after restore = %+v", rep)
-	}
-	if l := last(); l == nil || l.MissingTotal != 1 {
-		t.Fatalf("last check = %+v, want the update still missing", l)
-	}
-	if res := call(t, srv, cookie, http.MethodPost, "/api/items/"+id(base.ID)+"/forget", ""); res.StatusCode != http.StatusConflict {
-		t.Fatalf("forget a present item = %d, want 409", res.StatusCode)
-	}
-	if res := call(t, srv, cookie, http.MethodPost, "/api/items/"+id(update.ID)+"/forget", ""); res.StatusCode != http.StatusNoContent {
-		t.Fatalf("forget = %d %s", res.StatusCode, problemDetail(t, res))
-	}
-	if g, _ := gameOf(t, srv, game); len(g.Items) != 1 || g.MissingCount != 0 {
-		t.Fatalf("detail after forget = %+v", g)
+	if trash := trashList(t, srv, cookie); len(trash) != 1 || trash[0].Files[0].Name != "a.z64" {
+		t.Fatalf("trash = %+v", trash)
 	}
 }
 
-type consoleJSON struct {
-	ID          int64    `json:"id"`
-	Slug        string   `json:"slug"`
-	DisplayName string   `json:"displayName"`
-	Extensions  []string `json:"extensions"`
-	LogoImageID *string  `json:"logoImageId"`
-	ReleaseYear *int     `json:"releaseYear"`
-	SortOrder   int      `json:"sortOrder"`
-	BuiltIn     bool     `json:"builtIn"`
-	Detection   string   `json:"detection"`
+func TestScanFindsChangesMadeOverSMB(t *testing.T) {
+	t.Parallel()
+	srv, cookie, library := libraryServer(t)
+	keep := store(t, srv, cookie, "switch", "Limbo", "l.nsp", "base", map[string]any{"kind": "base"})
+	gone := store(t, srv, cookie, "psp", "Daxter", "d.iso", "daxter", map[string]any{})
+
+	// Deleted over SMB: the game leaves the library.
+	if err := os.Remove(filepath.Join(library, "psp", "Daxter", "Daxter.iso")); err != nil {
+		t.Fatal(err)
+	}
+	// Unknown files: one in a game folder, one in the root, one in an unknown
+	// folder and junk that is ignored.
+	writeFile(t, filepath.Join(library, "switch", "Limbo", "extra.nsp"), "extra")
+	writeFile(t, filepath.Join(library, "readme.txt"), "hi")
+	writeFile(t, filepath.Join(library, "n64", "Mario.z64"), "mario")
+	writeFile(t, filepath.Join(library, "switch", ".DS_Store"), "junk")
+
+	type report struct{ Unassigned, Removed, Pending int }
+	scan := func() map[string]int {
+		res := post(t, srv, cookie, "/api/library/scan", "")
+		wantStatus(t, res, http.StatusOK, "scan")
+		r := decode[report](t, res)
+		return map[string]int{"unassigned": r.Unassigned, "removed": r.Removed, "pending": r.Pending}
+	}
+	first := scan()
+	if first["removed"] != 1 || first["pending"] != 3 || first["unassigned"] != 0 {
+		t.Fatalf("first scan = %+v (unknown files wait for a second look)", first)
+	}
+	if _, status := gameOf(t, srv, cookie, gone); status != http.StatusNotFound {
+		t.Fatal("game deleted over SMB must be gone")
+	}
+
+	// A file still being copied changes between scans and waits again.
+	writeFile(t, filepath.Join(library, "n64", "Mario.z64"), "mario, bigger now")
+	second := scan()
+	if second["unassigned"] != 2 || second["pending"] != 1 {
+		t.Fatalf("second scan = %+v", second)
+	}
+	if !exists(filepath.Join(library, "_unassigned", "switch", "Limbo", "extra.nsp")) || !exists(filepath.Join(library, "_unassigned", "readme.txt")) {
+		t.Fatal("unknown files must move to _unassigned keeping their path")
+	}
+	if !exists(filepath.Join(library, "switch", ".DS_Store")) {
+		t.Fatal("junk must be left alone")
+	}
+	third := scan()
+	if third["unassigned"] != 1 || exists(filepath.Join(library, "n64")) {
+		t.Fatalf("third scan = %+v (the n64 folder goes when empty)", third)
+	}
+	if g, _ := gameOf(t, srv, cookie, keep); len(g.Items) != 1 {
+		t.Fatalf("known game = %+v", g)
+	}
+	status := decode[struct {
+		LastScan *struct {
+			Unassigned int `json:"unassigned"`
+		} `json:"lastScan"`
+	}](t, get(t, srv, cookie, "/api/library/scan"))
+	if status.LastScan == nil || status.LastScan.Unassigned != 1 {
+		t.Fatalf("last scan = %+v", status)
+	}
+	if n := len(unassignedList(t, srv, cookie)); n != 3 {
+		t.Fatalf("unassigned = %d, want 3", n)
+	}
 }
 
-func TestConsoleManagement(t *testing.T) {
+func TestConsoleSettings(t *testing.T) {
 	t.Parallel()
 	srv, cookie, _ := libraryServer(t)
 
-	res := call(t, srv, cookie, http.MethodPost, "/api/consoles",
-		`{"igdbPlatformId":4,"slug":"n64","displayName":"  Nintendo   64 ","extensions":[".z64","N64",".z64"]}`)
-	if res.StatusCode != http.StatusCreated {
-		t.Fatalf("create = %d %s", res.StatusCode, problemDetail(t, res))
+	type consoleJSON struct {
+		Slug             string   `json:"slug"`
+		DisplayName      string   `json:"displayName"`
+		DefaultName      string   `json:"defaultName"`
+		Extensions       []string `json:"extensions"`
+		CustomExtensions []struct {
+			Extension string `json:"extension"`
+			FileCount int    `json:"fileCount"`
+		} `json:"customExtensions"`
 	}
-	n64 := decode[consoleJSON](t, res)
-	if n64.DisplayName != "Nintendo 64" || !slices.Equal(n64.Extensions, []string{".z64", ".n64"}) ||
-		n64.LogoImageID == nil || *n64.LogoImageID != "pl6n" || n64.ReleaseYear == nil || n64.SortOrder <= 60 || // last in the carousel
-		n64.BuiltIn || n64.Detection != "extension" {
-		t.Fatalf("n64 = %+v", n64)
+	res := call(t, srv, cookie, http.MethodPatch, "/api/consoles/switch", `{"displayName":" Switch "}`)
+	wantStatus(t, res, http.StatusOK, "rename")
+	if c := decode[consoleJSON](t, res); c.DisplayName != "Switch" || c.DefaultName != "Nintendo Switch" {
+		t.Fatalf("console = %+v", c)
 	}
-	for name, body := range map[string]string{
-		"taken slug":       `{"igdbPlatformId":4,"slug":"psx","displayName":"X","extensions":[".x"]}`,
-		"taken platform":   `{"igdbPlatformId":4,"slug":"n64b","displayName":"X","extensions":[".x"]}`,
-		"bad slug":         `{"igdbPlatformId":4,"slug":"N 64","displayName":"X","extensions":[".x"]}`,
-		"no extensions":    `{"igdbPlatformId":4,"slug":"n64c","displayName":"X","extensions":[]}`,
-		"unknown platform": `{"igdbPlatformId":999,"slug":"n64d","displayName":"X","extensions":[".x"]}`,
-	} {
-		res := call(t, srv, cookie, http.MethodPost, "/api/consoles", body)
-		if want := map[bool]int{true: http.StatusConflict, false: http.StatusBadRequest}[strings.HasPrefix(name, "taken")]; res.StatusCode != want {
-			t.Errorf("%s = %d, want %d", name, res.StatusCode, want)
+	res = call(t, srv, cookie, http.MethodPut, "/api/consoles/order", `{"slugs":["psp","switch","wii"]}`)
+	wantStatus(t, res, http.StatusOK, "reorder")
+	if list := decode[[]consoleJSON](t, res); list[0].Slug != "psp" || list[1].DisplayName != "Switch" {
+		t.Fatalf("consoles = %+v", list)
+	}
+	wantStatus(t, call(t, srv, cookie, http.MethodPut, "/api/consoles/order", `{"slugs":["psp"]}`), http.StatusBadRequest, "incomplete order")
+
+	wantStatus(t, post(t, srv, cookie, "/api/consoles/switch/extensions", `{"extension":"XCZ"}`), http.StatusOK, "add extension")
+	wantStatus(t, post(t, srv, cookie, "/api/consoles/switch/extensions", `{"extension":".xcz"}`), http.StatusConflict, "add twice")
+	wantStatus(t, post(t, srv, cookie, "/api/consoles/switch/extensions", `{"extension":"x y"}`), http.StatusBadRequest, "bad extension")
+	ext := url.QueryEscape(".nsp")
+	wantStatus(t, call(t, srv, cookie, http.MethodDelete, "/api/consoles/switch/extensions?extension="+ext, ""), http.StatusConflict, "remove fixed")
+
+	// A file with the custom extension keeps it from being removed.
+	store(t, srv, cookie, "switch", "Limbo", "l.xcz", "xcz", map[string]any{"kind": "base"})
+	wantStatus(t, call(t, srv, cookie, http.MethodDelete, "/api/consoles/switch/extensions?extension=.xcz", ""), http.StatusConflict, "remove in use")
+	list := decode[[]consoleJSON](t, get(t, srv, cookie, "/api/consoles"))
+	for _, c := range list {
+		if c.Slug == "switch" && (len(c.CustomExtensions) != 1 || c.CustomExtensions[0].FileCount != 1) {
+			t.Fatalf("switch = %+v", c)
 		}
-	}
-
-	// A file with the new console's extension is detected as n64.
-	jobID := upload(t, srv, cookie, "Mario Kart 64.z64", []byte("\x80\x37\x12\x40 rom"))
-	waitStatus(t, srv, cookie, jobID, "review")
-	if got := items(t, srv, cookie, jobID); len(got) != 1 || !slices.Equal(got[0].Consoles, []string{"n64"}) {
-		t.Fatalf("detection = %+v", got)
-	}
-	res = post(t, srv.URL, cookie, jobID, "commit", commitBody(t, "n64", 26764, map[string]any{"path": "Mario Kart 64.z64", "kind": "base"}))
-	game := decode[commitJSON](t, res).GameID
-
-	path := "/api/consoles/" + id(n64.ID)
-	if res := call(t, srv, cookie, http.MethodPatch, path, `{"slug":"nintendo64","displayName":"N64","extensions":[".z64"]}`); res.StatusCode != http.StatusConflict {
-		t.Fatalf("slug change with games = %d, want 409", res.StatusCode)
-	}
-	if res := call(t, srv, cookie, http.MethodPatch, path, `{"slug":"n64","displayName":"N64","extensions":[".z64",".v64"]}`); res.StatusCode != http.StatusOK {
-		t.Fatalf("rename = %d %s", res.StatusCode, problemDetail(t, res))
-	}
-	if res := call(t, srv, cookie, http.MethodDelete, path, ""); res.StatusCode != http.StatusConflict {
-		t.Fatalf("delete with games = %d, want 409", res.StatusCode)
-	}
-
-	consoles := decode[[]consoleJSON](t, get(t, srv, cookie, "/api/consoles"))
-	ids := []int64{n64.ID}
-	for _, c := range consoles {
-		if c.ID != n64.ID {
-			ids = append(ids, c.ID)
-		}
-	}
-	order := `{"ids":[` + strings.Join(func() []string {
-		var s []string
-		for _, i := range ids {
-			s = append(s, id(i))
-		}
-		return s
-	}(), ",") + `]}`
-	if got := decode[[]consoleJSON](t, call(t, srv, cookie, http.MethodPut, "/api/consoles/order", order)); got[0].Slug != "n64" || got[1].Slug != "switch" {
-		t.Fatalf("order = %+v", got)
-	}
-	if res := call(t, srv, cookie, http.MethodPut, "/api/consoles/order", `{"ids":[1,2]}`); res.StatusCode != http.StatusBadRequest {
-		t.Fatalf("partial order = %d, want 400", res.StatusCode)
-	}
-
-	// Once its game is gone for good, the console can be deleted.
-	call(t, srv, cookie, http.MethodPost, "/api/games/"+id(game)+"/trash", "")
-	call(t, srv, cookie, http.MethodDelete, "/api/trash", "")
-	if res := call(t, srv, cookie, http.MethodDelete, path, ""); res.StatusCode != http.StatusNoContent {
-		t.Fatalf("delete = %d %s", res.StatusCode, problemDetail(t, res))
-	}
-	if res := call(t, srv, cookie, http.MethodDelete, "/api/consoles/1", ""); res.StatusCode != http.StatusConflict {
-		t.Fatalf("delete built-in = %d, want 409", res.StatusCode)
 	}
 }

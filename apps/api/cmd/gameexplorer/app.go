@@ -12,6 +12,7 @@ import (
 	"time"
 
 	catalogapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/application"
+	catalogconsoles "github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain/consoles"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/infrastructure/libraryfs"
 	catalogsqlite "github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/infrastructure/sqlite"
 	cataloghttp "github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/interfaces/http"
@@ -20,7 +21,6 @@ import (
 	identityhttp "github.com/CarlosSV923/GameExplorer/apps/api/internal/identity/interfaces/http"
 	ingestionapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/application"
 	ingestiondomain "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain"
-	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain/detection"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/broker"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/sevenzip"
 	ingestionsqlite "github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/sqlite"
@@ -106,7 +106,7 @@ func (a *app) start(ctx context.Context) {
 		go a.uploads.Run(ctx, a.ingestion)
 		go a.ingestion.RunPurge(ctx, time.Hour)
 		go a.processor.Run(ctx, a.cfg.ExtractConcurrency)
-		go a.library.RunMaintenance(ctx, time.Hour, a.trashRetention())
+		go a.library.RunMaintenance(ctx, a.cfg.ScanInterval, a.trashRetention())
 	}
 	go a.syncConsoles(ctx, a.log)
 }
@@ -139,6 +139,17 @@ func volumesDir(libraryPath string) string {
 // so moving a finished game into place is a rename, not a copy.
 func uploadsDir(libraryPath string) string {
 	return filepath.Join(libraryPath, ".gameexplorer", "staging", "uploads")
+}
+
+// unassignedDir is the unassigned section: unknown files found by the scan
+// and uploads that did not fit their console (RF-27).
+func unassignedDir(libraryPath string) string {
+	return filepath.Join(libraryPath, "_unassigned")
+}
+
+// sourcesDir holds the files that jobs took from the unassigned section.
+func sourcesDir(libraryPath string) string {
+	return filepath.Join(libraryPath, ".gameexplorer", "staging", "sources")
 }
 
 // newApp wires every adapter. It is the only place that knows them all.
@@ -174,35 +185,44 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 	metadata := metadataapp.NewService(provider,
 		imagecache.New(filepath.Join(cfg.DataPath, "cache", "images"), cfg.IGDBImageURL, nil))
 
-	consoles := catalogapp.NewConsoleService(catalogsqlite.NewConsoleRepository(db))
+	consoles, err := catalogapp.NewConsoleService(catalogconsoles.All(), catalogsqlite.NewConsoleRepository(db), cfg.Extensions)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	rules := consoleRules{consoles}
 
 	events := broker.New()
-	uploads, uploadsErr := tus.New(uploadsDir(cfg.LibraryPath), "/api/uploads/", log, diskspace.Free)
+	jobs := ingestionsqlite.NewJobRepository(db)
+	stagedFiles := ingestionsqlite.NewFileRepository(db)
+	var ingestion *ingestionapp.Service // the tus validator below runs only after it is set
+	uploads, uploadsErr := tus.New(uploadsDir(cfg.LibraryPath), "/api/uploads/", log, diskspace.Free,
+		func(ctx context.Context, m ingestionapp.UploadMeta) error {
+			_, err := ingestion.SpecFromMeta(ctx, m)
+			return err
+		})
 	var store ingestionapp.UploadStore = unavailableStore{}
 	if uploadsErr != nil {
 		log.Error("uploads disabled: library not writable", "error", uploadsErr)
 	} else {
 		store = uploads
 	}
-	jobs := ingestionsqlite.NewJobRepository(db)
-	items := ingestionsqlite.NewItemRepository(db)
 	extractor := sevenzip.New("")
-	stagingArea := staging.New(stagingDir(cfg.LibraryPath), volumesDir(cfg.LibraryPath))
-	ingestion := ingestionapp.NewService(jobs, store, events, log, nil).WithItems(items)
+	stagingArea := staging.New(stagingDir(cfg.LibraryPath), volumesDir(cfg.LibraryPath), sourcesDir(cfg.LibraryPath))
+	ingestion = ingestionapp.NewService(jobs, store, rules, events, log, nil)
 	libraryRepo := catalogsqlite.NewLibraryRepository(db)
-	libraryFiles := libraryfs.New(cfg.LibraryPath, trashDir(cfg.LibraryPath), scratchDir(cfg.LibraryPath))
-	library := catalogapp.NewLibraryService(
-		catalogsqlite.NewConsoleRepository(db), libraryRepo, gameDirectory{metadata}, libraryFiles, log, nil)
-	browse := catalogapp.NewBrowseService(catalogsqlite.NewConsoleRepository(db), libraryRepo, libraryFiles)
-	committer := ingestionapp.NewCommitter(jobs, items, stagingArea, libraryPort{library}, events, log, nil)
+	libraryFiles := libraryfs.New(cfg.LibraryPath, trashDir(cfg.LibraryPath), scratchDir(cfg.LibraryPath), unassignedDir(cfg.LibraryPath))
+	library := catalogapp.NewLibraryService(consoles, libraryRepo, gameDirectory{metadata}, libraryFiles, log, nil)
+	browse := catalogapp.NewBrowseService(consoles, libraryRepo, libraryFiles)
+	committer := ingestionapp.NewCommitter(jobs, stagedFiles, stagingArea, libraryPort{library}, rules, events, log, nil)
 	var processor *ingestionapp.Processor
 	if uploadsErr == nil {
 		processor = ingestionapp.NewProcessor(ingestionapp.ProcessorDeps{
-			Jobs: jobs, Items: items, Uploads: uploads, Extractor: extractor,
-			Staging: stagingArea, Profiles: consoleProfiles{consoles},
+			Jobs: jobs, Files: stagedFiles, Uploads: uploads, Extractor: extractor,
+			Staging: stagingArea, Consoles: rules, Library: libraryPort{library},
 			Publisher: events, Log: log,
 		})
-		ingestion.WithQueue(processor)
+		ingestion.WithQueue(processor).WithUnassigned(libraryPort{library}, stagingArea)
 	}
 	shutdown := make(chan struct{})
 
@@ -219,7 +239,7 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 		),
 		identityAPI: identityHandler,
 		catalogAPI: cataloghttp.NewHandler(consoles).WithLibrary(browse, log).
-			WithManagement(library, platformDirectory{metadata}, time.Duration(cfg.TrashRetentionDays)*24*time.Hour),
+			WithManagement(library, time.Duration(cfg.TrashRetentionDays)*24*time.Hour),
 		metadataAPI: metadatahttp.NewHandler(metadata, log),
 		jobsAPI:     ingestionhttp.NewHandler(ingestion, passwordSubmitter{processor}, events, shutdown).WithCommits(committer),
 	}
@@ -273,21 +293,6 @@ func newApp(ctx context.Context, cfg config.Config, log *slog.Logger) (*app, err
 		a.uploads = uploads
 	}
 	return a, nil
-}
-
-// consoleProfiles adapts the catalog's consoles to ingestion's detection.
-type consoleProfiles struct{ svc *catalogapp.ConsoleService }
-
-func (c consoleProfiles) Profiles(ctx context.Context) ([]detection.ConsoleProfile, error) {
-	consoles, err := c.svc.List(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]detection.ConsoleProfile, 0, len(consoles))
-	for _, con := range consoles {
-		out = append(out, detection.ConsoleProfile{Slug: string(con.Slug), Extensions: con.Extensions, DetectorKey: con.DetectorKey})
-	}
-	return out, nil
 }
 
 // passwordSubmitter answers 409 when uploads (and so processing) are disabled.

@@ -2,16 +2,17 @@
 
 [English](README.md)
 
-> **Estado:** desarrollo inicial (fases 0–9 de [`docs/tasks.md`](docs/tasks.md) completadas: la app web funciona de punta a punta contra la API: entrar, recorrer el carrusel de consolas, subir con transferencias reanudables, revisar con IGDB, descargar, re-emparejar, mandar a la papelera y restaurar, y administrar consolas; sigue una simplificación del alcance: solo Switch, Wii y PSP, el usuario nombra cada subida e IGDB pasa a ser opcional (fase 10); después, la demo sin backend (fase 11) y la publicación para TrueNAS (fase 12)).
+> **Estado:** desarrollo inicial (fases 0–10 de [`docs/tasks.md`](docs/tasks.md) completadas: la app web funciona de punta a punta contra la API para Switch, Wii y PSP: entrar, recorrer el carrusel, subir con formulario y transferencias reanudables, confirmar cada archivo, editar y mover juegos, la sección No asignados alimentada por el escaneo de Samba, y la papelera con restauración; sigue la demo sin backend (fase 11) y la publicación para TrueNAS (fase 12)).
 
 App web autoalojada para un NAS doméstico (TrueNAS SCALE) que permite **subir, descomprimir, clasificar, renombrar, explorar y descargar juegos de emulación** desde cualquier navegador: escritorio, tablet, pantalla táctil o gamepad. La interfaz está inspirada en EmulationStation.
 
-Arrastra un `.rar`, `.zip`, `.7z` o el archivo del juego. GameExplorer lo descomprime, detecta la consola por la cabecera del archivo, te deja elegir el juego en IGDB y lo guarda como `[consola]/[juego]/[archivo]` con nombres consistentes. Maneja juego base, updates, DLC y juegos de varios discos.
+Arrastra un `.rar`, `.zip`, `.7z` o el archivo del juego, indica qué juego y consola es (IGDB sugiere nombres, pero sirve cualquiera) y GameExplorer lo descomprime, comprueba que los archivos valgan para la consola y los guarda como `[consola]/[juego]/[archivo]` con nombres consistentes. En Switch maneja juego base, updates y DLC; Wii y PSP guardan un archivo por juego.
 
 ## Características (planeadas)
 - Subidas reanudables de decenas de gigabytes (protocolo tus), escritas a disco en streaming.
-- Detección de consola por bytes mágicos (cabeceras de disco de GameCube/Wii, `SYSTEM.CNF` de PS1/PS2, estructura de carpetas de PS3, Title ID de Switch).
+- Cada consola es un módulo definido en código ([agregar una](docs/adding-a-console.md) no toca nada más); las extensiones vienen de variables de entorno más las tuyas.
 - Aviso de duplicados antes de escribir nada; papelera con restauración.
+- Lo que se agrega por Samba se detecta: lo desconocido va a una sección «No asignados» para asignarlo después.
 - Un solo binario de Go con la app React incrustada, desplegado como Custom App de TrueNAS.
 - **Demo sin backend** en Vercel: la misma interfaz con adaptadores en el navegador, para probar el flujo completo sin NAS ni juegos.
 

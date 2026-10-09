@@ -1,17 +1,35 @@
 {
-  "description": "Expected folder and file names. sanitizedTitle is the game folder name; fileName is relative to it. expected.error names the rejected field. trackCases name the tracks of a .cue disc (Redump style).",
+  "description": "Expected folder and file names (spec §5). sanitizedTitle is the game folder; fileName is relative to it. kind is base, update or dlc (Switch) or game (Wii, PSP); label is what the user typed (version or DLC name). extensionCases pick a file's extension: the longest known one it ends with. expected.error names the rejected field.",
   "cases": [
     {
-      "name": "base game keeps only the title",
-      "input": {
-        "title": "Mario Kart 8 Deluxe",
-        "kind": "base",
-        "extension": ".nsp"
-      },
-      "expected": {
-        "sanitizedTitle": "Mario Kart 8 Deluxe",
-        "fileName": "Mario Kart 8 Deluxe.nsp"
-      }
+      "name": "base game carries its tag",
+      "input": { "title": "Limbo", "kind": "base", "extension": ".xci" },
+      "expected": { "sanitizedTitle": "Limbo", "fileName": "Limbo [BASE].xci" }
+    },
+    {
+      "name": "update carries its version with one v",
+      "input": { "title": "Limbo", "kind": "update", "label": "122345", "extension": ".nsp" },
+      "expected": { "sanitizedTitle": "Limbo", "fileName": "Limbo [UPDATE v122345].nsp" }
+    },
+    {
+      "name": "a typed v is not doubled",
+      "input": { "title": "Limbo", "kind": "update", "label": " v1.0.4 ", "extension": ".nsp" },
+      "expected": { "sanitizedTitle": "Limbo", "fileName": "Limbo [UPDATE v1.0.4].nsp" }
+    },
+    {
+      "name": "dlc carries its name",
+      "input": { "title": "Limbo", "kind": "dlc", "label": "Fuga Maestra", "extension": ".nsp" },
+      "expected": { "sanitizedTitle": "Limbo", "fileName": "Limbo [DLC Fuga Maestra].nsp" }
+    },
+    {
+      "name": "the dlc name is sanitized too",
+      "input": { "title": "Limbo", "kind": "dlc", "label": "Pack: 1/2", "extension": ".nsp" },
+      "expected": { "sanitizedTitle": "Limbo", "fileName": "Limbo [DLC Pack - 1 2].nsp" }
+    },
+    {
+      "name": "wii and psp files are named after the game",
+      "input": { "title": "Ōkami", "kind": "game", "extension": ".nkit.iso" },
+      "expected": { "sanitizedTitle": "Ōkami", "fileName": "Ōkami.nkit.iso" }
     },
     {
       "name": "colon becomes space-dash",
@@ -22,53 +40,14 @@
       },
       "expected": {
         "sanitizedTitle": "The Legend of Zelda - Tears of the Kingdom",
-        "fileName": "The Legend of Zelda - Tears of the Kingdom.xci"
+        "fileName": "The Legend of Zelda - Tears of the Kingdom [BASE].xci"
       }
     },
     {
-      "name": "update carries its version tag",
-      "input": {
-        "title": "Mario Kart 8 Deluxe",
-        "kind": "update",
-        "label": "v3.0.1",
-        "extension": ".nsp"
-      },
-      "expected": {
-        "sanitizedTitle": "Mario Kart 8 Deluxe",
-        "fileName": "Mario Kart 8 Deluxe [Update v3.0.1].nsp"
-      }
-    },
-    {
-      "name": "dlc carries its name",
-      "input": {
-        "title": "Mario Kart 8 Deluxe",
-        "kind": "dlc",
-        "label": "Booster Course Pass",
-        "extension": ".nsp"
-      },
-      "expected": {
-        "sanitizedTitle": "Mario Kart 8 Deluxe",
-        "fileName": "Mario Kart 8 Deluxe [DLC] Booster Course Pass.nsp"
-      }
-    },
-    {
-      "name": "disc carries its number",
-      "input": {
-        "title": "Final Fantasy VII",
-        "kind": "disc",
-        "discNumber": 2,
-        "extension": ".cue"
-      },
-      "expected": {
-        "sanitizedTitle": "Final Fantasy VII",
-        "fileName": "Final Fantasy VII (Disc 2).cue"
-      }
-    },
-    {
-      "name": "characters forbidden on SMB/Windows are removed",
+      "name": "forbidden characters are dropped",
       "input": {
         "title": "What?! <Bad> \"Name\" | A/B \\ C*",
-        "kind": "base",
+        "kind": "game",
         "extension": ".iso"
       },
       "expected": {
@@ -78,171 +57,66 @@
     },
     {
       "name": "trailing dots and spaces are trimmed",
-      "input": {
-        "title": "Shadow of the Colossus... ",
-        "kind": "base",
-        "extension": ".iso"
-      },
+      "input": { "title": "Shadow of the Colossus... ", "kind": "game", "extension": ".iso" },
       "expected": {
         "sanitizedTitle": "Shadow of the Colossus",
         "fileName": "Shadow of the Colossus.iso"
       }
     },
     {
-      "name": "whitespace runs collapse to one space",
+      "name": "whitespace collapses",
       "input": {
-        "title": "  Super   Mario\tSunshine ",
-        "kind": "base",
-        "extension": ".rvz"
+        "title": "  God of War:\tGhost   of Sparta ",
+        "kind": "game",
+        "extension": ".cso"
       },
       "expected": {
-        "sanitizedTitle": "Super Mario Sunshine",
-        "fileName": "Super Mario Sunshine.rvz"
+        "sanitizedTitle": "God of War - Ghost of Sparta",
+        "fileName": "God of War - Ghost of Sparta.cso"
       }
     },
     {
-      "name": "unicode is normalized to NFC and kept",
-      "input": {
-        "title": "Pokémon Legends: Arceus",
-        "kind": "base",
-        "extension": ".nsp"
-      },
-      "expected": {
-        "sanitizedTitle": "Pokémon Legends - Arceus",
-        "fileName": "Pokémon Legends - Arceus.nsp"
-      }
-    },
-    {
-      "name": "real: modifier-letter colon (U+A789) is treated like a colon, trademark sign is kept",
-      "input": {
-        "title": "Animal Crossing™꞉ New Horizons",
-        "kind": "base",
-        "extension": ".nsp"
-      },
+      "name": "windows colon substitute and trademark",
+      "input": { "title": "Animal Crossing™꞉ New Horizons", "kind": "base", "extension": ".nsp" },
       "expected": {
         "sanitizedTitle": "Animal Crossing™ - New Horizons",
-        "fileName": "Animal Crossing™ - New Horizons.nsp"
+        "fileName": "Animal Crossing™ - New Horizons [BASE].nsp"
       }
     },
     {
-      "name": "update label uses the human display version",
-      "input": {
-        "title": "INSIDE",
-        "kind": "update",
-        "label": "v1.0.3",
-        "extension": ".nsp"
-      },
-      "expected": {
-        "sanitizedTitle": "INSIDE",
-        "fileName": "INSIDE [Update v1.0.3].nsp"
-      }
+      "name": "extension is lower-cased",
+      "input": { "title": "Metroid Prime", "kind": "game", "extension": ".ISO" },
+      "expected": { "sanitizedTitle": "Metroid Prime", "fileName": "Metroid Prime.iso" }
     },
     {
-      "name": "extension is lowercased",
-      "input": {
-        "title": "Metroid Prime",
-        "kind": "base",
-        "extension": ".ISO"
-      },
-      "expected": {
-        "sanitizedTitle": "Metroid Prime",
-        "fileName": "Metroid Prime.iso"
-      }
+      "name": "update without version",
+      "input": { "title": "Limbo", "kind": "update", "label": "  ", "extension": ".nsp" },
+      "expected": { "error": "version" }
     },
     {
-      "name": "empty update label is rejected",
-      "input": {
-        "title": "INSIDE",
-        "kind": "update",
-        "label": "  ",
-        "extension": ".nsp"
-      },
-      "expected": {
-        "error": "label"
-      }
+      "name": "version with letters",
+      "input": { "title": "Limbo", "kind": "update", "label": "1.0 beta", "extension": ".nsp" },
+      "expected": { "error": "version" }
     },
     {
-      "name": "title made only of forbidden characters is rejected",
-      "input": {
-        "title": "???",
-        "kind": "base",
-        "extension": ".iso"
-      },
-      "expected": {
-        "error": "title"
-      }
+      "name": "dlc without name",
+      "input": { "title": "Limbo", "kind": "dlc", "label": "???", "extension": ".nsp" },
+      "expected": { "error": "label" }
     },
     {
-      "name": "folder-format game has no extension",
-      "input": {
-        "title": "Demon's Souls",
-        "kind": "base",
-        "extension": ""
-      },
-      "expected": {
-        "sanitizedTitle": "Demon's Souls",
-        "fileName": "Demon's Souls"
-      }
+      "name": "title with nothing left",
+      "input": { "title": "???", "kind": "game", "extension": ".iso" },
+      "expected": { "error": "title" }
     }
   ],
-  "trackCases": [
+  "extensionCases": [
     {
-      "name": "single track takes the disc name",
-      "input": {
-        "stem": "Final Fantasy VII (Disc 1)",
-        "extensions": [".bin"]
-      },
-      "expected": ["Final Fantasy VII (Disc 1).bin"]
+      "name": "Ookami (USA).nkit.iso",
+      "known": [".iso", ".nkit.iso", ".cso"],
+      "expected": ".nkit.iso"
     },
-    {
-      "name": "several tracks are numbered from 1",
-      "input": {
-        "stem": "Tomb Raider",
-        "extensions": [".bin", ".bin", ".BIN"]
-      },
-      "expected": [
-        "Tomb Raider (Track 1).bin",
-        "Tomb Raider (Track 2).bin",
-        "Tomb Raider (Track 3).bin"
-      ]
-    },
-    {
-      "name": "ten or more tracks use two digits",
-      "input": {
-        "stem": "Wipeout",
-        "extensions": [
-          ".bin",
-          ".bin",
-          ".bin",
-          ".bin",
-          ".bin",
-          ".bin",
-          ".bin",
-          ".bin",
-          ".bin",
-          ".bin"
-        ]
-      },
-      "expected": [
-        "Wipeout (Track 01).bin",
-        "Wipeout (Track 02).bin",
-        "Wipeout (Track 03).bin",
-        "Wipeout (Track 04).bin",
-        "Wipeout (Track 05).bin",
-        "Wipeout (Track 06).bin",
-        "Wipeout (Track 07).bin",
-        "Wipeout (Track 08).bin",
-        "Wipeout (Track 09).bin",
-        "Wipeout (Track 10).bin"
-      ]
-    },
-    {
-      "name": "audio tracks keep their own extension",
-      "input": {
-        "stem": "Rayman",
-        "extensions": [".bin", ".wav"]
-      },
-      "expected": ["Rayman (Track 1).bin", "Rayman (Track 2).wav"]
-    }
+    { "name": "Daxter.ISO", "known": [".iso", ".nkit.iso"], "expected": ".iso" },
+    { "name": "Limbo.xci", "known": [".nsp", ".iso"], "expected": "" },
+    { "name": ".iso", "known": [".iso"], "expected": "" }
   ]
 }

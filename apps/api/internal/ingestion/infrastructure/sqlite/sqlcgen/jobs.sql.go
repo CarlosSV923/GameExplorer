@@ -11,27 +11,32 @@ import (
 )
 
 const createJob = `-- name: CreateJob :exec
-INSERT INTO upload_jobs (id, file_name, size, received, status, error, origin_console, storage_path,
-                         progress, warning, volume_set, volume_index, merged_into, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO upload_jobs (id, file_name, size, received, status, error, warning, progress, console, title, igdb_id,
+                         invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin,
+                         created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateJobParams struct {
-	ID            string
-	FileName      string
-	Size          int64
-	Received      int64
-	Status        string
-	Error         string
-	OriginConsole sql.NullString
-	StoragePath   string
-	Progress      int64
-	Warning       string
-	VolumeSet     string
-	VolumeIndex   int64
-	MergedInto    string
-	CreatedAt     string
-	UpdatedAt     string
+	ID               string
+	FileName         string
+	Size             int64
+	Received         int64
+	Status           string
+	Error            string
+	Warning          string
+	Progress         int64
+	Console          string
+	Title            string
+	IgdbID           sql.NullInt64
+	InvalidReason    string
+	GroupID          string
+	GroupSize        int64
+	MergedInto       string
+	StoragePath      string
+	UnassignedOrigin string
+	CreatedAt        string
+	UpdatedAt        string
 }
 
 func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) error {
@@ -42,13 +47,17 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) error {
 		arg.Received,
 		arg.Status,
 		arg.Error,
-		arg.OriginConsole,
-		arg.StoragePath,
-		arg.Progress,
 		arg.Warning,
-		arg.VolumeSet,
-		arg.VolumeIndex,
+		arg.Progress,
+		arg.Console,
+		arg.Title,
+		arg.IgdbID,
+		arg.InvalidReason,
+		arg.GroupID,
+		arg.GroupSize,
 		arg.MergedInto,
+		arg.StoragePath,
+		arg.UnassignedOrigin,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -56,7 +65,7 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) error {
 }
 
 const getJob = `-- name: GetJob :one
-SELECT id, file_name, size, received, status, error, origin_console, storage_path, created_at, updated_at, progress, warning, volume_set, volume_index, merged_into FROM upload_jobs WHERE id = ?
+SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at FROM upload_jobs WHERE id = ?
 `
 
 func (q *Queries) GetJob(ctx context.Context, id string) (UploadJob, error) {
@@ -69,15 +78,19 @@ func (q *Queries) GetJob(ctx context.Context, id string) (UploadJob, error) {
 		&i.Received,
 		&i.Status,
 		&i.Error,
-		&i.OriginConsole,
+		&i.Warning,
+		&i.Progress,
+		&i.Console,
+		&i.Title,
+		&i.IgdbID,
+		&i.InvalidReason,
+		&i.GroupID,
+		&i.GroupSize,
+		&i.MergedInto,
 		&i.StoragePath,
+		&i.UnassignedOrigin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Progress,
-		&i.Warning,
-		&i.VolumeSet,
-		&i.VolumeIndex,
-		&i.MergedInto,
 	)
 	return i, err
 }
@@ -93,8 +106,55 @@ func (q *Queries) JobExists(ctx context.Context, id string) (bool, error) {
 	return exists, err
 }
 
+const listGroup = `-- name: ListGroup :many
+SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at FROM upload_jobs WHERE group_id = ? ORDER BY created_at, id
+`
+
+func (q *Queries) ListGroup(ctx context.Context, groupID string) ([]UploadJob, error) {
+	rows, err := q.db.QueryContext(ctx, listGroup, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UploadJob
+	for rows.Next() {
+		var i UploadJob
+		if err := rows.Scan(
+			&i.ID,
+			&i.FileName,
+			&i.Size,
+			&i.Received,
+			&i.Status,
+			&i.Error,
+			&i.Warning,
+			&i.Progress,
+			&i.Console,
+			&i.Title,
+			&i.IgdbID,
+			&i.InvalidReason,
+			&i.GroupID,
+			&i.GroupSize,
+			&i.MergedInto,
+			&i.StoragePath,
+			&i.UnassignedOrigin,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listJobs = `-- name: ListJobs :many
-SELECT id, file_name, size, received, status, error, origin_console, storage_path, created_at, updated_at, progress, warning, volume_set, volume_index, merged_into FROM upload_jobs ORDER BY created_at DESC LIMIT ?
+SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at FROM upload_jobs ORDER BY created_at DESC LIMIT ?
 `
 
 func (q *Queries) ListJobs(ctx context.Context, limit int64) ([]UploadJob, error) {
@@ -113,15 +173,19 @@ func (q *Queries) ListJobs(ctx context.Context, limit int64) ([]UploadJob, error
 			&i.Received,
 			&i.Status,
 			&i.Error,
-			&i.OriginConsole,
+			&i.Warning,
+			&i.Progress,
+			&i.Console,
+			&i.Title,
+			&i.IgdbID,
+			&i.InvalidReason,
+			&i.GroupID,
+			&i.GroupSize,
+			&i.MergedInto,
 			&i.StoragePath,
+			&i.UnassignedOrigin,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.Progress,
-			&i.Warning,
-			&i.VolumeSet,
-			&i.VolumeIndex,
-			&i.MergedInto,
 		); err != nil {
 			return nil, err
 		}
@@ -137,7 +201,7 @@ func (q *Queries) ListJobs(ctx context.Context, limit int64) ([]UploadJob, error
 }
 
 const listStaleJobs = `-- name: ListStaleJobs :many
-SELECT id, file_name, size, received, status, error, origin_console, storage_path, created_at, updated_at, progress, warning, volume_set, volume_index, merged_into FROM upload_jobs WHERE status = ? AND updated_at < ? ORDER BY updated_at
+SELECT id, file_name, size, received, status, error, warning, progress, console, title, igdb_id, invalid_reason, group_id, group_size, merged_into, storage_path, unassigned_origin, created_at, updated_at FROM upload_jobs WHERE status = ? AND updated_at < ? ORDER BY updated_at
 `
 
 type ListStaleJobsParams struct {
@@ -161,58 +225,19 @@ func (q *Queries) ListStaleJobs(ctx context.Context, arg ListStaleJobsParams) ([
 			&i.Received,
 			&i.Status,
 			&i.Error,
-			&i.OriginConsole,
+			&i.Warning,
+			&i.Progress,
+			&i.Console,
+			&i.Title,
+			&i.IgdbID,
+			&i.InvalidReason,
+			&i.GroupID,
+			&i.GroupSize,
+			&i.MergedInto,
 			&i.StoragePath,
+			&i.UnassignedOrigin,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.Progress,
-			&i.Warning,
-			&i.VolumeSet,
-			&i.VolumeIndex,
-			&i.MergedInto,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listWaitingParts = `-- name: ListWaitingParts :many
-SELECT id, file_name, size, received, status, error, origin_console, storage_path, created_at, updated_at, progress, warning, volume_set, volume_index, merged_into FROM upload_jobs WHERE volume_set = ? AND status = 'waiting_parts' ORDER BY volume_index
-`
-
-func (q *Queries) ListWaitingParts(ctx context.Context, volumeSet string) ([]UploadJob, error) {
-	rows, err := q.db.QueryContext(ctx, listWaitingParts, volumeSet)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []UploadJob
-	for rows.Next() {
-		var i UploadJob
-		if err := rows.Scan(
-			&i.ID,
-			&i.FileName,
-			&i.Size,
-			&i.Received,
-			&i.Status,
-			&i.Error,
-			&i.OriginConsole,
-			&i.StoragePath,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Progress,
-			&i.Warning,
-			&i.VolumeSet,
-			&i.VolumeIndex,
-			&i.MergedInto,
 		); err != nil {
 			return nil, err
 		}
@@ -229,23 +254,23 @@ func (q *Queries) ListWaitingParts(ctx context.Context, volumeSet string) ([]Upl
 
 const saveJob = `-- name: SaveJob :exec
 UPDATE upload_jobs
-SET received = ?, status = ?, error = ?, storage_path = ?, progress = ?, warning = ?,
-    volume_set = ?, volume_index = ?, merged_into = ?, updated_at = ?
+SET received = ?, status = ?, error = ?, warning = ?, progress = ?, console = ?, invalid_reason = ?,
+    merged_into = ?, storage_path = ?, updated_at = ?
 WHERE id = ?
 `
 
 type SaveJobParams struct {
-	Received    int64
-	Status      string
-	Error       string
-	StoragePath string
-	Progress    int64
-	Warning     string
-	VolumeSet   string
-	VolumeIndex int64
-	MergedInto  string
-	UpdatedAt   string
-	ID          string
+	Received      int64
+	Status        string
+	Error         string
+	Warning       string
+	Progress      int64
+	Console       string
+	InvalidReason string
+	MergedInto    string
+	StoragePath   string
+	UpdatedAt     string
+	ID            string
 }
 
 func (q *Queries) SaveJob(ctx context.Context, arg SaveJobParams) error {
@@ -253,12 +278,12 @@ func (q *Queries) SaveJob(ctx context.Context, arg SaveJobParams) error {
 		arg.Received,
 		arg.Status,
 		arg.Error,
-		arg.StoragePath,
-		arg.Progress,
 		arg.Warning,
-		arg.VolumeSet,
-		arg.VolumeIndex,
+		arg.Progress,
+		arg.Console,
+		arg.InvalidReason,
 		arg.MergedInto,
+		arg.StoragePath,
 		arg.UpdatedAt,
 		arg.ID,
 	)

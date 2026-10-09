@@ -3,10 +3,14 @@ package application
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain"
@@ -40,30 +44,16 @@ var ErrCannotCancel = errors.New("job can no longer be cancelled")
 
 // Service implements the ingestion use cases.
 type Service struct {
-	repo  domain.JobRepository
-	store UploadStore
-	pub   Publisher
-	queue Queue
-	items domain.StagedItemRepository
-	log   *slog.Logger
-	now   func() time.Time
-}
-
-// WithItems sets the repository of staged items (for the review).
-func (s *Service) WithItems(items domain.StagedItemRepository) *Service {
-	s.items = items
-	return s
-}
-
-// Items returns the items found in a job.
-func (s *Service) Items(ctx context.Context, id domain.JobID) ([]domain.StagedItem, error) {
-	if _, err := s.repo.Get(ctx, id); err != nil {
-		return nil, err
-	}
-	if s.items == nil {
-		return nil, nil
-	}
-	return s.items.List(ctx, id)
+	repo     domain.JobRepository
+	store    UploadStore
+	pub      Publisher
+	queue    Queue
+	consoles Consoles
+	library  Library
+	staging  Staging
+	log      *slog.Logger
+	now      func() time.Time
+	newID    func() string
 }
 
 // WithQueue sets the processing queue that picks up finished uploads.
@@ -72,24 +62,76 @@ func (s *Service) WithQueue(q Queue) *Service {
 	return s
 }
 
+// WithUnassigned lets the service start jobs from the unassigned section.
+func (s *Service) WithUnassigned(library Library, staging Staging) *Service {
+	s.library, s.staging = library, staging
+	return s
+}
+
 // NewService builds the service. now may be nil (time.Now).
-func NewService(repo domain.JobRepository, store UploadStore, pub Publisher, log *slog.Logger, now func() time.Time) *Service {
+func NewService(repo domain.JobRepository, store UploadStore, consoles Consoles, pub Publisher, log *slog.Logger, now func() time.Time) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{repo: repo, store: store, pub: pub, log: log, now: now}
+	return &Service{repo: repo, store: store, consoles: consoles, pub: pub, log: log, now: now, newID: randomID}
 }
 
-var slugShape = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
+func randomID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
+}
+
+// UploadMeta is what the browser sends with a tus upload (Upload-Metadata).
+type UploadMeta struct {
+	FileName, Console, Title, IGDBID, Group, GroupSize string
+}
+
+// ErrInvalidMeta is returned for an upload whose form data is wrong.
+var ErrInvalidMeta = errors.New("invalid upload metadata")
+
+// SpecFromMeta checks an upload's form data (RF-03, RF-03a).
+func (s *Service) SpecFromMeta(ctx context.Context, m UploadMeta) (domain.Spec, error) {
+	spec := domain.Spec{Console: m.Console, Title: m.Title, GroupID: m.Group}
+	rules, _, err := s.consoles.Rules(ctx)
+	if err != nil {
+		return spec, err
+	}
+	if _, ok := rules[m.Console]; !ok {
+		return spec, fmt.Errorf("%w: unknown console %q", ErrInvalidMeta, m.Console)
+	}
+	if m.IGDBID != "" {
+		id, err := strconv.ParseInt(m.IGDBID, 10, 64)
+		if err != nil || id <= 0 {
+			return spec, fmt.Errorf("%w: igdbId", ErrInvalidMeta)
+		}
+		spec.IGDBID = &id
+	}
+	if m.GroupSize != "" {
+		n, err := strconv.Atoi(m.GroupSize)
+		if err != nil {
+			return spec, fmt.Errorf("%w: groupSize", ErrInvalidMeta)
+		}
+		spec.GroupSize = n
+	}
+	if m.Group != "" && !groupShape.MatchString(m.Group) {
+		return spec, fmt.Errorf("%w: group", ErrInvalidMeta)
+	}
+	if _, err := domain.NewUploadJob("check", m.FileName, 0, spec, s.now()); err != nil {
+		return spec, fmt.Errorf("%w: %w", ErrInvalidMeta, err)
+	}
+	return spec, nil
+}
+
+var groupShape = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 
 // UploadCreated registers a job for an upload the browser just started.
-// origin is the console slug of the screen the upload started from (RF-08).
-func (s *Service) UploadCreated(ctx context.Context, id domain.JobID, fileName string, size int64, origin string) error {
-	var originPtr *string
-	if slugShape.MatchString(origin) {
-		originPtr = &origin
+func (s *Service) UploadCreated(ctx context.Context, id domain.JobID, size int64, m UploadMeta) error {
+	spec, err := s.SpecFromMeta(ctx, m)
+	if err != nil {
+		return err
 	}
-	job, err := domain.NewUploadJob(id, fileName, size, originPtr, s.now())
+	job, err := domain.NewUploadJob(id, m.FileName, size, spec, s.now())
 	if err != nil {
 		return err
 	}
@@ -98,6 +140,41 @@ func (s *Service) UploadCreated(ctx context.Context, id domain.JobID, fileName s
 	}
 	s.pub.Publish(*job)
 	return nil
+}
+
+// Assign starts a job from a file of the unassigned section (RF-27): the
+// file leaves the section and follows the upload pipeline.
+func (s *Service) Assign(ctx context.Context, unassigned int64, spec domain.Spec) (*domain.UploadJob, error) {
+	if s.library == nil || s.queue == nil {
+		return nil, errors.New("uploads are disabled: the library is not writable")
+	}
+	spec.GroupID, spec.GroupSize = "", 0
+	src, err := s.library.UnassignedFile(ctx, unassigned)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.SpecFromMeta(ctx, UploadMeta{FileName: src.Name, Console: spec.Console, Title: spec.Title}); err != nil {
+		return nil, err
+	}
+	id := domain.JobID(s.newID())
+	job, err := domain.NewUploadJob(id, src.Name, src.Size, spec, s.now())
+	if err != nil {
+		return nil, err
+	}
+	dest := filepath.Join(s.staging.SourceDir(id), src.Name)
+	if src, err = s.library.TakeUnassigned(ctx, unassigned, dest); err != nil {
+		return nil, err
+	}
+	job.UnassignedOrigin = src.Path
+	if err := job.MarkUploaded(dest, s.now()); err != nil {
+		return nil, err
+	}
+	if err := s.repo.Create(ctx, job); err != nil {
+		return nil, fmt.Errorf("create job: %w", err)
+	}
+	s.pub.Publish(*job)
+	s.queue.Enqueue(id)
+	return job, nil
 }
 
 // UploadProgress records received bytes.

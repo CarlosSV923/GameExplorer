@@ -1,15 +1,14 @@
-import { useNavigate } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ButtonLink } from '@/shared/routing/links'
 import { FileButton, UploadIcon, type ButtonSize, type ButtonVariant } from '@/shared/ui'
 
-import { useUploadQueue, useUploadRows } from '../application/queries'
+import { useOpenUploadForm, useUploadRows } from '../application/queries'
 import { activeRows, needsUser } from '../domain/uploads'
 
 interface UploadButtonProps {
-  /** The console screen it sits on: that console comes preselected (RF-08). */
+  /** The console of the screen: it comes preselected in the form (RF-03). */
   consoleSlug?: string
   children: ReactNode
   variant?: ButtonVariant
@@ -19,7 +18,7 @@ interface UploadButtonProps {
 
 /**
  * "Subir juegos" / "Agregar juegos" (RF-01): the native picker; the chosen
- * files are queued and the uploads screen shows their progress.
+ * files open the upload form (RF-03).
  */
 export function UploadButton({
   consoleSlug,
@@ -28,8 +27,7 @@ export function UploadButton({
   size = 'md',
   icon = <UploadIcon />,
 }: UploadButtonProps) {
-  const queue = useUploadQueue()
-  const navigate = useNavigate()
+  const openForm = useOpenUploadForm()
   return (
     <FileButton
       shortcut
@@ -37,8 +35,7 @@ export function UploadButton({
       size={size}
       icon={icon}
       onFiles={(files) => {
-        queue.add(files, consoleSlug)
-        void navigate({ to: '/subidas' })
+        openForm({ kind: 'files', files, ...(consoleSlug ? { console: consoleSlug } : {}) })
       }}
     >
       {children}

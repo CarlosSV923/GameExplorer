@@ -10,37 +10,31 @@ import (
 // GameID identifies a game in the library.
 type GameID int64
 
-// ItemID identifies a stored item.
+// ItemID identifies a stored file.
 type ItemID int64
 
 // TrashEntryID identifies a trash entry.
 type TrashEntryID int64
 
-// Shape is how an item is laid out on disk.
-type Shape string
-
-// Item shapes.
-const (
-	ShapeFile   Shape = "file"   // one file
-	ShapeDisc   Shape = "disc"   // a .cue sheet plus its tracks
-	ShapeFolder Shape = "folder" // folder-format game (PS3), never renamed inside
-)
+// UnassignedID identifies a file of the unassigned section.
+type UnassignedID int64
 
 // Not-found errors.
 var (
 	ErrGameNotFound       = errors.New("game not found")
 	ErrItemNotFound       = errors.New("item not found")
 	ErrTrashEntryNotFound = errors.New("trash entry not found")
+	ErrUnassignedNotFound = errors.New("unassigned file not found")
 )
 
-// Game is a game of one console, matched to an IGDB entry (aggregate root).
+// Game is a name within a console, optionally linked to IGDB (aggregate root).
 type Game struct {
-	ID        GameID
-	ConsoleID ConsoleID
-	IGDBID    int64
-	Title     string
+	ID      GameID
+	Console Slug
+	Title   string
 	// Folder is the game's directory name inside the console folder.
 	Folder       string
+	IGDBID       *int64
 	ReleaseYear  *int
 	CoverImageID *string
 	Summary      *string
@@ -50,39 +44,33 @@ type Game struct {
 	UpdatedAt    time.Time
 }
 
-// GameItem is one stored item: a base game, an update, a DLC or a disc.
+// GameItem is one stored file: a base game, an update, a DLC or the game.
 type GameItem struct {
-	ID         ItemID
-	GameID     GameID
-	Kind       ItemKind
-	Label      string
-	DiscNumber int
-	Shape      Shape
-	// Files are relative to the game folder (or to the trash entry's
-	// directory while trashed); the first one is the item's main entry (the
-	// .cue for discs, the directory for folder games).
-	Files   []string
-	Size    int64
-	TitleID string
-	// SourceJob is the upload the item came from.
+	ID     ItemID
+	GameID GameID
+	Kind   ItemKind
+	// Label is the update version (without "v") or the DLC name.
+	Label string
+	// File is the name inside the game folder (or the trash entry's
+	// directory while trashed).
+	File string
+	Size int64
+	// SourceJob is the upload the file came from.
 	SourceJob string
 	CreatedAt time.Time
-	// TrashEntry is set while the item is in the trash.
+	// TrashEntry is set while the file is in the trash.
 	TrashEntry *TrashEntryID
-	// MissingSince is set while a file of the item is missing from disk
-	// (deleted over SMB), as found by the integrity check.
-	MissingSince *time.Time
 }
 
-// Live reports whether the item is in the library (not in the trash).
+// Live reports whether the file is in the library (not in the trash).
 func (i GameItem) Live() bool { return i.TrashEntry == nil }
 
-// Name describes the item for naming.
+// Name describes the file for naming under a game title.
 func (i GameItem) Name(title string) ItemName {
-	return ItemName{Title: title, Kind: i.Kind, Label: i.Label, DiscNumber: i.DiscNumber}
+	return ItemName{Title: title, Kind: i.Kind, Label: i.Label}
 }
 
-// LiveItems returns the items that are not in the trash.
+// LiveItems returns the files that are not in the trash.
 func (g *Game) LiveItems() []GameItem {
 	var out []GameItem
 	for _, it := range g.Items {
@@ -91,6 +79,61 @@ func (g *Game) LiveItems() []GameItem {
 		}
 	}
 	return out
+}
+
+// FindDuplicate applies the duplicate policy (RF-09): a live file of the
+// game with the same final name, ignoring case. It returns nil when there
+// is none.
+func FindDuplicate(existing []GameItem, file string) *GameItem {
+	for i := range existing {
+		if existing[i].Live() && strings.EqualFold(existing[i].File, file) {
+			return &existing[i]
+		}
+	}
+	return nil
+}
+
+// DuplicateAction is the user's decision for a duplicate.
+type DuplicateAction string
+
+// Duplicate decisions.
+const (
+	// Replace sends the existing file to the trash.
+	Replace DuplicateAction = "replace"
+	// Skip keeps the existing file and drops the other one.
+	Skip DuplicateAction = "skip"
+)
+
+// UnassignedReason says how a file reached the unassigned section.
+type UnassignedReason string
+
+// Unassigned reasons.
+const (
+	UnassignedSamba  UnassignedReason = "samba"  // found by the scan
+	UnassignedUpload UnassignedReason = "upload" // an upload that did not fit its console
+	UnassignedManual UnassignedReason = "manual" // moved here by the user
+)
+
+// UnassignedFile is a file of the unassigned section (RF-27).
+type UnassignedFile struct {
+	ID UnassignedID
+	// Path is relative to the unassigned folder, "/" separators; while
+	// trashed, relative to the trash entry's directory.
+	Path      string
+	Origin    string
+	Reason    UnassignedReason
+	Size      int64
+	ArrivedAt time.Time
+	// TrashEntry is set while the file is in the trash.
+	TrashEntry *TrashEntryID
+}
+
+// Name is the file's base name.
+func (u UnassignedFile) Name() string {
+	if i := strings.LastIndex(u.Path, "/"); i >= 0 {
+		return u.Path[i+1:]
+	}
+	return u.Path
 }
 
 // TrashReason says why something went to the trash.
@@ -102,83 +145,18 @@ const (
 	TrashReplaced TrashReason = "replaced" // replaced by a duplicate
 )
 
-// TrashEntry is what was sent to the trash together: one item or a whole
-// game. Its files live in the trash under Dir.
+// TrashEntry is what was sent to the trash together: one file, a whole
+// game, or unassigned files (GameID nil). Its files live under Dir.
 type TrashEntry struct {
 	ID        TrashEntryID
-	GameID    GameID
+	GameID    *GameID
 	WholeGame bool
 	Reason    TrashReason
 	Dir       string
 	TrashedAt time.Time
 	Items     []GameItem
+	Files     []UnassignedFile
 }
-
-// Candidate is an item about to be stored, as the duplicate policy sees it.
-type Candidate struct {
-	Kind       ItemKind
-	Label      string
-	DiscNumber int
-	Files      []string
-}
-
-// FindDuplicate applies the duplicate policy (RF-10): within the same game,
-// a base, the same disc, an update with the same version or any item that
-// would use one of the same file names is a duplicate. It returns nil when
-// the candidate is new.
-func FindDuplicate(existing []GameItem, c Candidate) *GameItem {
-	names := map[string]bool{}
-	for _, f := range c.Files {
-		names[strings.ToLower(f)] = true
-	}
-	for i := range existing {
-		it := &existing[i]
-		if !it.Live() {
-			continue
-		}
-		if it.Kind == c.Kind {
-			switch c.Kind {
-			case KindBase:
-				return it
-			case KindDisc:
-				if it.DiscNumber == c.DiscNumber {
-					return it
-				}
-			case KindUpdate:
-				if sameVersion(it.Label, c.Label) {
-					return it
-				}
-			case KindDLC:
-			}
-		}
-		for _, f := range it.Files {
-			if names[strings.ToLower(f)] {
-				return it
-			}
-		}
-	}
-	return nil
-}
-
-// sameVersion compares update labels ignoring case, spaces and a leading "v".
-func sameVersion(a, b string) bool {
-	clean := func(s string) string {
-		s = strings.ToLower(strings.Join(strings.Fields(s), ""))
-		return strings.TrimPrefix(s, "v")
-	}
-	return clean(a) == clean(b)
-}
-
-// DuplicateAction is the user's decision for a duplicate.
-type DuplicateAction string
-
-// Duplicate decisions.
-const (
-	// Replace sends the existing item to the trash.
-	Replace DuplicateAction = "replace"
-	// Skip keeps the existing item and drops the other one.
-	Skip DuplicateAction = "skip"
-)
 
 // Move is one rename of a library operation.
 type Move struct {
@@ -199,57 +177,89 @@ type Operation struct {
 // GameSummary is a game as listed in the library (read model).
 type GameSummary struct {
 	ID           GameID
-	ConsoleID    ConsoleID
-	IGDBID       int64
+	Console      Slug
+	IGDBID       *int64
 	Title        string
 	Folder       string
 	ReleaseYear  *int
 	CoverImageID *string
 	ItemCount    int
-	MissingCount int
 	Size         int64
+}
+
+// LibraryFile is a live file of the library with where it is (read model
+// for the scan).
+type LibraryFile struct {
+	Item    ItemID
+	Game    GameID
+	Console Slug
+	Folder  string
+	File    string
+}
+
+// PendingFile is an unknown file seen by a scan, waiting to be unchanged on
+// the next one (RF-26).
+type PendingFile struct {
+	// Path is relative to the library root, "/" separators.
+	Path    string
+	Size    int64
+	ModTime time.Time
 }
 
 // LibraryTx records the catalog side of one library change, atomically.
 type LibraryTx interface {
 	InsertGame(ctx context.Context, g Game, now time.Time) (GameID, error)
-	// UpdateGame stores IGDB id, title, folder and metadata.
+	// UpdateGame stores console, title, folder, IGDB link and metadata.
 	UpdateGame(ctx context.Context, g Game, now time.Time) error
 	DeleteGame(ctx context.Context, id GameID) error
-	// DeleteGameIfEmpty deletes the game when no item (not even a trashed one) is left.
+	// DeleteGameIfEmpty deletes the game when no file (not even a trashed one) is left.
 	DeleteGameIfEmpty(ctx context.Context, id GameID) error
 	InsertItem(ctx context.Context, it GameItem, now time.Time) (ItemID, error)
-	// PlaceItem sets the item's game and file names.
-	PlaceItem(ctx context.Context, id ItemID, game GameID, files []string) error
+	// UpdateItem stores the item's game, kind, label and file name.
+	UpdateItem(ctx context.Context, it GameItem) error
 	DeleteItem(ctx context.Context, id ItemID) error
-	SetMissing(ctx context.Context, id ItemID, since *time.Time) error
-	// MoveGameContents moves every item and trash entry of one game to another.
+	// MoveGameContents moves every file and trash entry of one game to another.
 	MoveGameContents(ctx context.Context, from, to GameID) error
 	InsertTrashEntry(ctx context.Context, e TrashEntry) (TrashEntryID, error)
 	SetItemTrash(ctx context.Context, id ItemID, entry *TrashEntryID) error
 	DeleteTrashEntry(ctx context.Context, id TrashEntryID) error
+	InsertUnassigned(ctx context.Context, f UnassignedFile) (UnassignedID, error)
+	// SetUnassignedPlace stores the file's path and trash entry.
+	SetUnassignedPlace(ctx context.Context, id UnassignedID, path string, entry *TrashEntryID) error
+	DeleteUnassigned(ctx context.Context, id UnassignedID) error
 }
 
-// LibraryRepository persists games, items, the trash and the operation journal.
+// LibraryRepository persists games, files, the unassigned section, the
+// trash and the operation journal.
 type LibraryRepository interface {
-	// ListGames returns the games with items outside the trash, by title.
+	// ListGames returns the games with files outside the trash, by title.
 	ListGames(ctx context.Context) ([]GameSummary, error)
-	// GameByID returns a game with every item (ErrGameNotFound).
+	// GameByID returns a game with every file (ErrGameNotFound).
 	GameByID(ctx context.Context, id GameID) (*Game, error)
-	// ItemByID returns one item (ErrItemNotFound).
+	// GameByFolder returns the console's game with that folder, ignoring
+	// case, with every file (ErrGameNotFound).
+	GameByFolder(ctx context.Context, console Slug, folder string) (*Game, error)
+	// ItemByID returns one file (ErrItemNotFound).
 	ItemByID(ctx context.Context, id ItemID) (GameItem, error)
-	// FindGame returns the console's game for an IGDB id, with every item.
-	FindGame(ctx context.Context, console ConsoleID, igdbID int64) (*Game, error)
-	// FolderTaken reports whether another game of the console (other than
-	// except) uses the folder.
-	FolderTaken(ctx context.Context, console ConsoleID, folder string, except GameID) (bool, error)
-	// HasItemsFrom reports whether any item came from the upload.
+	// LibraryFiles returns every live file with its place.
+	LibraryFiles(ctx context.Context) ([]LibraryFile, error)
+	// HasItemsFrom reports whether any file came from the upload.
 	HasItemsFrom(ctx context.Context, source string) (bool, error)
 
-	// TrashEntries returns every entry with its items, newest first.
+	// UnassignedFiles returns the files of the section (not in the trash), newest first.
+	UnassignedFiles(ctx context.Context) ([]UnassignedFile, error)
+	// UnassignedByID returns one file of the section, even while trashed (ErrUnassignedNotFound).
+	UnassignedByID(ctx context.Context, id UnassignedID) (UnassignedFile, error)
+
+	// TrashEntries returns every entry with its files, newest first.
 	TrashEntries(ctx context.Context) ([]TrashEntry, error)
-	// TrashEntry returns one entry with its items (ErrTrashEntryNotFound).
+	// TrashEntry returns one entry with its files (ErrTrashEntryNotFound).
 	TrashEntry(ctx context.Context, id TrashEntryID) (*TrashEntry, error)
+
+	// PendingFiles returns the unknown files seen by the last scan.
+	PendingFiles(ctx context.Context) ([]PendingFile, error)
+	// SetPendingFiles replaces them.
+	SetPendingFiles(ctx context.Context, files []PendingFile) error
 
 	SaveOperation(ctx context.Context, op Operation) error
 	Operations(ctx context.Context) ([]Operation, error)

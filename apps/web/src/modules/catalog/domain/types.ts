@@ -1,61 +1,62 @@
 /** Catalog model as the screens see it (docs/spec.md §2). */
 
-export type Detection = 'titleId' | 'header' | 'structure' | 'extension'
+/**
+ * What a file is within its game: base, update and dlc on consoles with
+ * add-ons (Switch); game on consoles with one file per game (Wii, PSP).
+ */
+export type ItemKind = 'base' | 'update' | 'dlc' | 'game'
 
+export interface CustomExtension {
+  extension: string
+  /** Files in the library with it; it can be removed only at 0. */
+  fileCount: number
+}
+
+/** A console defined in code, with what the user can change (RF-40 to RF-42). */
 export interface Console {
-  id: number
+  /** Folder in the library; fixed. */
   slug: string
   displayName: string
-  igdbPlatformId?: number | null
+  defaultName: string
+  igdbPlatformId: number
   releaseYear?: number | null
   logoImageId?: string | null
+  /** From the environment variable (or the code default): fixed here. */
   extensions: string[]
+  customExtensions: CustomExtension[]
+  kinds: ItemKind[]
+  /** Several game files per upload (Switch) or exactly one (Wii, PSP). */
+  multipleFiles: boolean
   sortOrder: number
   gameCount: number
-  builtIn: boolean
-  detection: Detection
 }
-
-export interface ConsoleInput {
-  slug: string
-  displayName: string
-  extensions: string[]
-}
-
-export interface ConsoleCreate extends ConsoleInput {
-  igdbPlatformId: number
-}
-
-export type ItemKind = 'base' | 'update' | 'dlc' | 'disc'
-export type ItemShape = 'file' | 'disc' | 'folder'
 
 export interface LibraryItem {
   id: number
   kind: ItemKind
+  /** Update version (without the v) or DLC name. */
   label?: string | null
-  discNumber?: number | null
-  shape: ItemShape
-  /** Relative to the game folder; the first is the main entry. */
-  files: string[]
+  /** Name inside the game folder. */
+  file: string
   size: number
   createdAt: string
-  missingSince?: string | null
 }
 
 export interface GameSummary {
   id: number
-  igdbId: number
+  /** Unset for a name of the user's own. */
+  igdbId?: number | null
   console: string
   title: string
   folder: string
   releaseYear?: number | null
   coverImageId?: string | null
   itemCount: number
-  missingCount: number
   size: number
 }
 
 export interface GameDetail extends GameSummary {
+  /** Library-relative folder ("switch/Limbo"). */
   path: string
   summary?: string | null
   genres: string[]
@@ -65,53 +66,89 @@ export interface GameDetail extends GameSummary {
 export type DuplicateAction = 'replace' | 'skip'
 export type PlannedAction = 'store' | 'replace' | 'skip' | 'undecided'
 
-export interface RematchRequest {
-  igdbGameId: number
+/** Rename a game or move it to another console (RF-24). */
+export interface GameEdit {
+  console: string
+  title: string
+  igdbId?: number | null
   decisions?: { itemId: number; onDuplicate: DuplicateAction }[]
 }
 
-export interface RematchPlan {
+export interface GameEditPlan {
   console: string
   title: string
   folder: string
+  /** A game of the target console already has the name: they merge. */
   mergeInto?: number | null
   items: {
     item: LibraryItem
-    files: string[]
+    file: string
     action: PlannedAction
     duplicate?: LibraryItem | null
   }[]
 }
 
-export interface RematchResult {
+export interface GameEditResult {
   gameId: number
   path: string
   merged: boolean
 }
 
+/** Change a file's kind, version or DLC name (RF-24). */
+export interface ItemEdit {
+  kind: ItemKind
+  label?: string
+  onDuplicate?: DuplicateAction
+}
+
+export type UnassignedReason = 'samba' | 'upload' | 'manual'
+
+/** A file in `_unassigned/` (RF-27). */
+export interface UnassignedFile {
+  id: number
+  /** Relative to the unassigned folder. */
+  path: string
+  name: string
+  /** A library path, or the upload's file name. */
+  origin: string
+  reason: UnassignedReason
+  size: number
+  arrivedAt: string
+  /** Consoles whose extensions accept it. */
+  consoles: string[]
+  /** A zip, 7z or rar: validated once extracted. */
+  archive: boolean
+}
+
 export interface TrashEntry {
   id: number
-  gameId: number
-  console: string
+  kind: 'game' | 'unassigned'
+  gameId?: number | null
+  console?: string | null
+  /** Empty for unassigned files. */
   title: string
-  folder: string
+  folder?: string | null
   wholeGame: boolean
   reason: 'deleted' | 'replaced'
   trashedAt: string
   expiresAt: string
   size: number
   items: LibraryItem[]
+  files: UnassignedFile[]
 }
 
 export interface RestoreResult {
-  gameId: number
+  gameId?: number | null
   path: string
 }
 
-export interface IntegrityReport {
-  checkedAt: string
-  checked: number
-  missing: number
-  found: number
-  missingTotal: number
+/** What a library scan changed (RF-26). */
+export interface ScanReport {
+  scannedAt: string
+  /** Unknown files moved to (or found in) the unassigned section. */
+  unassigned: number
+  /** Files deleted over SMB that left the library. */
+  removed: number
+  /** Unknown files still changing; the next scan moves them. */
+  pending: number
 }

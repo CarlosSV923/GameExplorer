@@ -34,7 +34,7 @@ export const UploadIcon = icon([
 export const DownloadIcon = icon(['M12 3v12', 'M7 10l5 5 5-5', 'M5 21h14'])
 export const TrashIcon = icon(['M4 7h16', 'M9 7V4h6v3', 'M6 7l1 13h10l1-13'])
 export const RestoreIcon = icon(['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5'])
-export const RematchIcon = icon(['M21 12a9 9 0 1 1-3-6.7L21 8', 'M21 3v5h-5'])
+export const RefreshIcon = icon(['M21 12a9 9 0 1 1-3-6.7L21 8', 'M21 3v5h-5'])
 export const ChevronLeftIcon = icon(['m15 18-6-6 6-6'])
 export const ChevronRightIcon = icon(['m9 18 6-6-6-6'])
 export const ChevronUpIcon = icon(['m6 15 6-6 6 6'])
@@ -70,4 +70,10 @@ export const LogoutIcon = icon([
   'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3',
   'M10 17l-5-5 5-5',
   'M5 12h11',
+])
+export const MoreIcon = icon(['M5 12h.01', 'M12 12h.01', 'M19 12h.01'])
+export const ArrowRightIcon = icon(['M5 12h14', 'M13 6l6 6-6 6'])
+export const FileIcon = icon([
+  'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z',
+  'M14 3v6h6',
 ])

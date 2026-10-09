@@ -22,7 +22,7 @@ var fakeGames = map[string]string{
 // fakePlatforms are the platforms the fake IGDB returns by id.
 var fakePlatforms = map[string]string{
 	"130": `{"id":130,"name":"Nintendo Switch","platform_logo":{"image_id":"plgu"},"versions":[{"platform_version_release_dates":[{"y":2017}]}]}`,
-	"4":   `{"id":4,"name":"Nintendo 64","platform_logo":{"image_id":"pl6n"},"versions":[{"platform_version_release_dates":[{"y":1996}]}]}`,
+	"38":  `{"id":38,"name":"PlayStation Portable","platform_logo":{"image_id":"pl6q"},"versions":[{"platform_version_release_dates":[{"y":2004}]}]}`,
 }
 
 // fakeIGDBServer answers the token endpoint, the API and the image CDN.
@@ -75,6 +75,13 @@ func TestMetadataWithoutIGDBAnswers503(t *testing.T) {
 	srv := newTestServer(t, nil)
 	cookie := login(t, srv)
 
+	status := decode[struct {
+		Configured bool `json:"configured"`
+	}](t, do(t, http.MethodGet, srv.URL+"/api/metadata/status", "", cookie))
+	if status.Configured {
+		t.Fatal("IGDB must not be configured")
+	}
+
 	res := do(t, http.MethodGet, srv.URL+"/api/metadata/games?q=zelda", "", cookie)
 	if res.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503", res.StatusCode)
@@ -126,7 +133,7 @@ func TestConsoleSyncFromIGDB(t *testing.T) {
 	igdbSrv := fakeIGDBServer(t)
 	cfg := config.Config{
 		Port: 8080, LibraryPath: t.TempDir(), DataPath: t.TempDir(), Password: testPassword,
-		SessionSecret: strings.Repeat("s", config.MinSessionSecretBytes), SessionTTL: 3600e9, ExtractConcurrency: 1,
+		SessionSecret: strings.Repeat("s", config.MinSessionSecretBytes), SessionTTL: 3600e9, ExtractConcurrency: 1, ScanInterval: 3600e9,
 	}
 	withFakeIGDB(igdbSrv)(&cfg)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))

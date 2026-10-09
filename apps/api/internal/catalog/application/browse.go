@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"path"
 	"slices"
 	"strings"
 	"unicode"
@@ -19,26 +18,18 @@ import (
 
 // Browse errors.
 var (
-	ErrConsoleNotFound = errors.New("console not found")
 	// ErrInvalidSearch is returned for empty or too long search terms.
 	ErrInvalidSearch = errors.New("invalid search")
-	// ErrFileMissing means a recorded file is no longer on disk (deleted over SMB).
+	// ErrFileMissing means a recorded file is no longer on disk (deleted over
+	// SMB and not yet noticed by the scan).
 	ErrFileMissing = errors.New("file missing from the library")
 )
 
-// GameListing is a game in a list, with its console slug.
-type GameListing struct {
-	domain.GameSummary
-	Console domain.Slug
-}
-
-// GameView is a game's detail: items in the library, base first.
+// GameView is a game's detail: files in the library, base first.
 type GameView struct {
-	Game    *domain.Game
-	Console domain.Slug
-	Items   []domain.GameItem
-	Size    int64
-	Missing int
+	Game  *domain.Game
+	Items []domain.GameItem
+	Size  int64
 }
 
 // Download describes what to send for a download request: a single file
@@ -46,7 +37,7 @@ type GameView struct {
 type Download struct {
 	// Name is the suggested file name.
 	Name string
-	// File is set for single-file items.
+	// File is set for single files.
 	File *TreeFile
 	// Entries are set for zips; Name is "<game folder>/<file>".
 	Entries []ZipFile
@@ -60,47 +51,32 @@ type ZipFile struct {
 
 // BrowseService implements the library's read side (RF-20..RF-23).
 type BrowseService struct {
-	consoles domain.ConsoleRepository
+	consoles Consoles
 	repo     domain.LibraryRepository
 	files    Files
 }
 
 // NewBrowseService builds the service.
-func NewBrowseService(consoles domain.ConsoleRepository, repo domain.LibraryRepository, files Files) *BrowseService {
+func NewBrowseService(consoles Consoles, repo domain.LibraryRepository, files Files) *BrowseService {
 	return &BrowseService{consoles: consoles, repo: repo, files: files}
 }
 
 // ConsoleGames lists the games of one console, by title.
-func (s *BrowseService) ConsoleGames(ctx context.Context, slug string) ([]GameListing, error) {
-	slugs, err := s.slugs(ctx)
-	if err != nil {
+func (s *BrowseService) ConsoleGames(ctx context.Context, slug string) ([]domain.GameSummary, error) {
+	if _, err := s.consoles.Console(ctx, slug); err != nil {
 		return nil, err
 	}
-	var id domain.ConsoleID
-	found := false
-	for cid, sl := range slugs {
-		if string(sl) == slug {
-			id, found = cid, true
-		}
-	}
-	if !found {
-		return nil, ErrConsoleNotFound
-	}
-	return s.list(ctx, slugs, func(g domain.GameSummary) bool { return g.ConsoleID == id })
+	return s.list(ctx, func(g domain.GameSummary) bool { return string(g.Console) == slug })
 }
 
 // Search finds games whose title contains every word of q, ignoring case and
 // accents ("pokemon" finds "Pokémon").
-func (s *BrowseService) Search(ctx context.Context, q string) ([]GameListing, error) {
+func (s *BrowseService) Search(ctx context.Context, q string) ([]domain.GameSummary, error) {
 	words := strings.Fields(fold(q))
 	if len(words) == 0 || len([]rune(q)) > 100 {
 		return nil, ErrInvalidSearch
 	}
-	slugs, err := s.slugs(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return s.list(ctx, slugs, func(g domain.GameSummary) bool {
+	return s.list(ctx, func(g domain.GameSummary) bool {
 		title := fold(g.Title)
 		for _, w := range words {
 			if !strings.Contains(title, w) {
@@ -111,28 +87,16 @@ func (s *BrowseService) Search(ctx context.Context, q string) ([]GameListing, er
 	})
 }
 
-func (s *BrowseService) list(ctx context.Context, slugs map[domain.ConsoleID]domain.Slug, keep func(domain.GameSummary) bool) ([]GameListing, error) {
+func (s *BrowseService) list(ctx context.Context, keep func(domain.GameSummary) bool) ([]domain.GameSummary, error) {
 	games, err := s.repo.ListGames(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := []GameListing{}
+	out := []domain.GameSummary{}
 	for _, g := range games {
 		if keep(g) {
-			out = append(out, GameListing{GameSummary: g, Console: slugs[g.ConsoleID]})
+			out = append(out, g)
 		}
-	}
-	return out, nil
-}
-
-func (s *BrowseService) slugs(ctx context.Context) (map[domain.ConsoleID]domain.Slug, error) {
-	consoles, err := s.consoles.List(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[domain.ConsoleID]domain.Slug, len(consoles))
-	for _, c := range consoles {
-		out[c.ID] = c.Slug
 	}
 	return out, nil
 }
@@ -152,8 +116,8 @@ func fold(s string) string {
 	return b.String()
 }
 
-// Game returns a game with its items in the library. A game whose items are
-// all in the trash is not found.
+// Game returns a game with its files in the library. A game whose files
+// are all in the trash is not found.
 func (s *BrowseService) Game(ctx context.Context, id domain.GameID) (*GameView, error) {
 	g, err := s.repo.GameByID(ctx, id)
 	if err != nil {
@@ -163,36 +127,48 @@ func (s *BrowseService) Game(ctx context.Context, id domain.GameID) (*GameView, 
 	if len(items) == 0 {
 		return nil, domain.ErrGameNotFound
 	}
-	slugs, err := s.slugs(ctx)
-	if err != nil {
-		return nil, err
-	}
 	slices.SortStableFunc(items, compareItems)
-	v := &GameView{Game: g, Console: slugs[g.ConsoleID], Items: items}
+	v := &GameView{Game: g, Items: items}
 	for _, it := range items {
 		v.Size += it.Size
-		if it.MissingSince != nil {
-			v.Missing++
-		}
 	}
 	return v, nil
 }
 
-// compareItems orders a game's items: base, discs by number, updates by
-// date, then DLC by name.
+// compareItems orders a game's files: base (or game), updates by version,
+// then DLC by name.
 func compareItems(a, b domain.GameItem) int {
-	rank := map[domain.ItemKind]int{domain.KindBase: 0, domain.KindDisc: 1, domain.KindUpdate: 2, domain.KindDLC: 3}
+	rank := map[domain.ItemKind]int{domain.KindGame: 0, domain.KindBase: 0, domain.KindUpdate: 1, domain.KindDLC: 2}
 	return cmp.Or(
 		cmp.Compare(rank[a.Kind], rank[b.Kind]),
-		cmp.Compare(a.DiscNumber, b.DiscNumber),
-		a.CreatedAt.Compare(b.CreatedAt),
+		compareVersions(a, b),
 		strings.Compare(strings.ToLower(a.Label), strings.ToLower(b.Label)),
 		cmp.Compare(a.ID, b.ID),
 	)
 }
 
-// ItemDownload prepares the download of one item: single files as they are,
-// discs and folder games as a zip.
+// compareVersions orders updates numerically ("1.10" after "1.9").
+func compareVersions(a, b domain.GameItem) int {
+	if a.Kind != domain.KindUpdate || b.Kind != domain.KindUpdate {
+		return 0
+	}
+	pa, pb := strings.Split(a.Label, "."), strings.Split(b.Label, ".")
+	for i := range max(len(pa), len(pb)) {
+		var x, y int
+		if i < len(pa) {
+			_, _ = fmt.Sscan(pa[i], &x)
+		}
+		if i < len(pb) {
+			_, _ = fmt.Sscan(pb[i], &y)
+		}
+		if c := cmp.Compare(x, y); c != 0 {
+			return c
+		}
+	}
+	return 0
+}
+
+// ItemDownload prepares the download of one file.
 func (s *BrowseService) ItemDownload(ctx context.Context, id domain.ItemID) (Download, error) {
 	it, err := s.repo.ItemByID(ctx, id)
 	if err != nil {
@@ -209,10 +185,7 @@ func (s *BrowseService) ItemDownload(ctx context.Context, id domain.ItemID) (Dow
 	if err != nil {
 		return Download{}, err
 	}
-	if it.Shape == domain.ShapeFile && len(entries) == 1 {
-		return Download{Name: it.Files[0], File: &entries[0].TreeFile}, nil
-	}
-	return Download{Name: strings.TrimSuffix(it.Files[0], path.Ext(it.Files[0])) + ".zip", Entries: entries}, nil
+	return Download{Name: it.File, File: &entries[0].TreeFile}, nil
 }
 
 // GameDownload prepares the whole game as a zip.
@@ -231,24 +204,28 @@ func (s *BrowseService) GameDownload(ctx context.Context, id domain.GameID) (Dow
 func (s *BrowseService) zipEntries(v *GameView, items []domain.GameItem) ([]ZipFile, error) {
 	var out []ZipFile
 	for _, it := range items {
-		for _, f := range it.Files {
-			files, err := s.files.Tree(s.files.LibraryPath(string(v.Console), v.Game.Folder, f))
-			if errors.Is(err, fs.ErrNotExist) {
-				return nil, fmt.Errorf("%w: %s/%s/%s", ErrFileMissing, v.Console, v.Game.Folder, f)
-			}
-			if err != nil {
-				return nil, err
-			}
-			for _, tf := range files {
-				name := v.Game.Folder + "/" + f
-				if tf.Rel != "" {
-					name += "/" + tf.Rel
-				}
-				out = append(out, ZipFile{Name: name, TreeFile: tf})
-			}
+		files, err := s.files.Tree(s.files.LibraryPath(string(v.Game.Console), v.Game.Folder, it.File))
+		if errors.Is(err, fs.ErrNotExist) || (err == nil && len(files) != 1) {
+			return nil, fmt.Errorf("%w: %s/%s/%s", ErrFileMissing, v.Game.Console, v.Game.Folder, it.File)
 		}
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ZipFile{Name: v.Game.Folder + "/" + it.File, TreeFile: files[0]})
 	}
 	return out, nil
+}
+
+// FileDownload prepares the download of a single file at an absolute path.
+func (s *BrowseService) FileDownload(p, name string) (Download, error) {
+	files, err := s.files.Tree(p)
+	if errors.Is(err, fs.ErrNotExist) || (err == nil && len(files) != 1) {
+		return Download{}, fmt.Errorf("%w: %s", ErrFileMissing, name)
+	}
+	if err != nil {
+		return Download{}, err
+	}
+	return Download{Name: name, File: &files[0]}, nil
 }
 
 // Open opens a file of a Download.

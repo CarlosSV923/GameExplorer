@@ -23,11 +23,26 @@ import (
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain"
 )
 
-// Metadata keys the browser sends with Upload-Metadata.
+// Metadata keys the browser sends with Upload-Metadata (RF-03).
 const (
-	MetaFileName = "filename"
-	MetaConsole  = "consoleSlug"
+	MetaFileName  = "filename"
+	MetaConsole   = "consoleSlug"
+	MetaTitle     = "title"
+	MetaIGDBID    = "igdbId"
+	MetaGroup     = "group"
+	MetaGroupSize = "groupSize"
 )
+
+// Meta reads the form data of an upload.
+func Meta(m map[string]string) application.UploadMeta {
+	return application.UploadMeta{
+		FileName: m[MetaFileName], Console: m[MetaConsole], Title: m[MetaTitle],
+		IGDBID: m[MetaIGDBID], Group: m[MetaGroup], GroupSize: m[MetaGroupSize],
+	}
+}
+
+// Validator checks an upload's form data before any byte is accepted.
+type Validator func(ctx context.Context, meta application.UploadMeta) error
 
 // FreeSpaceMargin is kept free on top of every upload's size.
 const FreeSpaceMargin = 1 << 30 // 1 GiB
@@ -37,7 +52,7 @@ type FreeSpaceFunc func(path string) (uint64, error)
 
 // Hooks receives upload lifecycle events (implemented by application.Service).
 type Hooks interface {
-	UploadCreated(ctx context.Context, id domain.JobID, fileName string, size int64, origin string) error
+	UploadCreated(ctx context.Context, id domain.JobID, size int64, meta application.UploadMeta) error
 	UploadProgress(ctx context.Context, id domain.JobID, received int64) error
 	UploadFinished(ctx context.Context, id domain.JobID, storagePath string) error
 	UploadTerminated(ctx context.Context, id domain.JobID) error
@@ -58,7 +73,7 @@ var (
 
 // New creates the store in dir (inside the library dataset, so later moves
 // are a rename) and the tus handler served under basePath.
-func New(dir, basePath string, log *slog.Logger, freeSpace FreeSpaceFunc) (*Adapter, error) {
+func New(dir, basePath string, log *slog.Logger, freeSpace FreeSpaceFunc, validate Validator) (*Adapter, error) {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("tus: create upload dir: %w", err)
 	}
@@ -81,7 +96,15 @@ func New(dir, basePath string, log *slog.Logger, freeSpace FreeSpaceFunc) (*Adap
 		// tusd logs every request at info level (with its own slog type); keep only warnings.
 		Logger: expslog.New(expslog.NewJSONHandler(os.Stdout, &expslog.HandlerOptions{Level: expslog.LevelWarn})),
 		PreUploadCreateCallback: func(ev tusd.HookEvent) (tusd.HTTPResponse, tusd.FileInfoChanges, error) {
-			return tusd.HTTPResponse{}, tusd.FileInfoChanges{}, validateNewUpload(ev.Upload, dir, freeSpace)
+			if err := validateNewUpload(ev.Upload, dir, freeSpace); err != nil {
+				return tusd.HTTPResponse{}, tusd.FileInfoChanges{}, err
+			}
+			if validate != nil {
+				if err := validate(ev.Context, Meta(ev.Upload.MetaData)); err != nil {
+					return tusd.HTTPResponse{}, tusd.FileInfoChanges{}, tusd.NewError("ERR_INVALID_METADATA", err.Error(), http.StatusBadRequest)
+				}
+			}
+			return tusd.HTTPResponse{}, tusd.FileInfoChanges{}, nil
 		},
 	})
 	if err != nil {
@@ -120,8 +143,7 @@ func (a *Adapter) Run(ctx context.Context, hooks Hooks) {
 		case <-ctx.Done():
 			return
 		case ev := <-a.handler.CreatedUploads:
-			err = hooks.UploadCreated(ctx, domain.JobID(ev.Upload.ID), ev.Upload.MetaData[MetaFileName],
-				ev.Upload.Size, ev.Upload.MetaData[MetaConsole])
+			err = hooks.UploadCreated(ctx, domain.JobID(ev.Upload.ID), ev.Upload.Size, Meta(ev.Upload.MetaData))
 		case ev := <-a.handler.UploadProgress:
 			err = hooks.UploadProgress(ctx, domain.JobID(ev.Upload.ID), ev.Upload.Offset)
 		case ev := <-a.handler.CompleteUploads:

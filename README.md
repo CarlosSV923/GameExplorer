@@ -2,16 +2,17 @@
 
 [Español](README.es.md)
 
-> **Status:** early development (phases 0–9 of [`docs/tasks.md`](docs/tasks.md) done: the web app works end to end against the API — sign in, browse the console carousel, upload with resumable transfers, review against IGDB, download, re-match, trash and restore, manage consoles; next: a scope simplification — Switch, Wii and PSP only, the user names each upload, IGDB optional (phase 10) — then the backend-less demo (phase 11) and the TrueNAS release (phase 12)).
+> **Status:** early development (phases 0–10 of [`docs/tasks.md`](docs/tasks.md) done: the web app works end to end against the API for Switch, Wii and PSP — sign in, browse the carousel, upload with a form and resumable transfers, confirm each file, edit and move games, the unassigned section fed by a Samba scan, trash and restore; next: the backend-less demo (phase 11) and the TrueNAS release (phase 12)).
 
 Self-hosted web app for a home NAS (TrueNAS SCALE) to **upload, extract, classify, rename, browse and download emulation game files** from any browser: desktop, tablet, touch screen or gamepad. The UI is inspired by EmulationStation.
 
-Drop a `.rar`, `.zip`, `.7z` or a raw game file. GameExplorer extracts it, detects the console from the file header, lets you pick the game from IGDB, and stores it as `[console]/[game]/[file]` with consistent names. Base games, updates, DLC and multi-disc games are all handled.
+Drop a `.rar`, `.zip`, `.7z` or a raw game file, say which game and console it is (IGDB suggests names, but any name works), and GameExplorer extracts it, checks the files fit the console and stores them as `[console]/[game]/[file]` with consistent names. Switch base games, updates and DLC are handled; Wii and PSP keep one file per game.
 
 ## Highlights (planned)
 - Resumable uploads of tens of gigabytes (tus protocol), streamed to disk.
-- Console detection from magic bytes (GameCube/Wii disc headers, PS1/PS2 `SYSTEM.CNF`, PS3 folder layout, Switch title IDs).
+- Each console is a module defined in code ([adding one](docs/adding-a-console.md) touches nothing else); extensions come from environment variables plus your own.
 - Duplicate warnings before anything is written; trash with restore.
+- Files added over Samba are picked up: unknown ones go to an "Unassigned" section to be assigned later.
 - Single Go binary with the React app embedded; deployed as a TrueNAS custom app.
 - **Backend-less demo** on Vercel: the same UI with in-browser adapters, so you can try the full flow without a NAS or game files.
 

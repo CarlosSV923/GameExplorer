@@ -5,13 +5,15 @@ import type {
   CommitPlan,
   CommitRequest,
   CommitResult,
-  StagedItem,
+  ResolveAction,
+  StagedFile,
   UploadJob,
+  UploadSpec,
 } from '../domain/types'
 
 export interface UploadOptions {
-  /** Console screen the upload started from (RF-08). */
-  consoleSlug?: string
+  /** What the form decided (RF-03); ignored when resuming. */
+  spec: UploadSpec
   /** Continue an interrupted upload (the tus id) instead of starting one. */
   resumeJobId?: string
 }
@@ -30,16 +32,22 @@ export interface UploadHandle {
   abort: () => void
 }
 
-/** Uploads and their jobs: extraction, review and commit (RF-01 to RF-13). */
+/** Uploads and their jobs: extraction, validation and commit (RF-01 to RF-13, RF-27). */
 export interface IngestionPorts {
   /** Resumable upload (tus): the bytes never pass through memory twice. */
   upload(file: File, options: UploadOptions, callbacks: UploadCallbacks): UploadHandle
+  /** Starts a job from an unassigned file (RF-27). */
+  assign(unassignedId: number, spec: Omit<UploadSpec, 'group' | 'groupSize'>): Promise<UploadJob>
   jobs(): Promise<UploadJob[]>
   job(id: string): Promise<UploadJob>
   /** Live job changes. Returns a function that stops watching. */
   watchJobs(handlers: { onJob: (job: UploadJob) => void; onOpen?: () => void }): () => void
-  items(jobId: string): Promise<StagedItem[]>
+  files(jobId: string): Promise<StagedFile[]>
   submitPassword(jobId: string, password: string): Promise<UploadJob>
+  /** Validates the files for another console without extracting again (RF-07). */
+  changeConsole(jobId: string, console: string): Promise<UploadJob>
+  /** Sets aside an upload that does not fit its console (RF-07). */
+  resolve(jobId: string, action: ResolveAction): Promise<UploadJob>
   cancel(jobId: string): Promise<UploadJob>
   plan(jobId: string, request: CommitRequest): Promise<CommitPlan>
   commit(jobId: string, request: CommitRequest): Promise<CommitResult>

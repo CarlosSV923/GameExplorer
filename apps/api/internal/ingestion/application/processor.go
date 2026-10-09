@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain"
-	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain/scan"
 )
 
 // ExtractionMargin is kept free on top of an archive's uncompressed size.
@@ -28,14 +29,15 @@ var ErrNotWaitingForPassword = errors.New("job is not waiting for a password")
 // ProcessorDeps are the processor's collaborators.
 type ProcessorDeps struct {
 	Jobs    domain.JobRepository
-	Items   domain.StagedItemRepository
+	Files   domain.StagedFileRepository
 	Uploads interface {
 		UploadStore
 		UploadAdopter
 	}
 	Extractor Extractor
 	Staging   Staging
-	Profiles  ProfileSource
+	Consoles  Consoles
+	Library   Library
 	Publisher Publisher
 	Log       *slog.Logger
 	Now       func() time.Time
@@ -46,8 +48,9 @@ type request struct {
 	password string
 }
 
-// Processor moves uploaded jobs to review: extraction (with password and
-// integrity checks) or adoption of a raw file, then scanning and detection.
+// Processor takes uploaded jobs to confirmation: gathering multi-volume
+// groups, extraction (with password and integrity checks) or adoption of a
+// raw file, then validation against the chosen console (RF-03..RF-07).
 type Processor struct {
 	d     ProcessorDeps
 	queue chan request
@@ -55,9 +58,9 @@ type Processor struct {
 	mu      sync.Mutex
 	running map[domain.JobID]context.CancelFunc
 
-	// setMu serializes volume-set completion: parts arriving together must
-	// not both promote the set.
-	setMu sync.Mutex
+	// groupMu serializes group completion: parts arriving together must
+	// not both promote the group.
+	groupMu sync.Mutex
 }
 
 // NewProcessor builds a processor.
@@ -107,28 +110,55 @@ func (p *Processor) SubmitPassword(ctx context.Context, id domain.JobID, passwor
 }
 
 // Discard stops any running work for the job and deletes its staged files
-// (and, for multi-volume archives, its parts).
+// (and, for multi-volume groups, its parts). A file taken from the
+// unassigned section goes back there.
 func (p *Processor) Discard(id domain.JobID) {
 	p.mu.Lock()
 	if cancel, ok := p.running[id]; ok {
 		cancel()
 	}
 	p.mu.Unlock()
+	ctx := context.Background()
+	job, err := p.d.Jobs.Get(ctx, id)
+	if err == nil {
+		p.giveBack(ctx, job)
+	}
 	if err := p.d.Staging.Remove(id); err != nil {
 		p.d.Log.Warn("remove staging", "job", id, "error", err)
 	}
-	job, err := p.d.Jobs.Get(context.Background(), id)
-	if err != nil || job.VolumeSet == "" {
+	if err != nil || job.GroupID == "" {
 		return
 	}
 	if job.Status == domain.StatusWaitingParts {
 		err = p.d.Staging.RemovePart(job.StoragePath)
 	} else {
-		err = p.d.Staging.RemoveVolumes(job.VolumeSet)
+		err = p.d.Staging.RemoveVolumes(job.GroupID)
 	}
 	if err != nil {
 		p.d.Log.Warn("remove volume files", "job", id, "error", err)
 	}
+}
+
+// giveBack returns the file of a job started from the unassigned section,
+// wherever it is now (its source folder, or staging if it was not an
+// archive), to the section.
+func (p *Processor) giveBack(ctx context.Context, job *domain.UploadJob) {
+	if job.UnassignedOrigin == "" {
+		return
+	}
+	src := job.StoragePath
+	if !p.d.Staging.Exists(src) {
+		return
+	}
+	err := p.d.Library.PutAside(ctx, SetAsideRequest{
+		Source: string(job.ID), Root: filepath.Dir(src), Files: []string{filepath.Base(src)},
+		Folder: path.Dir(job.UnassignedOrigin), Origin: job.UnassignedOrigin, Reason: "manual",
+	})
+	if err != nil {
+		p.d.Log.Error("give file back to the unassigned section", "job", job.ID, "error", err)
+		return
+	}
+	_ = p.d.Staging.RemoveSource(job.ID)
 }
 
 func (p *Processor) enqueue(r request) {
@@ -187,113 +217,111 @@ func (p *Processor) process(parent context.Context, req request) {
 }
 
 func (p *Processor) handle(ctx context.Context, job *domain.UploadJob, password string) error {
-	if job.VolumeSet == "" { // not yet sorted into a volume set
-		if v, ok := domain.ParseVolume(job.FileName); ok {
-			return p.collectPart(ctx, job, v)
-		}
-		if domain.IsLegacyRarVolume(job.FileName) {
-			return errLegacyVolume
-		}
+	if job.GroupID != "" && !strings.HasPrefix(job.StoragePath, p.d.Staging.VolumeDir(job.GroupID)) {
+		return p.collectPart(ctx, job)
+	}
+	if job.GroupID == "" && domain.IsLegacyRarVolume(job.FileName) {
+		return errLegacyVolume
 	}
 	header, err := p.d.Staging.ReadHeader(job.StoragePath, 8)
 	if err != nil {
 		return fmt.Errorf("read upload: %w", err)
 	}
 	if _, isArchive := domain.DetectArchive(header); !isArchive {
+		if job.GroupID != "" {
+			return errNotAGroup
+		}
 		return p.adoptRaw(ctx, job)
 	}
 	return p.extract(ctx, job, password)
 }
 
-// collectPart moves a volume into its set's folder and waits for the rest.
-func (p *Processor) collectPart(ctx context.Context, job *domain.UploadJob, v domain.Volume) error {
-	dest := filepath.Join(p.d.Staging.VolumeDir(v.Set), job.FileName)
+// collectPart moves a part into its group's folder and waits for the rest.
+func (p *Processor) collectPart(ctx context.Context, job *domain.UploadJob) error {
+	dest := filepath.Join(p.d.Staging.VolumeDir(job.GroupID), job.FileName)
 	if err := p.d.Uploads.Take(ctx, job.ID, dest); err != nil {
-		return fmt.Errorf("collect volume: %w", err)
+		return fmt.Errorf("collect part: %w", err)
 	}
-	if err := job.WaitForParts(v, dest, p.d.Now()); err != nil {
+	if err := job.WaitForParts(dest, p.d.Now()); err != nil {
 		return err
 	}
 	if err := p.save(ctx, job); err != nil {
 		return err
 	}
-	return p.tryCompleteSet(ctx, v.Set)
+	return p.tryCompleteGroup(ctx, job.GroupID, job.GroupSize)
 }
 
-// tryCompleteSet promotes the set's first volume once every part is there.
-// 7-Zip refuses to open a split archive with missing parts, so a successful
-// listing of the first volume means the set is complete. Header-encrypted
-// sets cannot be listed without the password; they are promoted when the
-// parts are contiguous, and extraction reports anything still missing.
-func (p *Processor) tryCompleteSet(ctx context.Context, set string) error {
-	p.setMu.Lock()
-	defer p.setMu.Unlock()
+// tryCompleteGroup promotes the group's first volume once every part has
+// arrived. Parts that do not form one archive fail together (RF-03a).
+func (p *Processor) tryCompleteGroup(ctx context.Context, group string, size int) error {
+	p.groupMu.Lock()
+	defer p.groupMu.Unlock()
 
-	parts, err := p.d.Jobs.ListWaitingParts(ctx, set)
+	jobs, err := p.d.Jobs.ListGroup(ctx, group)
 	if err != nil {
 		return err
 	}
-	var first *domain.UploadJob
-	for _, part := range parts {
-		if part.VolumeIndex == 1 {
-			first = part
+	var parts []*domain.UploadJob
+	for _, j := range jobs {
+		if j.Status == domain.StatusWaitingParts {
+			parts = append(parts, j)
 		}
 	}
-	if first == nil {
-		return nil // keep waiting for the first volume
+	if len(parts) < size {
+		return nil // keep waiting
 	}
-	_, err = p.d.Extractor.List(ctx, first.StoragePath, "")
-	complete := err == nil ||
-		((errors.Is(err, ErrPasswordRequired) || errors.Is(err, ErrWrongPassword)) && contiguous(parts))
-	if !complete {
-		return nil
+	names := make([]string, len(parts))
+	for i, part := range parts {
+		names[i] = part.FileName
 	}
-
-	for _, part := range parts {
-		if part.ID == first.ID {
+	first, ok := domain.FirstVolume(names)
+	if !ok {
+		for _, part := range parts {
+			if err := part.Fail("Los archivos no son las partes de un mismo comprimido, o falta alguna parte.", p.d.Now()); err != nil {
+				return err
+			}
+			if err := p.save(ctx, part); err != nil {
+				return err
+			}
+		}
+		return p.d.Staging.RemoveVolumes(group)
+	}
+	for i, part := range parts {
+		if i == first {
 			continue
 		}
-		if err := part.MergeInto(first.ID, p.d.Now()); err != nil {
+		if err := part.MergeInto(parts[first].ID, p.d.Now()); err != nil {
 			return err
 		}
 		if err := p.save(ctx, part); err != nil {
 			return err
 		}
 	}
-	if err := first.PartsComplete(p.d.Now()); err != nil {
+	if err := parts[first].PartsComplete(p.d.Now()); err != nil {
 		return err
 	}
-	if err := p.save(ctx, first); err != nil {
+	if err := p.save(ctx, parts[first]); err != nil {
 		return err
 	}
-	p.enqueue(request{id: first.ID})
+	p.enqueue(request{id: parts[first].ID})
 	return nil
 }
 
-func contiguous(parts []*domain.UploadJob) bool {
-	for i, part := range parts { // sorted by volume index
-		if part.VolumeIndex != i+1 {
-			return false
-		}
-	}
-	return len(parts) > 0
-}
-
-// adoptRaw moves a non-archive upload (an .nsp, an .iso...) into staging.
+// adoptRaw moves a non-archive file (an .nsp, an .iso...) into staging.
 func (p *Processor) adoptRaw(ctx context.Context, job *domain.UploadJob) error {
 	if err := p.d.Staging.Reset(job.ID); err != nil {
 		return err
 	}
-	if err := p.d.Uploads.Take(ctx, job.ID, filepath.Join(p.d.Staging.Dir(job.ID), job.FileName)); err != nil {
+	dest := filepath.Join(p.d.Staging.Dir(job.ID), job.FileName)
+	if job.UnassignedOrigin != "" {
+		if err := p.d.Staging.Adopt(job.StoragePath, dest); err != nil {
+			return fmt.Errorf("adopt file: %w", err)
+		}
+		job.StoragePath = dest // where to give it back from, if cancelled
+	} else if err := p.d.Uploads.Take(ctx, job.ID, dest); err != nil {
 		return fmt.Errorf("adopt upload: %w", err)
 	}
-	if err := p.stageItems(ctx, job); err != nil {
-		return err
-	}
-	if err := job.ReadyForReview(p.d.Now()); err != nil {
-		return err
-	}
-	return p.save(ctx, job)
+	return p.validate(ctx, job, "")
 }
 
 func (p *Processor) extract(ctx context.Context, job *domain.UploadJob, password string) error {
@@ -346,15 +374,12 @@ func (p *Processor) extract(ctx context.Context, job *domain.UploadJob, password
 		_ = p.d.Staging.Remove(job.ID)
 		return err
 	}
-	// The archive is no longer needed (RF-03).
-	p.deleteArchive(ctx, job)
-	if err := p.stageItems(ctx, job); err != nil {
-		return err
+	// The archive is no longer needed (RF-06); one taken from the unassigned
+	// section stays until the job ends, to give it back if cancelled.
+	if job.UnassignedOrigin == "" {
+		p.deleteArchive(ctx, job)
 	}
-	if err := job.FinishExtraction(warning, p.d.Now()); err != nil {
-		return err
-	}
-	return p.save(ctx, job)
+	return p.validate(ctx, job, warning)
 }
 
 // passwordProblem pauses the job when err is a password error.
@@ -374,16 +399,55 @@ func (p *Processor) passwordProblem(ctx context.Context, job *domain.UploadJob, 
 	return true, p.save(ctx, job)
 }
 
-func (p *Processor) stageItems(ctx context.Context, job *domain.UploadJob) error {
-	profiles, err := p.d.Profiles.Profiles(ctx)
+// validate lists the staged files and checks them against the job's
+// console (RF-07).
+func (p *Processor) validate(ctx context.Context, job *domain.UploadJob, warning string) error {
+	files, err := listFiles(p.d.Staging.FS(job.ID), job.ID)
+	if err != nil {
+		return fmt.Errorf("list files: %w", err)
+	}
+	if err := p.d.Files.Replace(ctx, job.ID, files); err != nil {
+		return err
+	}
+	rules, known, err := p.d.Consoles.Rules(ctx)
 	if err != nil {
 		return err
 	}
-	items, err := scan.Scan(p.d.Staging.FS(job.ID), job.ID, profiles)
-	if err != nil {
-		return fmt.Errorf("scan: %w", err)
+	_, reason := domain.Validate(rules[job.Console], files, known)
+	if err := job.Validated(job.Console, reason, p.d.Now()); err != nil {
+		return err
 	}
-	return p.d.Items.Replace(ctx, job.ID, items)
+	job.Warning = warning
+	return p.save(ctx, job)
+}
+
+// listFiles returns every regular file of an upload, skipping the hidden
+// ones and macOS resource forks (junk that zips made on a Mac carry).
+func listFiles(fsys fs.FS, id domain.JobID) ([]domain.StagedFile, error) {
+	var out []domain.StagedFile
+	err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		name := d.Name()
+		if p != "." && (strings.HasPrefix(name, ".") || name == "__MACOSX") {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		out = append(out, domain.StagedFile{JobID: id, Path: p, Size: info.Size()})
+		return nil
+	})
+	slices.SortFunc(out, func(a, b domain.StagedFile) int { return strings.Compare(a.Path, b.Path) })
+	return out, err
 }
 
 func (p *Processor) fail(ctx context.Context, job *domain.UploadJob, reason string) {
@@ -391,16 +455,17 @@ func (p *Processor) fail(ctx context.Context, job *domain.UploadJob, reason stri
 		return
 	}
 	_ = p.save(ctx, job)
-	if job.VolumeSet != "" { // a failed set frees its parts
-		_ = p.d.Staging.RemoveVolumes(job.VolumeSet)
+	p.giveBack(ctx, job)
+	if job.GroupID != "" { // a failed group frees its parts
+		_ = p.d.Staging.RemoveVolumes(job.GroupID)
 	}
 }
 
-// deleteArchive removes the uploaded archive (or every part of a volume set).
+// deleteArchive removes the uploaded archive (or every part of a group).
 func (p *Processor) deleteArchive(ctx context.Context, job *domain.UploadJob) {
 	var err error
-	if job.VolumeSet != "" {
-		err = p.d.Staging.RemoveVolumes(job.VolumeSet)
+	if job.GroupID != "" {
+		err = p.d.Staging.RemoveVolumes(job.GroupID)
 	} else {
 		err = p.d.Uploads.Delete(ctx, job.ID)
 	}
@@ -421,6 +486,7 @@ var (
 	errUnsafePath   = errors.New("unsafe path in archive")
 	errNoSpace      = errors.New("not enough free space")
 	errLegacyVolume = errors.New("legacy rar volume")
+	errNotAGroup    = errors.New("group part is not an archive")
 )
 
 // failureMessage turns an error into the text shown to the user.
@@ -431,9 +497,11 @@ func failureMessage(err error) string {
 	case errors.Is(err, errUnsafePath):
 		return "El comprimido contiene rutas peligrosas (fuera de su carpeta) y se descartó."
 	case errors.Is(err, ErrCorrupt):
-		return "El comprimido está dañado o un archivo no pasó la verificación de integridad."
+		return "El comprimido está dañado, falta alguna parte o un archivo no pasó la verificación de integridad."
 	case errors.Is(err, errLegacyVolume):
 		return "Volúmenes RAR en formato antiguo (.r00, .r01…) no soportados; usa un comprimido de una parte o volúmenes .part1.rar."
+	case errors.Is(err, errNotAGroup):
+		return "Los archivos no son las partes de un mismo comprimido."
 	case errors.Is(err, ErrUnsafeEntry):
 		return "El comprimido contiene enlaces o archivos especiales y se descartó."
 	default:

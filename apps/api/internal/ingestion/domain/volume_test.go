@@ -43,17 +43,16 @@ func TestVolumeLifecycle(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
-	first, _ := domain.NewUploadJob("a", "g.7z.001", 10, nil, now)
-	second, _ := domain.NewUploadJob("b", "g.7z.002", 10, nil, now)
+	group := domain.Spec{Console: "psp", Title: "G", GroupID: "g", GroupSize: 2}
+	first, _ := domain.NewUploadJob("a", "g.7z.001", 10, group, now)
+	second, _ := domain.NewUploadJob("b", "g.7z.002", 10, group, now)
 	for _, j := range []*domain.UploadJob{first, second} {
 		_ = j.MarkUploaded("/up/"+string(j.ID), now)
 	}
-	v1, _ := domain.ParseVolume(first.FileName)
-	v2, _ := domain.ParseVolume(second.FileName)
-	if err := first.WaitForParts(v1, "/vol/g.7z.001", now); err != nil {
+	if err := first.WaitForParts("/vol/g.7z.001", now); err != nil {
 		t.Fatal(err)
 	}
-	if err := second.WaitForParts(v2, "/vol/g.7z.002", now); err != nil {
+	if err := second.WaitForParts("/vol/g.7z.002", now); err != nil {
 		t.Fatal(err)
 	}
 	if err := second.MergeInto(first.ID, now); err != nil || second.MergedInto != "a" || !second.Status.Terminal() {
@@ -61,5 +60,29 @@ func TestVolumeLifecycle(t *testing.T) {
 	}
 	if err := first.PartsComplete(now); err != nil || first.Status != domain.StatusUploaded || first.StoragePath != "/vol/g.7z.001" {
 		t.Fatalf("complete: %v %+v", err, first)
+	}
+}
+
+func TestFirstVolume(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		names []string
+		first int
+		ok    bool
+	}{
+		{[]string{"g.7z.003", "g.7z.001", "g.7z.002"}, 1, true},
+		{[]string{"Game.part2.rar", "Game.part1.rar"}, 1, true},
+		{[]string{"g.7z.001", "g.7z.003"}, 0, false},     // a part is missing
+		{[]string{"g.7z.001", "other.7z.002"}, 0, false}, // two archives
+		{[]string{"a.iso", "b.iso"}, 0, false},           // not parts at all
+		{[]string{"g.7z.001", "g.7z.001"}, 0, false},     // the same part twice
+		{[]string{"g.part1.rar", "g.7z.002"}, 0, false},  // mixed styles
+	}
+	for _, tt := range tests {
+		first, ok := domain.FirstVolume(tt.names)
+		if ok != tt.ok || (ok && first != tt.first) {
+			t.Errorf("FirstVolume(%v) = %d %v, want %d %v", tt.names, first, ok, tt.first, tt.ok)
+		}
 	}
 }

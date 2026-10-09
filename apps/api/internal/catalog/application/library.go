@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"path"
 	"strings"
 	"sync"
 	"time"
@@ -38,9 +37,15 @@ type GameDirectory interface {
 	GameByID(ctx context.Context, id int64) (GameInfo, error)
 }
 
+// Consoles gives the library the consoles and their extensions.
+type Consoles interface {
+	List(ctx context.Context) ([]domain.Console, error)
+	Console(ctx context.Context, slug string) (domain.Console, error)
+}
+
 // Files is the library's file system. Every path is absolute and must lie
-// inside the library (staging, trash and scratch live there too, so moves
-// are renames).
+// inside the library (staging, trash, scratch and the unassigned folder live
+// there too, so moves are renames).
 type Files interface {
 	// LibraryPath joins elem under the library root.
 	LibraryPath(elem ...string) string
@@ -48,6 +53,8 @@ type Files interface {
 	TrashPath(elem ...string) string
 	// ScratchPath joins elem under the directory for operations' scratch files.
 	ScratchPath(elem ...string) string
+	// UnassignedPath joins elem under the unassigned folder.
+	UnassignedPath(elem ...string) string
 	Exists(path string) (bool, error)
 	// MkdirAll creates dir and returns the directories it created, outermost first.
 	MkdirAll(dir string) ([]string, error)
@@ -59,10 +66,9 @@ type Files interface {
 	RemoveAll(path string) error
 	// List returns the names in a directory (none if it does not exist).
 	List(dir string) ([]string, error)
-	ReadFile(path string, limit int64) ([]byte, error)
-	WriteFile(path string, data []byte) error
 	// Tree lists the regular files at path: the file itself, or every file
-	// under a directory (sorted, Rel with "/" separators).
+	// under a directory (sorted, Rel with "/" separators). Links and special
+	// files are skipped.
 	Tree(path string) ([]TreeFile, error)
 	Open(path string) (io.ReadSeekCloser, error)
 }
@@ -99,7 +105,7 @@ func reject(reason RejectReason, format string, args ...any) *Rejection {
 	return &Rejection{Reason: reason, Message: fmt.Sprintf(format, args...)}
 }
 
-// Action is what will happen to a planned item.
+// Action is what will happen to a planned file.
 type Action string
 
 // Planned actions.
@@ -107,18 +113,16 @@ const (
 	ActionStore   Action = "store"
 	ActionReplace Action = "replace"
 	ActionSkip    Action = "skip"
-	// ActionUndecided means the item is a duplicate and needs a decision.
+	// ActionUndecided means the file is a duplicate and needs a decision.
 	ActionUndecided Action = "undecided"
 )
 
-// maxCueSize bounds the .cue sheets read for rewriting.
-const maxCueSize = 1 << 20
-
-// LibraryService changes the library: stores uploads, re-matches games and
-// manages the trash and the integrity check (RF-09..RF-11, RF-24..RF-30).
-// Every change goes through a journaled operation (engine.go).
+// LibraryService changes the library: stores uploads, edits games, manages
+// the unassigned section, the trash and the scan of changes made over SMB
+// (RF-07..RF-11, RF-24..RF-30). Every change goes through a journaled
+// operation (engine.go).
 type LibraryService struct {
-	consoles domain.ConsoleRepository
+	consoles Consoles
 	repo     domain.LibraryRepository
 	games    GameDirectory
 	files    Files
@@ -128,12 +132,12 @@ type LibraryService struct {
 
 	// mu serializes changes: two of them must not race for a folder or a name.
 	mu sync.Mutex
-	// lastCheck is the last integrity report (guarded by mu).
-	lastCheck *IntegrityReport
+	// lastScan is the last scan report (guarded by mu).
+	lastScan *ScanReport
 }
 
 // NewLibraryService builds the service. now may be nil (time.Now).
-func NewLibraryService(consoles domain.ConsoleRepository, repo domain.LibraryRepository, games GameDirectory, files Files, log *slog.Logger, now func() time.Time) *LibraryService {
+func NewLibraryService(consoles Consoles, repo domain.LibraryRepository, games GameDirectory, files Files, log *slog.Logger, now func() time.Time) *LibraryService {
 	if now == nil {
 		now = time.Now
 	}
@@ -146,25 +150,12 @@ func randomID() string {
 	return hex.EncodeToString(b[:])
 }
 
-func (s *LibraryService) console(ctx context.Context, match func(domain.Console) bool, what string) (domain.Console, error) {
-	consoles, err := s.consoles.List(ctx)
-	if err != nil {
-		return domain.Console{}, err
+func (s *LibraryService) console(ctx context.Context, slug domain.Slug) (domain.Console, error) {
+	c, err := s.consoles.Console(ctx, string(slug))
+	if errors.Is(err, ErrConsoleNotFound) {
+		return c, reject(RejectInvalid, "La consola %q no existe.", slug)
 	}
-	for _, c := range consoles {
-		if match(c) {
-			return c, nil
-		}
-	}
-	return domain.Console{}, reject(RejectInvalid, "La consola %s no existe.", what)
-}
-
-func (s *LibraryService) consoleBySlug(ctx context.Context, slug string) (domain.Console, error) {
-	return s.console(ctx, func(c domain.Console) bool { return string(c.Slug) == slug }, fmt.Sprintf("%q", slug))
-}
-
-func (s *LibraryService) consoleByID(ctx context.Context, id domain.ConsoleID) (domain.Console, error) {
-	return s.console(ctx, func(c domain.Console) bool { return c.ID == id }, fmt.Sprint(id))
+	return c, err
 }
 
 // gameInfo asks IGDB for a game, turning failures into rejections.
@@ -181,79 +172,53 @@ func (s *LibraryService) gameInfo(ctx context.Context, igdbID int64) (GameInfo, 
 	return info, err
 }
 
-// newFolder picks a folder name for a game (RF-11a). self is the game being
-// renamed (0 for a new one): its own folder never counts as taken, even when
-// only the letter case changes.
-func (s *LibraryService) newFolder(ctx context.Context, console domain.Console, info GameInfo, self *domain.Game) (string, error) {
-	var except domain.GameID
-	if self != nil {
-		except = self.ID
+// GameName is the name the user gave a game, optionally picked from IGDB.
+type GameName struct {
+	Title  string
+	IGDBID *int64
+}
+
+// describe turns a GameName into a game with its title, folder and, when
+// linked to IGDB, its metadata. A name picked from IGDB uses IGDB's title.
+func (s *LibraryService) describe(ctx context.Context, console domain.Slug, n GameName) (domain.Game, error) {
+	g := domain.Game{Console: console, Title: strings.Join(strings.Fields(n.Title), " ")}
+	if n.IGDBID != nil {
+		info, err := s.gameInfo(ctx, *n.IGDBID)
+		if err != nil {
+			return g, err
+		}
+		id := info.IGDBID
+		g.IGDBID, g.Title = &id, info.Name
+		g.ReleaseYear, g.CoverImageID, g.Summary, g.Genres = info.ReleaseYear, info.CoverImageID, info.Summary, info.Genres
 	}
-	folder, err := domain.GameFolder(info.Name, info.ReleaseYear, info.IGDBID, func(f string) (bool, error) {
-		if taken, err := s.repo.FolderTaken(ctx, console.ID, f, except); err != nil || taken {
-			return taken, err
-		}
-		if self != nil && strings.EqualFold(f, self.Folder) {
-			return false, nil
-		}
-		return s.files.Exists(s.files.LibraryPath(string(console.Slug), f))
-	})
+	folder, err := domain.GameFolder(g.Title)
 	if err != nil {
-		return "", nameRejection(err)
+		return g, nameRejection(err)
 	}
-	return folder, nil
+	g.Folder = folder
+	return g, nil
 }
 
-// itemNames names every file of an item: one name for files and folder
-// games; the .cue sheet and its tracks for discs. parts are the current
-// names (only their extensions and count matter).
-func itemNames(title string, ref string, shape domain.Shape, n domain.ItemName, parts []string) ([]string, error) {
-	if !n.Kind.Valid() {
-		return nil, reject(RejectInvalid, "%q: tipo %q desconocido.", ref, n.Kind)
+// fileName names a file of a game; ext comes from the file's current name.
+func fileName(title string, kind domain.ItemKind, label, ext, ref string) (string, error) {
+	name, err := domain.ItemName{Title: title, Kind: kind, Label: label}.FileName(ext)
+	if err != nil {
+		return "", itemRejection(ref, err)
 	}
-	n.Title = title
-	switch shape {
-	case domain.ShapeFile, domain.ShapeFolder:
-		if len(parts) != 1 {
-			return nil, fmt.Errorf("item %q: %s with %d parts", ref, shape, len(parts))
-		}
-		ext := ""
-		if shape == domain.ShapeFile {
-			ext = path.Ext(parts[0])
-		}
-		f, err := n.FileName(ext)
-		if err != nil {
-			return nil, itemRejection(ref, err)
-		}
-		return []string{f}, nil
-	case domain.ShapeDisc:
-		if len(parts) == 0 || !strings.EqualFold(path.Ext(parts[0]), ".cue") {
-			return nil, fmt.Errorf("item %q: disc without a .cue sheet", ref)
-		}
-		stem, err := n.Stem()
-		if err != nil {
-			return nil, itemRejection(ref, err)
-		}
-		cue, err := n.FileName(".cue")
-		if err != nil {
-			return nil, itemRejection(ref, err)
-		}
-		exts := make([]string, 0, len(parts)-1)
-		for _, p := range parts[1:] {
-			exts = append(exts, path.Ext(p))
-		}
-		tracks, err := domain.TrackNames(stem, exts)
-		if err != nil {
-			return nil, itemRejection(ref, err)
-		}
-		return append([]string{cue}, tracks...), nil
-	}
-	return nil, fmt.Errorf("item %q: unknown shape %q", ref, shape)
+	return name, nil
 }
 
-// storedNames renames a stored item for a (new) game title.
-func storedNames(title string, it domain.GameItem) ([]string, error) {
-	return itemNames(title, it.Files[0], it.Shape, it.Name(title), it.Files)
+// extensionOf returns a stored or staged file's extension among every
+// console's extensions; a file whose extension is no longer known keeps its
+// last dot-suffix.
+func extensionOf(name string, consoles []domain.Console) string {
+	if ext := domain.ExtensionOf(name, KnownExtensions(consoles)); ext != "" {
+		return ext
+	}
+	if i := strings.LastIndex(name, "."); i > 0 {
+		return strings.ToLower(name[i:])
+	}
+	return ""
 }
 
 func itemRejection(ref string, err error) error {
@@ -274,32 +239,70 @@ func nameRejection(err error) error {
 	case errors.Is(err, domain.ErrNameTooLong):
 		return reject(RejectInvalid, "El nombre resultante supera los 255 bytes.")
 	case ne.Field == "title":
-		return reject(RejectInvalid, "El título no deja un nombre de archivo válido.")
+		return reject(RejectInvalid, "El nombre del juego no deja un nombre de archivo válido.")
+	case ne.Field == "version":
+		return reject(RejectInvalid, "La versión del update debe tener solo números y puntos (por ejemplo 1.0.4).")
 	case ne.Field == "label":
-		return reject(RejectInvalid, "Falta la versión del update o el nombre del DLC.")
-	case ne.Field == "disc":
-		return reject(RejectInvalid, "El número de disco debe estar entre 1 y 99.")
+		return reject(RejectInvalid, "Falta el nombre del DLC.")
 	case ne.Field == "extension":
 		return reject(RejectInvalid, "La extensión del archivo no es válida.")
 	}
-	return reject(RejectInvalid, "Tipo de elemento no válido.")
+	return reject(RejectInvalid, "Tipo de archivo no válido.")
 }
 
-// nameSet detects two items that would get the same file name.
+// itemFor checks a file's kind and label against its console and returns
+// them clean.
+func itemFor(c domain.Console, kind domain.ItemKind, label, ref string) (domain.ItemKind, string, error) {
+	if kind == "" {
+		kind = c.SingleKind()
+	}
+	if kind == "" {
+		return "", "", reject(RejectInvalid, "%q: indica si es el juego base, un update o un DLC.", ref)
+	}
+	if !c.Allows(kind) {
+		return "", "", reject(RejectInvalid, "%q: %s no admite el tipo %q.", ref, c.DisplayName, kind)
+	}
+	clean, err := domain.CleanLabel(kind, label)
+	if err != nil {
+		return "", "", itemRejection(ref, err)
+	}
+	return kind, clean, nil
+}
+
+// nameSet detects two files that would get the same name.
 type nameSet map[string]string
 
-func (n nameSet) add(ref string, files []string) error {
-	for _, f := range files {
-		key := strings.ToLower(f)
-		if other, ok := n[key]; ok {
-			return reject(RejectInvalid, "%q y %q tendrían el mismo nombre: %s.", other, ref, f)
-		}
-		n[key] = ref
+func (n nameSet) add(ref, file string) error {
+	key := strings.ToLower(file)
+	if other, ok := n[key]; ok {
+		return reject(RejectInvalid, "%q y %q tendrían el mismo nombre: %s.", other, ref, file)
 	}
+	n[key] = ref
 	return nil
 }
 
-// HasItemsFrom reports whether an upload's items are in the library.
+func decide(a domain.DuplicateAction) Action {
+	switch a {
+	case domain.Replace:
+		return ActionReplace
+	case domain.Skip:
+		return ActionSkip
+	}
+	return ActionUndecided
+}
+
+// HasItemsFrom reports whether an upload's files are in the library.
 func (s *LibraryService) HasItemsFrom(ctx context.Context, source string) (bool, error) {
 	return s.repo.HasItemsFrom(ctx, source)
+}
+
+// gameDir is a game's folder.
+func (s *LibraryService) gameDir(g *domain.Game) string {
+	return s.files.LibraryPath(string(g.Console), g.Folder)
+}
+
+// pruneGame removes a game's folder and then its console's folder when
+// they are left empty (RF-25).
+func (b *opBuilder) pruneGame(console domain.Slug, folder string) {
+	b.prune = append(b.prune, b.s.files.LibraryPath(string(console), folder), b.s.files.LibraryPath(string(console)))
 }

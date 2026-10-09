@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/application"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/infrastructure/tus"
 )
@@ -17,7 +18,7 @@ import (
 func newServer(t *testing.T, free uint64) *httptest.Server {
 	t.Helper()
 	a, err := tus.New(t.TempDir(), "/files/", slog.New(slog.NewTextHandler(io.Discard, nil)),
-		func(string) (uint64, error) { return free, nil })
+		func(string) (uint64, error) { return free, nil }, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +31,7 @@ func newServer(t *testing.T, free uint64) *httptest.Server {
 
 type noopHooks struct{}
 
-func (noopHooks) UploadCreated(context.Context, domain.JobID, string, int64, string) error {
+func (noopHooks) UploadCreated(context.Context, domain.JobID, int64, application.UploadMeta) error {
 	return nil
 }
 

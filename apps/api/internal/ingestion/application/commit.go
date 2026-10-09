@@ -5,67 +5,57 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/ingestion/domain"
 )
 
-// CommitItem is the user's decision for one staged item (RF-09, RF-10).
-type CommitItem struct {
+// CommitFile is the user's data for one valid file (RF-08, RF-09).
+type CommitFile struct {
 	Path        string
-	Skip        bool // leave it out of the library
-	Kind        string
+	Kind        string // "" on consoles with one kind
 	Label       string
-	DiscNumber  int
 	OnDuplicate string // "", "replace" or "skip"
 }
 
-// CommitRequest stores a reviewed upload as one game of one console.
-type CommitRequest struct {
-	Console    string
-	IGDBGameID int64
-	Items      []CommitItem
-}
-
-// LibraryItem is a staged item handed to the library.
-type LibraryItem struct {
+// LibraryFile is a staged file handed to the library.
+type LibraryFile struct {
 	Ref         string
-	Shape       domain.ItemShape
-	Root        string // absolute directory the parts are relative to
-	Parts       []string
+	Root        string // absolute directory Path is relative to
+	Path        string
 	Size        int64
 	Kind        string
 	Label       string
-	DiscNumber  int
-	TitleID     string
 	OnDuplicate string
 }
 
 // LibraryRequest is a commit as the library sees it.
 type LibraryRequest struct {
-	Source     string
-	Console    string
-	IGDBGameID int64
-	Items      []LibraryItem
+	Source  string
+	Console string
+	Title   string
+	IGDBID  *int64
+	Files   []LibraryFile
 }
 
-// ExistingItem is an item already in the game's folder.
+// ExistingItem is a file already in the game's folder.
 type ExistingItem struct {
-	ID         int64
-	Kind       string
-	Shape      domain.ItemShape
-	CreatedAt  time.Time
-	Label      string
-	DiscNumber int
-	Files      []string
-	Size       int64
+	ID        int64
+	Kind      string
+	Label     string
+	File      string
+	Size      int64
+	CreatedAt time.Time
 }
 
-// PlannedItem is what the commit will do with one item.
-type PlannedItem struct {
+// PlannedFile is what the commit will do with one file.
+type PlannedFile struct {
 	Path      string
-	Files     []string // names inside the game folder
+	File      string // name inside the game folder
 	Duplicate *ExistingItem
 	// Action is store, replace, skip or undecided (a duplicate without decision).
 	Action string
@@ -73,12 +63,13 @@ type PlannedItem struct {
 
 // CommitPlan previews a commit: final folder, names and duplicates.
 type CommitPlan struct {
-	Console  string
-	Title    string
-	Folder   string
-	GameID   int64 // 0 when the game is new
-	Existing []ExistingItem
-	Items    []PlannedItem
+	Console   string
+	Title     string
+	Folder    string
+	GameID    int64 // 0 when the game is new
+	Existing  []ExistingItem
+	Files     []PlannedFile
+	Discarded []string
 }
 
 // CommitResult summarizes a finished commit.
@@ -88,27 +79,60 @@ type CommitResult struct {
 	Stored, Replaced, Skipped int
 }
 
+// SetAsideRequest puts files that did not become game files into the
+// unassigned section (or the trash, restorable there).
+type SetAsideRequest struct {
+	Source string
+	// Root is the absolute directory Files are relative to.
+	Root   string
+	Files  []string
+	Folder string
+	Origin string
+	// Reason is upload (did not fit its console) or manual (given back).
+	Reason  string
+	ToTrash bool
+}
+
+// UnassignedSource is a file of the unassigned section.
+type UnassignedSource struct {
+	Name string
+	// Path is relative to the unassigned folder.
+	Path string
+	Size int64
+}
+
 // Library is the catalog seen from ingestion (wired in the composition root).
 type Library interface {
 	Plan(ctx context.Context, req LibraryRequest) (CommitPlan, error)
-	// Store moves the items into the library; on failure everything is undone
+	// Store moves the files into the library; on failure everything is undone
 	// unless the error wraps ErrLibraryInconsistent.
 	Store(ctx context.Context, req LibraryRequest) (CommitResult, error)
 	// Recover undoes library changes interrupted by a restart.
 	Recover(ctx context.Context) (int, error)
 	HasItemsFrom(ctx context.Context, source string) (bool, error)
+	PutAside(ctx context.Context, req SetAsideRequest) error
+	// UnassignedFile describes a file of the section (ErrUnassignedNotFound).
+	UnassignedFile(ctx context.Context, id int64) (UnassignedSource, error)
+	// TakeUnassigned moves a file of the section to dest and forgets it.
+	TakeUnassigned(ctx context.Context, id int64, dest string) (UnassignedSource, error)
 }
 
-// ErrLibraryInconsistent means a failed commit could not be fully undone.
-var ErrLibraryInconsistent = errors.New("library change could not be undone")
+// Errors of the commit and the unassigned section.
+var (
+	// ErrLibraryInconsistent means a failed commit could not be fully undone.
+	ErrLibraryInconsistent = errors.New("library change could not be undone")
+	// ErrNotConfirmable is returned when a job cannot be committed in its state.
+	ErrNotConfirmable = errors.New("job is not waiting for confirmation")
+	// ErrNotInvalid is returned when setting aside a job that fits its console.
+	ErrNotInvalid = errors.New("job is not invalid")
+	// ErrUnassignedNotFound means the unassigned file does not exist.
+	ErrUnassignedNotFound = errors.New("unassigned file not found")
+)
 
-// ErrNotInReview is returned when a job cannot be committed in its state.
-var ErrNotInReview = errors.New("job is not in review")
-
-// RejectReason classifies a refused commit.
+// RejectReason classifies a refused request.
 type RejectReason string
 
-// Reasons for refusing a commit.
+// Reasons for refusing a request.
 const (
 	RejectInvalid     RejectReason = "invalid"
 	RejectConflict    RejectReason = "conflict"
@@ -116,8 +140,8 @@ const (
 	RejectUpstream    RejectReason = "upstream"
 )
 
-// CommitRejected is a refused commit; nothing was changed. Message is shown
-// to the user.
+// CommitRejected is a refused request; nothing was changed. Message is
+// shown to the user.
 type CommitRejected struct {
 	Reason  RejectReason
 	Message string
@@ -129,46 +153,96 @@ func invalid(format string, args ...any) *CommitRejected {
 	return &CommitRejected{Reason: RejectInvalid, Message: fmt.Sprintf(format, args...)}
 }
 
-// Committer moves reviewed uploads into the library (RF-11).
+// Committer moves confirmed uploads into the library (RF-08..RF-10), and
+// changes the console of, or sets aside, uploads that do not fit (RF-07).
 type Committer struct {
-	jobs    domain.JobRepository
-	items   domain.StagedItemRepository
-	staging Staging
-	library Library
-	pub     Publisher
-	log     *slog.Logger
-	now     func() time.Time
+	jobs     domain.JobRepository
+	files    domain.StagedFileRepository
+	staging  Staging
+	library  Library
+	consoles Consoles
+	pub      Publisher
+	log      *slog.Logger
+	now      func() time.Time
 
-	mu sync.Mutex // one commit at a time; it also guards the review → committing check
+	mu sync.Mutex // one change at a time; it also guards the status checks
 }
 
 // NewCommitter builds the use case. now may be nil (time.Now).
-func NewCommitter(jobs domain.JobRepository, items domain.StagedItemRepository, staging Staging, library Library, pub Publisher, log *slog.Logger, now func() time.Time) *Committer {
+func NewCommitter(jobs domain.JobRepository, files domain.StagedFileRepository, staging Staging, library Library, consoles Consoles, pub Publisher, log *slog.Logger, now func() time.Time) *Committer {
 	if now == nil {
 		now = time.Now
 	}
-	return &Committer{jobs: jobs, items: items, staging: staging, library: library, pub: pub, log: log, now: now}
+	return &Committer{jobs: jobs, files: files, staging: staging, library: library, consoles: consoles, pub: pub, log: log, now: now}
 }
 
-// Plan previews the commit of a job in review.
-func (c *Committer) Plan(ctx context.Context, id domain.JobID, req CommitRequest) (CommitPlan, error) {
+// FileView is a staged file with what the confirmation screen shows.
+type FileView struct {
+	domain.StagedFile
+	// Valid is a game file for the job's console.
+	Valid bool
+	// Consoles accept the file's extension.
+	Consoles []string
+}
+
+// Files lists the files found in a job.
+func (c *Committer) Files(ctx context.Context, id domain.JobID) ([]FileView, error) {
+	job, err := c.jobs.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	files, err := c.files.List(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	rules, known, err := c.consoles.Rules(ctx)
+	if err != nil {
+		return nil, err
+	}
+	valid, _ := domain.Validate(rules[job.Console], files, known)
+	isValid := map[string]bool{}
+	for _, f := range valid {
+		isValid[f.Path] = true
+	}
+	out := make([]FileView, 0, len(files))
+	for _, f := range files {
+		v := FileView{StagedFile: f, Valid: isValid[f.Path], Consoles: []string{}}
+		ext := domain.ExtensionOf(path.Base(f.Path), known)
+		for slug, r := range rules {
+			for _, e := range r.Extensions {
+				if e == ext {
+					v.Consoles = append(v.Consoles, slug)
+				}
+			}
+		}
+		slices.Sort(v.Consoles)
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+// Plan previews the commit of a job waiting for confirmation.
+func (c *Committer) Plan(ctx context.Context, id domain.JobID, req []CommitFile) (CommitPlan, error) {
 	job, err := c.jobs.Get(ctx, id)
 	if err != nil {
 		return CommitPlan{}, err
 	}
-	if job.Status != domain.StatusReview {
-		return CommitPlan{}, ErrNotInReview
+	if job.Status != domain.StatusConfirm {
+		return CommitPlan{}, ErrNotConfirmable
 	}
-	lreq, err := c.libraryRequest(ctx, job, req)
+	lreq, discarded, err := c.libraryRequest(ctx, job, req)
 	if err != nil {
 		return CommitPlan{}, err
 	}
-	return c.library.Plan(ctx, lreq)
+	plan, err := c.library.Plan(ctx, lreq)
+	plan.Discarded = discarded
+	return plan, err
 }
 
-// Commit stores a job in review. On failure the job returns to review with
-// its files back in staging (or fails, if the change could not be undone).
-func (c *Committer) Commit(ctx context.Context, id domain.JobID, req CommitRequest) (*domain.UploadJob, CommitResult, error) {
+// Commit stores a job waiting for confirmation. On failure the job returns
+// to confirmation with its files back in staging (or fails, if the change
+// could not be undone).
+func (c *Committer) Commit(ctx context.Context, id domain.JobID, req []CommitFile) (*domain.UploadJob, CommitResult, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -176,10 +250,10 @@ func (c *Committer) Commit(ctx context.Context, id domain.JobID, req CommitReque
 	if err != nil {
 		return nil, CommitResult{}, err
 	}
-	if job.Status != domain.StatusReview {
-		return nil, CommitResult{}, ErrNotInReview
+	if job.Status != domain.StatusConfirm {
+		return nil, CommitResult{}, ErrNotConfirmable
 	}
-	lreq, err := c.libraryRequest(ctx, job, req)
+	lreq, _, err := c.libraryRequest(ctx, job, req)
 	if err != nil {
 		return nil, CommitResult{}, err
 	}
@@ -218,13 +292,103 @@ func (c *Committer) Commit(ctx context.Context, id domain.JobID, req CommitReque
 	if err := c.save(ctx, job); err != nil {
 		return nil, res, err
 	}
-	c.removeStaging(id)
+	c.cleanUp(job)
 	return job, res, nil
 }
 
+// ChangeConsole validates the job's files for another console, without
+// extracting again (RF-07).
+func (c *Committer) ChangeConsole(ctx context.Context, id domain.JobID, console string) (*domain.UploadJob, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	job, err := c.jobs.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if job.Status != domain.StatusConfirm && job.Status != domain.StatusInvalid {
+		return nil, ErrNotConfirmable
+	}
+	rules, known, err := c.consoles.Rules(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rule, ok := rules[console]
+	if !ok {
+		return nil, invalid("La consola %q no existe.", console)
+	}
+	files, err := c.files.List(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	_, reason := domain.Validate(rule, files, known)
+	if err := job.Validated(console, reason, c.now()); err != nil {
+		return nil, err
+	}
+	return job, c.save(ctx, job)
+}
+
+// Resolution is what to do with an upload that does not fit (RF-07).
+type Resolution string
+
+// Resolutions.
+const (
+	ResolveUnassigned Resolution = "unassigned"
+	ResolveTrash      Resolution = "trash"
+	ResolveDelete     Resolution = "delete"
+)
+
+// Resolve sets aside an invalid upload: its extracted files go to the
+// unassigned section, the trash, or are deleted (RF-07).
+func (c *Committer) Resolve(ctx context.Context, id domain.JobID, r Resolution) (*domain.UploadJob, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	job, err := c.jobs.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if job.Status != domain.StatusInvalid {
+		return nil, ErrNotInvalid
+	}
+	ctx = context.WithoutCancel(ctx)
+	switch r {
+	case ResolveUnassigned, ResolveTrash:
+		files, err := c.files.List(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		paths := make([]string, len(files))
+		for i, f := range files {
+			paths[i] = f.Path
+		}
+		if len(paths) > 0 {
+			if err := c.library.PutAside(ctx, SetAsideRequest{
+				Source: string(job.ID), Root: c.staging.Dir(id), Files: paths, Folder: job.Title,
+				Origin: job.FileName, Reason: "upload", ToTrash: r == ResolveTrash,
+			}); err != nil {
+				return nil, err
+			}
+		}
+		err = job.SetAside(r == ResolveTrash, c.now())
+		if err != nil {
+			return nil, err
+		}
+	case ResolveDelete:
+		if err := job.Cancel(c.now()); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, invalid("Acción %q desconocida.", r)
+	}
+	if err := c.save(ctx, job); err != nil {
+		return nil, err
+	}
+	c.cleanUp(job)
+	return job, nil
+}
+
 // Recover finishes commits interrupted by a restart: the library undoes
-// unrecorded changes, then each job is done (its items were recorded) or back
-// in review (they were not).
+// unrecorded changes, then each job is done (its files were recorded) or
+// back to confirmation (they were not).
 func (c *Committer) Recover(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -253,64 +417,75 @@ func (c *Committer) Recover(ctx context.Context) error {
 			return err
 		}
 		if stored {
-			c.removeStaging(job.ID)
+			c.cleanUp(job)
 		}
 	}
 	return nil
 }
 
-// libraryRequest checks the request against the staged items: every item is
-// decided exactly once, and only staged paths are referenced.
-func (c *Committer) libraryRequest(ctx context.Context, job *domain.UploadJob, req CommitRequest) (LibraryRequest, error) {
-	staged, err := c.items.List(ctx, job.ID)
+// libraryRequest checks the request against the staged files: every valid
+// file is described exactly once, and only those. It also returns the
+// files that will be discarded.
+func (c *Committer) libraryRequest(ctx context.Context, job *domain.UploadJob, req []CommitFile) (LibraryRequest, []string, error) {
+	files, err := c.files.List(ctx, job.ID)
 	if err != nil {
-		return LibraryRequest{}, err
+		return LibraryRequest{}, nil, err
 	}
-	byPath := map[string]domain.StagedItem{}
-	for _, it := range staged {
-		if !it.Ignored {
-			byPath[it.Path] = it
+	rules, known, err := c.consoles.Rules(ctx)
+	if err != nil {
+		return LibraryRequest{}, nil, err
+	}
+	valid, reason := domain.Validate(rules[job.Console], files, known)
+	if reason != "" {
+		return LibraryRequest{}, nil, invalid("Los archivos ya no encajan en la consola: vuelve a elegirla.")
+	}
+	byPath := map[string]domain.StagedFile{}
+	for _, f := range valid {
+		byPath[f.Path] = f
+	}
+	var discarded []string
+	for _, f := range files {
+		if _, ok := byPath[f.Path]; !ok {
+			discarded = append(discarded, f.Path)
 		}
 	}
 
-	out := LibraryRequest{Source: string(job.ID), Console: req.Console, IGDBGameID: req.IGDBGameID}
+	out := LibraryRequest{Source: string(job.ID), Console: job.Console, Title: job.Title, IGDBID: job.IGDBID}
 	seen := map[string]bool{}
-	for _, it := range req.Items {
-		s, ok := byPath[it.Path]
+	for _, f := range req {
+		s, ok := byPath[f.Path]
 		if !ok {
-			return out, invalid("%q no es un elemento de esta subida.", it.Path)
+			return out, nil, invalid("%q no es un archivo de esta subida.", f.Path)
 		}
-		if seen[it.Path] {
-			return out, invalid("%q aparece dos veces.", it.Path)
+		if seen[f.Path] {
+			return out, nil, invalid("%q aparece dos veces.", f.Path)
 		}
-		seen[it.Path] = true
-		if it.Skip {
-			continue
-		}
-		switch it.OnDuplicate {
+		seen[f.Path] = true
+		switch f.OnDuplicate {
 		case "", "replace", "skip":
 		default:
-			return out, invalid("%q: decisión de duplicado %q desconocida.", it.Path, it.OnDuplicate)
+			return out, nil, invalid("%q: decisión de duplicado %q desconocida.", f.Path, f.OnDuplicate)
 		}
-		out.Items = append(out.Items, LibraryItem{
-			Ref: it.Path, Shape: s.Shape, Root: c.staging.Dir(job.ID), Parts: s.Parts, Size: s.Size,
-			Kind: it.Kind, Label: it.Label, DiscNumber: it.DiscNumber, TitleID: s.TitleID, OnDuplicate: it.OnDuplicate,
+		out.Files = append(out.Files, LibraryFile{
+			Ref: f.Path, Root: c.staging.Dir(job.ID), Path: s.Path, Size: s.Size,
+			Kind: f.Kind, Label: strings.TrimSpace(f.Label), OnDuplicate: f.OnDuplicate,
 		})
 	}
-	for _, it := range staged {
-		if !it.Ignored && !seen[it.Path] {
-			return out, invalid("Falta decidir qué hacer con %q.", it.Path)
+	for _, f := range valid {
+		if !seen[f.Path] {
+			return out, nil, invalid("Faltan los datos de %q.", f.Path)
 		}
 	}
-	if len(out.Items) == 0 {
-		return out, invalid("Elige al menos un elemento para guardar, o cancela la subida.")
-	}
-	return out, nil
+	return out, discarded, nil
 }
 
-func (c *Committer) removeStaging(id domain.JobID) {
-	if err := c.staging.Remove(id); err != nil {
-		c.log.Warn("remove staging after commit", "job", id, "error", err)
+// cleanUp deletes what a finished job leaves in staging.
+func (c *Committer) cleanUp(job *domain.UploadJob) {
+	if err := c.staging.Remove(job.ID); err != nil {
+		c.log.Warn("remove staging", "job", job.ID, "error", err)
+	}
+	if err := c.staging.RemoveSource(job.ID); err != nil {
+		c.log.Warn("remove source", "job", job.ID, "error", err)
 	}
 }
 

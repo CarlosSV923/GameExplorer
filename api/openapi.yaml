@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: GameExplorer API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     Single source of truth for the GameExplorer HTTP contract.
     Go handlers (oapi-codegen strict server) and the TypeScript client
@@ -9,6 +9,10 @@ info:
 
     Uploads are NOT described here: they use the tus resumable upload protocol
     (https://tus.io/protocols/resumable-upload) mounted at /api/uploads/.
+    Upload-Metadata keys: `filename` and `consoleSlug` and `title` (required),
+    `igdbId` (optional, the IGDB game the title was picked from), and for the
+    parts of one multi-volume archive `group` (a client-made id shared by the
+    parts) and `groupSize` (how many parts).
 
     Every operation requires the session cookie unless it declares `security: []`.
   license:
@@ -22,6 +26,7 @@ tags:
   - name: metadata
   - name: uploads
   - name: library
+  - name: unassigned
   - name: trash
 security:
   - sessionCookie: []
@@ -101,7 +106,8 @@ paths:
     get:
       tags: [consoles]
       operationId: listConsoles
-      summary: Consoles in carousel order
+      summary: The consoles defined in code, in carousel order (RF-40)
+      description: Every console, with or without games; the carousel hides the empty ones.
       responses:
         '200':
           description: All consoles.
@@ -113,40 +119,12 @@ paths:
                   $ref: '#/components/schemas/Console'
         '401':
           $ref: '#/components/responses/Unauthorized'
-    post:
-      tags: [consoles]
-      operationId: createConsole
-      summary: Add a console for an IGDB platform; it goes last (RF-41)
-      description: Consoles added by the user are detected by extension only.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ConsoleCreate'
-      responses:
-        '201':
-          description: The new console.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Console'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '502':
-          $ref: '#/components/responses/BadGateway'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
 
   /consoles/order:
     put:
       tags: [consoles]
       operationId: reorderConsoles
-      summary: Set the carousel order
+      summary: Set the carousel order (RF-42)
       requestBody:
         required: true
         content:
@@ -167,19 +145,46 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /consoles/{id}:
+  /consoles/{slug}:
     patch:
       tags: [consoles]
       operationId: updateConsole
-      summary: Change a console's name, extensions or (without games) its folder
+      summary: Change a console's display name (RF-42)
       parameters:
-        - $ref: '#/components/parameters/ConsoleId'
+        - $ref: '#/components/parameters/ConsoleSlug'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ConsoleInput'
+              $ref: '#/components/schemas/ConsoleUpdate'
+      responses:
+        '200':
+          description: The console.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Console'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /consoles/{slug}/extensions:
+    post:
+      tags: [consoles]
+      operationId: addConsoleExtension
+      summary: Add a custom extension to a console (RF-41)
+      parameters:
+        - $ref: '#/components/parameters/ConsoleSlug'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtensionInput'
       responses:
         '200':
           description: The console.
@@ -197,13 +202,25 @@ paths:
           $ref: '#/components/responses/Conflict'
     delete:
       tags: [consoles]
-      operationId: deleteConsole
-      summary: Delete a console added by the user that has no games
+      operationId: removeConsoleExtension
+      summary: Remove a custom extension that no file uses (RF-41)
       parameters:
-        - $ref: '#/components/parameters/ConsoleId'
+        - $ref: '#/components/parameters/ConsoleSlug'
+        - name: extension
+          in: query
+          required: true
+          schema:
+            type: string
+            example: .xcz
       responses:
-        '204':
-          description: Deleted.
+        '200':
+          description: The console.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Console'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -255,36 +272,20 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
-  /metadata/platforms:
+  /metadata/status:
     get:
       tags: [metadata]
-      operationId: searchPlatforms
-      summary: Search platforms on IGDB (used to add consoles)
-      parameters:
-        - name: q
-          in: query
-          required: true
-          schema:
-            type: string
-            minLength: 2
-            maxLength: 100
+      operationId: getMetadataStatus
+      summary: Whether IGDB is configured (RF-54)
       responses:
         '200':
-          description: Matching platforms.
+          description: The status.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/MetadataPlatform'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+                $ref: '#/components/schemas/MetadataStatus'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '502':
-          $ref: '#/components/responses/BadGateway'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
 
   /jobs:
     get:
@@ -293,8 +294,8 @@ paths:
       summary: Recent upload jobs, newest first
       description: |
         A job is created when the browser starts a tus upload at /api/uploads/
-        (metadata `filename`, optional `consoleSlug`) and follows the file
-        through extraction, review and commit.
+        (see the metadata above) or assigns a file from the unassigned section,
+        and follows it through extraction, validation, confirmation and commit.
       responses:
         '200':
           description: Up to 100 jobs.
@@ -346,25 +347,26 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /jobs/{id}/items:
+  /jobs/{id}/files:
     get:
       tags: [uploads]
-      operationId: listJobItems
-      summary: Items found in an upload, with console and kind suggestions
+      operationId: listJobFiles
+      summary: Files found in an upload (RF-07)
       description: |
-        Available once the job reaches `review`. Ignored items (readme, .nfo…)
-        are listed so the review can show what was set aside.
+        Available once the job reaches `confirm` or `invalid`. `valid` says
+        whether the file is a game file for the job's console; the rest are
+        discarded when the job is stored.
       parameters:
         - $ref: '#/components/parameters/JobId'
       responses:
         '200':
-          description: Items, sorted by path.
+          description: Files, sorted by path.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/StagedItem'
+                  $ref: '#/components/schemas/StagedFile'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -400,11 +402,79 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
+  /jobs/{id}/console:
+    post:
+      tags: [uploads]
+      operationId: changeJobConsole
+      summary: Validate the upload's files for another console (RF-07)
+      description: |
+        The files stay where they are (nothing is extracted again); the job
+        becomes `confirm` if they fit the new console, `invalid` otherwise.
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsoleChange'
+      responses:
+        '200':
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /jobs/{id}/resolve:
+    post:
+      tags: [uploads]
+      operationId: resolveJob
+      summary: Set aside an upload that does not fit its console (RF-07)
+      description: |
+        `unassigned` moves the extracted files to the unassigned section,
+        `trash` sends them to the trash (restorable to the unassigned section)
+        and `delete` deletes them for good.
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveRequest'
+      responses:
+        '200':
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /jobs/{id}/cancel:
     post:
       tags: [uploads]
       operationId: cancelJob
       summary: Cancel a job and delete its uploaded data
+      description: A job assigned from the unassigned section gives its file back to the section.
       parameters:
         - $ref: '#/components/parameters/JobId'
       responses:
@@ -425,11 +495,11 @@ paths:
     post:
       tags: [uploads]
       operationId: planJobCommit
-      summary: Preview where a reviewed upload would be stored
+      summary: Preview the final names of an upload ready to confirm (RF-08, RF-09)
       description: |
-        Computes the final folder and file names (spec §5) and the duplicates
-        against the game's current items (RF-10), without changing anything.
-        `onDuplicate` may be left out; such items come back as `undecided`.
+        Computes the game folder and file names (spec §5) and the duplicates
+        against the game's current files, without changing anything.
+        `onDuplicate` may be left out; such files come back as `undecided`.
       parameters:
         - $ref: '#/components/parameters/JobId'
       requestBody:
@@ -462,13 +532,13 @@ paths:
     post:
       tags: [uploads]
       operationId: commitJob
-      summary: Store a reviewed upload in the library
+      summary: Store a confirmed upload in the library (RF-10)
       description: |
-        Moves the items to `<console>/<game>/` with their final names, rewrites
-        the FILE lines of .cue sheets, sends replaced duplicates to the trash and
-        deletes the staging area (RF-11). Every duplicate needs `onDuplicate`.
-        If anything fails, every move is undone and the job returns to review
-        with the reason in `error`.
+        Moves the valid files to `<console>/<game>/` with their final names,
+        sends replaced duplicates to the trash and deletes the rest of the
+        staging area. Every duplicate needs `onDuplicate`. If anything fails,
+        every move is undone and the job returns to `confirm` with the reason
+        in `error`.
       parameters:
         - $ref: '#/components/parameters/JobId'
       requestBody:
@@ -505,15 +575,10 @@ paths:
       operationId: listConsoleGames
       summary: Games of one console, by title
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema:
-            type: string
-            pattern: '^[a-z0-9][a-z0-9_-]{0,31}$'
+        - $ref: '#/components/parameters/ConsoleSlug'
       responses:
         '200':
-          description: Games with at least one item in the library (trashed items do not count).
+          description: Games with at least one file in the library (trashed files do not count).
           content:
             application/json:
               schema:
@@ -557,7 +622,7 @@ paths:
     get:
       tags: [library]
       operationId: getGame
-      summary: Game detail with its items (RF-21)
+      summary: Game detail with its files (RF-21)
       parameters:
         - $ref: '#/components/parameters/GameId'
       responses:
@@ -571,6 +636,77 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /games/{id}/edit/plan:
+    post:
+      tags: [library]
+      operationId: planGameEdit
+      summary: Preview renaming a game or moving it to another console (RF-24)
+      description: |
+        When another game of the target console already has the new name the
+        games merge; files that would collide come back `undecided`. Moving
+        needs every file's extension to be valid on the target console.
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GameEdit'
+      responses:
+        '200':
+          description: The plan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameEditPlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /games/{id}/edit:
+    post:
+      tags: [library]
+      operationId: editGame
+      summary: Rename a game or move it to another console (RF-24)
+      description: Reversible like a commit. Every collision of a merge needs a decision.
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GameEdit'
+      responses:
+        '200':
+          description: Where the game is now.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameEditResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /games/{id}/download:
     get:
@@ -596,31 +732,89 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /games/{id}/trash:
+    post:
+      tags: [trash]
+      operationId: trashGame
+      summary: Send every file of a game to the trash, as one entry (RF-25)
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      responses:
+        '204':
+          description: In the trash.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /games/{id}/unassign:
+    post:
+      tags: [unassigned]
+      operationId: unassignGame
+      summary: Move every file of a game to the unassigned section (RF-24)
+      parameters:
+        - $ref: '#/components/parameters/GameId'
+      responses:
+        '204':
+          description: Moved.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /items/{id}:
+    patch:
+      tags: [library]
+      operationId: editItem
+      summary: Change a file's kind, version or DLC name (RF-24)
+      description: The file is renamed. A collision needs `onDuplicate`.
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemEdit'
+      responses:
+        '200':
+          description: The game.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /items/{id}/download:
     get:
       tags: [library]
       operationId: downloadItem
-      summary: Download one item (RF-23)
-      description: |
-        A single-file item is sent as is and supports HTTP Range (resumable
-        downloads). Discs (.cue + tracks) and folder games are sent as a zip,
-        like /games/{id}/download.
+      summary: Download one file; supports HTTP Range (RF-23)
       parameters:
         - $ref: '#/components/parameters/ItemId'
       responses:
         '200':
-          description: The file, or a zip for multi-file items.
+          description: The file.
           content:
             application/octet-stream:
               schema:
                 type: string
                 format: binary
-            application/zip:
-              schema:
-                type: string
-                format: binary
         '206':
-          description: The requested range of a single-file item.
+          description: The requested range.
           content:
             application/octet-stream:
               schema:
@@ -633,28 +827,11 @@ paths:
         '416':
           description: The requested range is not satisfiable.
 
-  /games/{id}/trash:
-    post:
-      tags: [trash]
-      operationId: trashGame
-      summary: Send every item of a game to the trash, as one entry (RF-25)
-      parameters:
-        - $ref: '#/components/parameters/GameId'
-      responses:
-        '204':
-          description: In the trash.
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-
   /items/{id}/trash:
     post:
       tags: [trash]
       operationId: trashItem
-      summary: Send one item to the trash (RF-25)
+      summary: Send one file to the trash (RF-25)
       parameters:
         - $ref: '#/components/parameters/ItemId'
       responses:
@@ -667,16 +844,16 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
-  /items/{id}/forget:
+  /items/{id}/unassign:
     post:
-      tags: [library]
-      operationId: forgetItem
-      summary: Remove a missing item (deleted over SMB) from the library (RF-26)
+      tags: [unassigned]
+      operationId: unassignItem
+      summary: Move one file to the unassigned section (RF-24)
       parameters:
         - $ref: '#/components/parameters/ItemId'
       responses:
         '204':
-          description: Forgotten.
+          description: Moved.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -684,103 +861,144 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
-  /library/check:
+  /unassigned:
     get:
-      tags: [library]
-      operationId: getLibraryCheck
-      summary: The last integrity check (it runs at start and every hour)
+      tags: [unassigned]
+      operationId: listUnassigned
+      summary: Files in the unassigned section, newest first (RF-27)
       responses:
         '200':
-          description: The last check, if one has run.
+          description: Files.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IntegrityStatus'
+                type: array
+                items:
+                  $ref: '#/components/schemas/UnassignedFile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /unassigned/{id}:
+    delete:
+      tags: [unassigned]
+      operationId: deleteUnassigned
+      summary: Delete an unassigned file for good (RF-27)
+      parameters:
+        - $ref: '#/components/parameters/UnassignedId'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /unassigned/{id}/download:
+    get:
+      tags: [unassigned]
+      operationId: downloadUnassigned
+      summary: Download an unassigned file; supports HTTP Range
+      parameters:
+        - $ref: '#/components/parameters/UnassignedId'
+      responses:
+        '200':
+          description: The file.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: The requested range.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '416':
+          description: The requested range is not satisfiable.
+
+  /unassigned/{id}/trash:
+    post:
+      tags: [trash]
+      operationId: trashUnassigned
+      summary: Send an unassigned file to the trash (RF-27)
+      parameters:
+        - $ref: '#/components/parameters/UnassignedId'
+      responses:
+        '204':
+          description: In the trash.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /unassigned/{id}/assign:
+    post:
+      tags: [unassigned]
+      operationId: assignUnassigned
+      summary: Start an upload job from an unassigned file (RF-27)
+      description: |
+        The file leaves the section and follows the upload pipeline
+        (extraction if it is an archive, validation, confirmation). Cancelling
+        the job gives it back to the section.
+      parameters:
+        - $ref: '#/components/parameters/UnassignedId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRequest'
+      responses:
+        '201':
+          description: The new job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /library/scan:
+    get:
+      tags: [library]
+      operationId: getLibraryScan
+      summary: The last library scan (RF-26)
+      responses:
+        '200':
+          description: The last scan, if one has run.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanStatus'
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
       tags: [library]
-      operationId: checkLibrary
-      summary: Run the integrity check now (it also runs every hour)
+      operationId: scanLibrary
+      summary: Scan the library for changes made over SMB now (RF-26)
       responses:
         '200':
           description: What changed.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IntegrityReport'
+                $ref: '#/components/schemas/ScanReport'
         '401':
           $ref: '#/components/responses/Unauthorized'
-
-  /games/{id}/rematch/plan:
-    post:
-      tags: [library]
-      operationId: planRematch
-      summary: Preview matching a game to another IGDB entry (RF-24)
-      description: |
-        When the new IGDB game is already in the library (same console) the
-        games merge; items that are duplicates there come back `undecided`.
-      parameters:
-        - $ref: '#/components/parameters/GameId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RematchRequest'
-      responses:
-        '200':
-          description: The plan.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RematchPlan'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '502':
-          $ref: '#/components/responses/BadGateway'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
-  /games/{id}/rematch:
-    post:
-      tags: [library]
-      operationId: rematchGame
-      summary: Match a game to another IGDB entry, renaming its folder and files (RF-24)
-      description: Reversible like a commit. Every duplicate of a merge needs a decision.
-      parameters:
-        - $ref: '#/components/parameters/GameId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RematchRequest'
-      responses:
-        '200':
-          description: Where the game is now.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RematchResult'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '500':
-          $ref: '#/components/responses/InternalError'
-        '502':
-          $ref: '#/components/responses/BadGateway'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
 
   /trash:
     get:
@@ -827,11 +1045,12 @@ paths:
     post:
       tags: [trash]
       operationId: restoreTrashEntry
-      summary: Put an entry back in its game
+      summary: Put an entry back where it came from
       description: |
-        Files take the names of the game's current title. If an item's place
-        is taken (a duplicate was stored since), the answer is 409 unless
-        `onConflict` is `replace`: the current item then goes to the trash.
+        Game files go back to their game, named for its current title; if a
+        place is taken (a duplicate was stored since), the answer is 409 unless
+        `onConflict` is `replace`: the current file then goes to the trash.
+        Unassigned files go back to the unassigned section.
       parameters:
         - $ref: '#/components/parameters/TrashEntryId'
       requestBody:
@@ -910,13 +1129,13 @@ components:
       name: ge_session
 
   parameters:
-    ConsoleId:
-      name: id
+    ConsoleSlug:
+      name: slug
       in: path
       required: true
       schema:
-        type: integer
-        format: int64
+        type: string
+        pattern: '^[a-z0-9][a-z0-9_-]{0,31}$'
     ItemId:
       name: id
       in: path
@@ -932,6 +1151,13 @@ components:
         type: integer
         format: int64
     GameId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    UnassignedId:
       name: id
       in: path
       required: true
@@ -1039,51 +1265,112 @@ components:
           type: string
           format: date-time
 
+    ItemKind:
+      type: string
+      description: |
+        What a file is within its game: base, update and dlc for consoles with
+        add-ons (Switch); game for consoles with one file per game (Wii, PSP).
+      enum: [base, update, dlc, game]
+
     Console:
       type: object
-      required: [id, slug, displayName, extensions, sortOrder, gameCount, builtIn, detection]
+      required:
+        [
+          slug,
+          displayName,
+          defaultName,
+          igdbPlatformId,
+          extensions,
+          customExtensions,
+          kinds,
+          multipleFiles,
+          sortOrder,
+          gameCount,
+        ]
       properties:
-        id:
-          type: integer
-          format: int64
         slug:
           type: string
-          description: Folder name in the library (ES-DE style).
-          example: ps2
+          description: Folder name in the library; fixed.
+          example: switch
         displayName:
           type: string
-          example: PlayStation 2
+          example: Nintendo Switch
+        defaultName:
+          type: string
+          description: The name defined in code (shown when the display name is reset).
         igdbPlatformId:
           type: integer
           format: int64
-          nullable: true
         releaseYear:
           type: integer
           nullable: true
-          example: 2000
+          example: 2017
         logoImageId:
           type: string
           nullable: true
           description: IGDB image id; render with /api/images/logo_med/{logoImageId}.
         extensions:
           type: array
+          description: Fixed extensions (environment variable or code default); cannot be removed here.
           items:
             type: string
-            example: .iso
+            example: .nsp
+        customExtensions:
+          type: array
+          description: Extensions added from the app.
+          items:
+            $ref: '#/components/schemas/CustomExtension'
+        kinds:
+          type: array
+          description: The kinds a file of this console can have.
+          items:
+            $ref: '#/components/schemas/ItemKind'
+        multipleFiles:
+          type: boolean
+          description: Whether one upload may hold several game files (Switch) or exactly one (Wii, PSP).
         sortOrder:
           type: integer
         gameCount:
           type: integer
-          description: Games with at least one item in the library.
-        builtIn:
-          type: boolean
-          description: One of the six consoles the app ships with; they cannot be deleted.
-        detection:
+          description: Games with at least one file in the library.
+
+    CustomExtension:
+      type: object
+      required: [extension, fileCount]
+      properties:
+        extension:
           type: string
-          enum: [titleId, header, structure, extension]
-          description: |
-            How uploads are recognized: Switch title id, disc header, folder
-            structure (PS3) or, for consoles added by the user, extension only.
+          example: .xcz
+        fileCount:
+          type: integer
+          description: Files in the library with this extension; it can be removed only at 0.
+
+    ConsoleUpdate:
+      type: object
+      required: [displayName]
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 60
+
+    ConsoleOrder:
+      type: object
+      required: [slugs]
+      properties:
+        slugs:
+          type: array
+          description: Every console slug, first to last.
+          items:
+            type: string
+
+    ExtensionInput:
+      type: object
+      required: [extension]
+      properties:
+        extension:
+          type: string
+          example: .xcz
 
     MetadataGame:
       type: object
@@ -1116,26 +1403,12 @@ components:
             type: integer
             format: int64
 
-    MetadataPlatform:
+    MetadataStatus:
       type: object
-      required: [id, name]
+      required: [configured]
       properties:
-        id:
-          type: integer
-          format: int64
-          description: IGDB platform id.
-        name:
-          type: string
-          example: Wii U
-        abbreviation:
-          type: string
-          nullable: true
-        logoImageId:
-          type: string
-          nullable: true
-        releaseYear:
-          type: integer
-          nullable: true
+        configured:
+          type: boolean
 
     ImageSize:
       type: string
@@ -1145,10 +1418,12 @@ components:
     JobStatus:
       type: string
       description: |
-        uploading → uploaded → (extracting ⇄ needs_password) → review →
-        committing → done; failed, cancelled and merged are terminal.
-        Parts of a multi-volume archive go uploaded → waiting_parts; when the
-        set is complete the first volume continues and the rest become merged.
+        uploading → uploaded → (extracting ⇄ needs_password) → confirm | invalid
+        → committing → done. Parts of a multi-volume archive wait in
+        waiting_parts; when the group is complete the first volume continues
+        and the rest become merged. An invalid job can change console (back to
+        confirm or invalid) or be set aside: unassigned, trashed or cancelled.
+        done, failed, cancelled, merged, unassigned and trashed are terminal.
       enum:
         [
           uploading,
@@ -1157,23 +1432,31 @@ components:
           merged,
           extracting,
           needs_password,
-          review,
+          confirm,
+          invalid,
           committing,
           done,
+          unassigned,
+          trashed,
           failed,
           cancelled,
         ]
 
+    InvalidReason:
+      type: string
+      description: none = no file fits the console; many = more than one, on a console with one file per game.
+      enum: [none, many]
+
     UploadJob:
       type: object
-      required: [id, fileName, size, received, status, createdAt, updatedAt]
+      required: [id, fileName, size, received, status, console, title, createdAt, updatedAt]
       properties:
         id:
           type: string
           description: Equals the tus upload id.
         fileName:
           type: string
-          example: INSIDE-Switch-NSP-Base-Game.rar
+          example: Limbo_Switch.rar
         size:
           type: integer
           format: int64
@@ -1182,6 +1465,24 @@ components:
           format: int64
         status:
           $ref: '#/components/schemas/JobStatus'
+        console:
+          type: string
+          description: Console slug chosen in the form.
+        title:
+          type: string
+          description: Game name chosen in the form.
+        igdbId:
+          type: integer
+          format: int64
+          nullable: true
+          description: IGDB game the name was picked from.
+        invalidReason:
+          allOf:
+            - $ref: '#/components/schemas/InvalidReason'
+          nullable: true
+        fromUnassigned:
+          type: boolean
+          description: The job was started from an unassigned file.
         progress:
           type: integer
           minimum: 0
@@ -1195,14 +1496,10 @@ components:
           type: string
           nullable: true
           description: Non-fatal note, e.g. archive file attributes not applied.
-        originConsole:
-          type: string
-          nullable: true
-          description: Slug of the console screen the upload started from.
-        volumeIndex:
+        groupSize:
           type: integer
           nullable: true
-          description: Part number for multi-volume archives (1 = first).
+          description: Parts of the multi-volume archive this job belongs to.
         mergedInto:
           type: string
           nullable: true
@@ -1223,105 +1520,147 @@ components:
           minLength: 1
           format: password
 
-    StagedItem:
+    ConsoleChange:
       type: object
-      required: [path, shape, parts, size, ignored, consoles, confidence]
-      properties:
-        path:
-          type: string
-          description: Relative to the upload; for discs, the .cue sheet. Identifies the item in the review.
-          example: Wrapper/INSIDE [0100D2D009028000][v0].nsp
-        shape:
-          type: string
-          enum: [file, disc, folder]
-          description: file; disc = .cue plus its .bin tracks; folder = folder-format game (PS3), kept whole.
-        parts:
-          type: array
-          items:
-            type: string
-        size:
-          type: integer
-          format: int64
-        ignored:
-          type: boolean
-          description: Junk (readme, .nfo, images) set aside; not stored in the library.
-        consoles:
-          type: array
-          description: Candidate console slugs; one when the content was conclusive, empty when unknown.
-          items:
-            type: string
-        confidence:
-          type: string
-          enum: [header, extension, none]
-        suggestedKind:
-          allOf:
-            - $ref: '#/components/schemas/ItemKind'
-          nullable: true
-        titleId:
-          type: string
-          nullable: true
-          description: Nintendo Switch title id found in the file name.
-        versionCode:
-          type: string
-          nullable: true
-          description: Numeric version tag ([v196608]).
-        displayVersion:
-          type: string
-          nullable: true
-          description: Human version (1.0.3), suggested as the update label.
-        discNumber:
-          type: integer
-          nullable: true
-
-    ItemKind:
-      type: string
-      description: What a stored item is within a game folder.
-      enum: [base, update, dlc, disc]
-
-    CommitRequest:
-      type: object
-      required: [console, igdbGameId, items]
+      required: [console]
       properties:
         console:
           type: string
-          description: Console slug.
-          example: switch
-        igdbGameId:
+
+    ResolveRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [unassigned, trash, delete]
+
+    StagedFile:
+      type: object
+      required: [path, size, valid, consoles]
+      properties:
+        path:
+          type: string
+          description: Relative to the upload. Identifies the file in the commit.
+          example: Limbo [0100A8E005E7C000].nsp
+        size:
           type: integer
           format: int64
-        items:
+        valid:
+          type: boolean
+          description: A game file for the job's console; the others are discarded.
+        consoles:
           type: array
-          description: One entry per staged item that is not ignored.
+          description: Every console whose extensions accept the file.
           items:
-            $ref: '#/components/schemas/CommitItem'
+            type: string
 
-    CommitItem:
+    CommitRequest:
+      type: object
+      required: [files]
+      properties:
+        files:
+          type: array
+          description: One entry per valid file.
+          items:
+            $ref: '#/components/schemas/CommitFile'
+
+    CommitFile:
       type: object
       required: [path]
       properties:
         path:
           type: string
-          description: StagedItem.path.
-        skip:
-          type: boolean
-          description: Leave this item out of the library (it is deleted with the staging area).
+          description: StagedFile.path.
         kind:
-          $ref: '#/components/schemas/ItemKind'
+          allOf:
+            - $ref: '#/components/schemas/ItemKind'
+          description: Required on consoles with several kinds; omitted means game.
         label:
           type: string
-          description: Update version (v1.0.3) or DLC name.
-        discNumber:
-          type: integer
-          minimum: 1
-          maximum: 99
+          description: Update version (digits and dots) or DLC name.
         onDuplicate:
+          $ref: '#/components/schemas/DuplicateAction'
+
+    DuplicateAction:
+      type: string
+      enum: [replace, skip]
+      description: replace sends the existing file to the trash; skip keeps it and drops the new one.
+
+    PlannedFile:
+      type: object
+      required: [path, file, action]
+      properties:
+        path:
           type: string
-          enum: [replace, skip]
-          description: replace sends the existing item to the trash; skip keeps it and drops this one.
+        file:
+          type: string
+          description: Final name inside the game folder.
+        action:
+          $ref: '#/components/schemas/PlanAction'
+        duplicate:
+          allOf:
+            - $ref: '#/components/schemas/LibraryItem'
+          nullable: true
+
+    PlanAction:
+      type: string
+      enum: [store, replace, skip, undecided]
+
+    CommitPlan:
+      type: object
+      required: [console, title, folder, existing, files, discarded]
+      properties:
+        console:
+          type: string
+        title:
+          type: string
+        folder:
+          type: string
+          example: Limbo
+        gameId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Set when the game is already in the library.
+        existing:
+          type: array
+          description: The game's current files.
+          items:
+            $ref: '#/components/schemas/LibraryItem'
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlannedFile'
+        discarded:
+          type: array
+          description: Files that are not game files for the console.
+          items:
+            type: string
+
+    CommitResult:
+      type: object
+      required: [job, gameId, path, stored, replaced, skipped]
+      properties:
+        job:
+          $ref: '#/components/schemas/UploadJob'
+        gameId:
+          type: integer
+          format: int64
+        path:
+          type: string
+          description: Library-relative game folder.
+          example: switch/Limbo
+        stored:
+          type: integer
+        replaced:
+          type: integer
+        skipped:
+          type: integer
 
     LibraryItem:
       type: object
-      required: [id, kind, shape, files, size, createdAt]
+      required: [id, kind, file, size, createdAt]
       properties:
         id:
           type: integer
@@ -1331,33 +1670,20 @@ components:
         label:
           type: string
           nullable: true
-        discNumber:
-          type: integer
-          nullable: true
-        shape:
+          description: Update version (without the v) or DLC name.
+        file:
           type: string
-          enum: [file, disc, folder]
-          description: file downloads as is (resumable); disc and folder download as a zip.
-        files:
-          type: array
-          description: Relative to the game folder; the first is the main entry.
-          items:
-            type: string
+          description: Name inside the game folder.
         size:
           type: integer
           format: int64
         createdAt:
           type: string
           format: date-time
-        missingSince:
-          type: string
-          format: date-time
-          nullable: true
-          description: Set while a file of the item is missing from disk (deleted over SMB).
 
     GameSummary:
       type: object
-      required: [id, console, igdbId, title, folder, itemCount, missingCount, size]
+      required: [id, console, title, folder, itemCount, size]
       properties:
         id:
           type: integer
@@ -1365,6 +1691,8 @@ components:
         igdbId:
           type: integer
           format: int64
+          nullable: true
+          description: Unset for games with a name of the user's own.
         console:
           type: string
           description: Console slug.
@@ -1382,13 +1710,10 @@ components:
           description: Render with /api/images/cover_big/{coverImageId}.
         itemCount:
           type: integer
-        missingCount:
-          type: integer
-          description: Items with files missing from disk.
         size:
           type: integer
           format: int64
-          description: Bytes of every item in the library.
+          description: Bytes of every file in the library.
 
     GameDetail:
       allOf:
@@ -1399,7 +1724,7 @@ components:
             path:
               type: string
               description: Library-relative folder.
-              example: switch/Inside
+              example: switch/Limbo
             summary:
               type: string
               nullable: true
@@ -1409,86 +1734,29 @@ components:
                 type: string
             items:
               type: array
-              description: Items in the library (not in the trash), base first.
+              description: Files in the library (not in the trash), base first.
               items:
                 $ref: '#/components/schemas/LibraryItem'
 
-    ConsoleInput:
+    GameEdit:
       type: object
-      required: [slug, displayName, extensions]
+      required: [console, title]
       properties:
-        slug:
+        console:
           type: string
-          description: Folder name; can only change while the console has no games.
-          example: n64
-        displayName:
+          description: Target console (the current one to only rename).
+        title:
           type: string
-          example: Nintendo 64
-        extensions:
-          type: array
-          items:
-            type: string
-            example: .z64
-
-    ConsoleCreate:
-      allOf:
-        - $ref: '#/components/schemas/ConsoleInput'
-        - type: object
-          required: [igdbPlatformId]
-          properties:
-            igdbPlatformId:
-              type: integer
-              format: int64
-
-    ConsoleOrder:
-      type: object
-      required: [ids]
-      properties:
-        ids:
-          type: array
-          description: Every console id, first to last.
-          items:
-            type: integer
-            format: int64
-
-    IntegrityReport:
-      type: object
-      required: [checkedAt, checked, missing, found, missingTotal]
-      properties:
-        checkedAt:
-          type: string
-          format: date-time
-        checked:
-          type: integer
-        missing:
-          type: integer
-          description: Items found missing in this check.
-        found:
-          type: integer
-          description: Missing items whose files are back.
-        missingTotal:
-          type: integer
-          description: Items still missing after this check.
-
-    IntegrityStatus:
-      type: object
-      properties:
-        lastCheck:
-          allOf:
-            - $ref: '#/components/schemas/IntegrityReport'
-          nullable: true
-          description: Unset until the first check has run.
-
-    RematchRequest:
-      type: object
-      required: [igdbGameId]
-      properties:
-        igdbGameId:
+          minLength: 1
+          maxLength: 200
+        igdbId:
           type: integer
           format: int64
+          nullable: true
+          description: IGDB game the title was picked from; unset for a name of the user's own.
         decisions:
           type: array
-          description: For duplicates when merging into a game that already has the new IGDB id.
+          description: For collisions when merging into another game.
           items:
             $ref: '#/components/schemas/ItemDecision'
 
@@ -1500,11 +1768,9 @@ components:
           type: integer
           format: int64
         onDuplicate:
-          type: string
-          enum: [replace, skip]
-          description: replace sends the other game's item to the trash; skip sends this one.
+          $ref: '#/components/schemas/DuplicateAction'
 
-    RematchPlan:
+    GameEditPlan:
       type: object
       required: [console, title, folder, items]
       properties:
@@ -1514,37 +1780,34 @@ components:
           type: string
         folder:
           type: string
-          description: Folder after the re-match.
+          description: Folder after the change.
         mergeInto:
           type: integer
           format: int64
           nullable: true
-          description: Game that already has the new IGDB id; the games merge.
+          description: Game that already has the name on that console; the games merge.
         items:
           type: array
           items:
-            $ref: '#/components/schemas/RematchItem'
+            $ref: '#/components/schemas/GameEditItem'
 
-    RematchItem:
+    GameEditItem:
       type: object
-      required: [item, files, action]
+      required: [item, file, action]
       properties:
         item:
           $ref: '#/components/schemas/LibraryItem'
-        files:
-          type: array
-          description: New names.
-          items:
-            type: string
-        action:
+        file:
           type: string
-          enum: [store, replace, skip, undecided]
+          description: New name.
+        action:
+          $ref: '#/components/schemas/PlanAction'
         duplicate:
           allOf:
             - $ref: '#/components/schemas/LibraryItem'
           nullable: true
 
-    RematchResult:
+    GameEditResult:
       type: object
       required: [gameId, path, merged]
       properties:
@@ -1553,27 +1816,121 @@ components:
           format: int64
         path:
           type: string
-          example: switch/Inside
+          example: switch/Limbo
         merged:
           type: boolean
 
-    TrashEntry:
+    ItemEdit:
       type: object
-      required:
-        [id, gameId, console, title, folder, wholeGame, reason, trashedAt, expiresAt, size, items]
+      required: [kind]
+      properties:
+        kind:
+          $ref: '#/components/schemas/ItemKind'
+        label:
+          type: string
+        onDuplicate:
+          $ref: '#/components/schemas/DuplicateAction'
+
+    UnassignedFile:
+      type: object
+      required: [id, path, name, origin, reason, size, arrivedAt, consoles, archive]
       properties:
         id:
           type: integer
           format: int64
-        gameId:
+        path:
+          type: string
+          description: Relative to the unassigned folder.
+          example: wii/Zelda/Zelda.iso
+        name:
+          type: string
+        origin:
+          type: string
+          description: Where it came from (a library path, or the upload's file name).
+        reason:
+          type: string
+          enum: [samba, upload, manual]
+          description: Added over SMB, an upload that did not fit, or moved here by the user.
+        size:
           type: integer
           format: int64
+        arrivedAt:
+          type: string
+          format: date-time
+        consoles:
+          type: array
+          description: Consoles whose extensions accept the file.
+          items:
+            type: string
+        archive:
+          type: boolean
+          description: A zip, 7z or rar; it is validated once extracted.
+
+    AssignRequest:
+      type: object
+      required: [console, title]
+      properties:
         console:
           type: string
         title:
           type: string
+          minLength: 1
+          maxLength: 200
+        igdbId:
+          type: integer
+          format: int64
+          nullable: true
+
+    ScanReport:
+      type: object
+      required: [scannedAt, unassigned, removed, pending]
+      properties:
+        scannedAt:
+          type: string
+          format: date-time
+        unassigned:
+          type: integer
+          description: Unknown files moved to (or found in) the unassigned section.
+        removed:
+          type: integer
+          description: Files deleted over SMB that left the library.
+        pending:
+          type: integer
+          description: Unknown files that are still changing (a copy in progress); the next scan moves them.
+
+    ScanStatus:
+      type: object
+      properties:
+        lastScan:
+          allOf:
+            - $ref: '#/components/schemas/ScanReport'
+          nullable: true
+          description: Unset until the first scan has run.
+
+    TrashEntry:
+      type: object
+      required: [id, kind, title, wholeGame, reason, trashedAt, expiresAt, size, items, files]
+      properties:
+        id:
+          type: integer
+          format: int64
+        kind:
+          type: string
+          enum: [game, unassigned]
+          description: Files of a game, or unassigned files.
+        gameId:
+          type: integer
+          format: int64
+          nullable: true
+        console:
+          type: string
+          nullable: true
+        title:
+          type: string
+          description: The game's title; empty for unassigned files.
         folder:
           type: string
+          nullable: true
         wholeGame:
           type: boolean
         reason:
@@ -1592,8 +1949,14 @@ components:
           format: int64
         items:
           type: array
+          description: Game files (kind game).
           items:
             $ref: '#/components/schemas/LibraryItem'
+        files:
+          type: array
+          description: Unassigned files (kind unassigned).
+          items:
+            $ref: '#/components/schemas/UnassignedFile'
 
     RestoreRequest:
       type: object
@@ -1604,81 +1967,15 @@ components:
 
     RestoreResult:
       type: object
-      required: [gameId, path]
+      required: [path]
       properties:
-        gameId:
-          type: integer
-          format: int64
-        path:
-          type: string
-
-    PlannedItem:
-      type: object
-      required: [path, files, action]
-      properties:
-        path:
-          type: string
-        files:
-          type: array
-          description: Final names inside the game folder (a .cue sheet first, then its tracks).
-          items:
-            type: string
-        action:
-          type: string
-          enum: [store, replace, skip, undecided]
-        duplicate:
-          allOf:
-            - $ref: '#/components/schemas/LibraryItem'
-          nullable: true
-
-    CommitPlan:
-      type: object
-      required: [console, title, folder, existing, items]
-      properties:
-        console:
-          type: string
-        title:
-          type: string
-          description: Game title used for the names.
-        folder:
-          type: string
-          description: Game folder inside the console folder.
-          example: The Legend of Zelda - Tears of the Kingdom
         gameId:
           type: integer
           format: int64
           nullable: true
-          description: Set when the game is already in the library.
-        existing:
-          type: array
-          description: The game's current items.
-          items:
-            $ref: '#/components/schemas/LibraryItem'
-        items:
-          type: array
-          description: Items that are not skipped by the user.
-          items:
-            $ref: '#/components/schemas/PlannedItem'
-
-    CommitResult:
-      type: object
-      required: [job, gameId, path, stored, replaced, skipped]
-      properties:
-        job:
-          $ref: '#/components/schemas/UploadJob'
-        gameId:
-          type: integer
-          format: int64
         path:
           type: string
-          description: Library-relative game folder.
-          example: switch/Mario Kart 8 Deluxe
-        stored:
-          type: integer
-        replaced:
-          type: integer
-        skipped:
-          type: integer
+          description: Library-relative folder the entry went back to.
 
     Problem:
       type: object

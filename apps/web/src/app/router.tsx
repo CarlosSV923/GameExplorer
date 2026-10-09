@@ -13,12 +13,12 @@ import { useTranslation } from 'react-i18next'
 
 import { ConsoleScreen } from '@/modules/catalog/ui/ConsoleScreen'
 import { HomeScreen } from '@/modules/catalog/ui/HomeScreen'
-import { RematchScreen } from '@/modules/catalog/ui/RematchScreen'
 import { SearchScreen } from '@/modules/catalog/ui/SearchScreen'
+import { UnassignedScreen } from '@/modules/catalog/ui/UnassignedScreen'
 import type { IdentityPorts } from '@/modules/identity/application/ports'
 import { sessionKey, sessionQuery } from '@/modules/identity/application/queries'
 import { LoginScreen } from '@/modules/identity/ui/LoginScreen'
-import { ReviewScreen } from '@/modules/ingestion/ui/ReviewScreen'
+import { JobScreen } from '@/modules/ingestion/ui/JobScreen'
 import { UploadsScreen } from '@/modules/ingestion/ui/UploadsScreen'
 import { isAppError } from '@/shared/kernel/errors'
 import { ButtonLink } from '@/shared/routing/links'
@@ -186,14 +186,10 @@ const gameRoute = createRoute({
   },
 })
 
-const rematchRoute = createRoute({
+const unassignedRoute = createRoute({
   getParentRoute: () => appRoute,
-  path: '/consolas/$slug/$gameId/reemparejar',
-  component: function Rematch() {
-    const { slug, gameId } = rematchRoute.useParams()
-    const id = optionalId(gameId)
-    return id === undefined ? <NotFound /> : <RematchScreen slug={slug} gameId={id} />
-  },
+  path: '/no-asignados',
+  component: UnassignedScreen,
 })
 
 const uploadsRoute = createRoute({
@@ -202,12 +198,12 @@ const uploadsRoute = createRoute({
   component: UploadsScreen,
 })
 
-const reviewRoute = createRoute({
+const jobRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/subidas/$jobId',
-  component: function Review() {
-    const { jobId } = reviewRoute.useParams()
-    return <ReviewScreen key={jobId} jobId={jobId} />
+  component: function Job() {
+    const { jobId } = jobRoute.useParams()
+    return <JobScreen key={jobId} jobId={jobId} />
   },
 })
 
@@ -242,9 +238,9 @@ const routeTree = rootRoute.addChildren([
     searchRoute,
     consoleRoute,
     gameRoute,
-    rematchRoute,
+    unassignedRoute,
     uploadsRoute,
-    reviewRoute,
+    jobRoute,
     settingsIndexRoute,
     settingsRoute,
   ]),

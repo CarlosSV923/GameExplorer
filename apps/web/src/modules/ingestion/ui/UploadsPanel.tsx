@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next'
 
 import { useConsoles } from '@/modules/catalog/application/queries'
+import { knownExtensions } from '@/modules/catalog/domain/items'
 import { FileButton, FolderIcon, UploadIcon } from '@/shared/ui'
 
 import { useUploadRows } from '../application/queries'
 import { UploadCard } from './UploadCard'
 
-/** Archives the app extracts itself (RF-03). */
+/** Archives the app extracts itself (RF-06). */
 const archives = ['.rar', '.zip', '.7z']
 
 /** The live list of uploads (RF-13): a polite live region. */
@@ -51,9 +52,7 @@ export function DropZone({
 }) {
   const { t } = useTranslation()
   const consoles = useConsoles()
-  const extensions = [
-    ...new Set([...archives, ...(consoles.data ?? []).flatMap((c) => c.extensions)]),
-  ]
+  const extensions = [...new Set([...archives, ...knownExtensions(consoles.data ?? [])])]
   return (
     <div className="box-border flex min-h-[420px] min-w-0 flex-[999_1_520px] flex-col items-center justify-center gap-5 rounded-xl border-3 border-dashed border-accent p-10 text-center">
       <span className="flex size-28 items-center justify-center rounded-full bg-accent text-on-accent">
