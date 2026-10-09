@@ -4,2685 +4,2671 @@
  */
 
 export interface paths {
-  '/health': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Liveness probe and startup diagnostics
-     * @description Always answers 200 while the process is up. `status` is `degraded` when
-     *     a check fails (for example the library is not writable), so the UI can
-     *     explain the problem instead of the container crash-looping.
-     */
-    get: operations['getHealth']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/auth/login': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Start a session with the shared password */
-    post: operations['login']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/auth/logout': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** End the session on this device */
-    post: operations['logout']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/auth/session': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Current session */
-    get: operations['getSession']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/consoles': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * The consoles defined in code, in carousel order (RF-40)
-     * @description Every console, with or without games; the carousel hides the empty ones.
-     */
-    get: operations['listConsoles']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/consoles/order': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    /** Set the carousel order (RF-42) */
-    put: operations['reorderConsoles']
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/consoles/{slug}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    /** Change a console's display name (RF-42) */
-    patch: operations['updateConsole']
-    trace?: never
-  }
-  '/consoles/{slug}/extensions': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Add a custom extension to a console (RF-41) */
-    post: operations['addConsoleExtension']
-    /** Remove a custom extension that no file uses (RF-41) */
-    delete: operations['removeConsoleExtension']
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/metadata/games': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Search games on IGDB, optionally limited to one platform */
-    get: operations['searchGames']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/metadata/status': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Whether IGDB is configured (RF-54) */
-    get: operations['getMetadataStatus']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/jobs': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Recent upload jobs, newest first
-     * @description A job is created when the browser starts a tus upload at /api/uploads/
-     *     (see the metadata above) or assigns an entry of the unassigned section,
-     *     and follows it through extraction, validation, confirmation and commit.
-     */
-    get: operations['listJobs']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/jobs/events': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Live job changes (server-sent events)
-     * @description `text/event-stream`. Each change is sent as `event: job` with an
-     *     UploadJob JSON in `data`. On connect the server first replays every
-     *     non-terminal job, then streams changes; a comment line is sent every
-     *     25 seconds to keep proxies from closing the connection.
-     */
-    get: operations['streamJobEvents']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/jobs/{id}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** One upload job */
-    get: operations['getJob']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/jobs/{id}/files': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Files found in an upload (RF-07)
-     * @description Available once the job reaches `confirm` or `invalid`. `valid` says
-     *     whether the file is a game file for the job's console; the rest are
-     *     discarded when the job is stored.
-     */
-    get: operations['listJobFiles']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/jobs/{id}/password': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Retry extraction of an encrypted archive with its password
-     * @description The password is used for this extraction only and never stored.
-     */
-    post: operations['submitJobPassword']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/jobs/{id}/console': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Validate the upload's files for another console (RF-07)
-     * @description The files stay where they are (nothing is extracted again); the job
-     *     becomes `confirm` if they fit the new console, `invalid` otherwise.
-     */
-    post: operations['changeJobConsole']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/jobs/{id}/resolve': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Set aside an upload that does not fit its console (RF-07)
-     * @description `unassigned` moves the extracted files to the unassigned section,
-     *     `trash` sends them to the trash (restorable to the unassigned section)
-     *     and `delete` deletes them for good.
-     */
-    post: operations['resolveJob']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/jobs/{id}/cancel': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Cancel a job and delete its uploaded data
-     * @description A job assigned from the unassigned section gives its file back to the section.
-     */
-    post: operations['cancelJob']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/jobs/{id}/plan': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Preview the final names of an upload ready to confirm (RF-08, RF-09)
-     * @description Computes the game folder and file names (spec §5) and the duplicates
-     *     against the game's current files, without changing anything.
-     *     `onDuplicate` may be left out; such files come back as `undecided`.
-     */
-    post: operations['planJobCommit']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/jobs/{id}/commit': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Store a confirmed upload in the library (RF-10)
-     * @description Moves the valid files to `<console>/<game>/` with their final names,
-     *     sends replaced duplicates to the trash and deletes the rest of the
-     *     staging area. Every duplicate needs `onDuplicate`. If anything fails,
-     *     every move is undone and the job returns to `confirm` with the reason
-     *     in `error`.
-     */
-    post: operations['commitJob']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/consoles/{slug}/games': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Games of one console, by title */
-    get: operations['listConsoleGames']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/games': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Search the library by title, across consoles (RF-22)
-     * @description Every word must appear in the title; case and accents are ignored.
-     */
-    get: operations['searchLibrary']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/games/{id}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Game detail with its files (RF-21) */
-    get: operations['getGame']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/games/{id}/edit/plan': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Preview renaming a game or moving it to another console (RF-24)
-     * @description When another game of the target console already has the new name the
-     *     games merge; files that would collide come back `undecided`. Moving
-     *     needs every file's extension to be valid on the target console.
-     */
-    post: operations['planGameEdit']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/games/{id}/edit': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Rename a game or move it to another console (RF-24)
-     * @description Reversible like a commit. Every collision of a merge needs a decision.
-     */
-    post: operations['editGame']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/games/{id}/download': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * The whole game as an uncompressed zip, streamed (RF-23)
-     * @description Entries are "<game folder>/<file>". The zip is built while it is sent,
-     *     so it cannot be resumed; Content-Length is announced, and files over
-     *     4 GB use zip64.
-     */
-    get: operations['downloadGame']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/games/{id}/trash': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Send every file of a game to the trash, as one entry (RF-25) */
-    post: operations['trashGame']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/games/{id}/unassign': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Move every file of a game to the unassigned section (RF-24) */
-    post: operations['unassignGame']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/items/{id}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    /**
-     * Change a file's kind, version or DLC name (RF-24)
-     * @description The file is renamed. A collision needs `onDuplicate`.
-     */
-    patch: operations['editItem']
-    trace?: never
-  }
-  '/items/{id}/download': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Download one file; supports HTTP Range (RF-23) */
-    get: operations['downloadItem']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/items/{id}/trash': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Send one file to the trash (RF-25) */
-    post: operations['trashItem']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/items/{id}/unassign': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Move one file to the unassigned section (RF-24) */
-    post: operations['unassignItem']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/unassigned': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Entries of the unassigned section, newest first (RF-27)
-     * @description Reads the unassigned folder first: files copied into it over SMB show
-     *     up right away, as copying until they settle (RF-26a).
-     */
-    get: operations['listUnassigned']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/unassigned/{id}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    post?: never
-    /** Delete an unassigned file for good (RF-27) */
-    delete: operations['deleteUnassigned']
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/unassigned/{id}/download': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Download an unassigned file; supports HTTP Range */
-    get: operations['downloadUnassigned']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/unassigned/{id}/trash': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Send an unassigned file to the trash (RF-27) */
-    post: operations['trashUnassigned']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/unassigned/entries/{id}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    post?: never
-    /** Delete every file of an entry for good (RF-27) */
-    delete: operations['deleteUnassignedEntry']
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/unassigned/entries/{id}/download': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Download an entry; a folder as a zip without compression (RF-27) */
-    get: operations['downloadUnassignedEntry']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/unassigned/entries/{id}/trash': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Send an entry to the trash, as one trash entry (RF-27) */
-    post: operations['trashUnassignedEntry']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/unassigned/entries/{id}/assign': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Start a job that assigns a whole entry (RF-27a)
-     * @description The entry's files stay in the section, without actions, while the job
-     *     extracts its archives, validates the files for the console and waits
-     *     for the confirmation, where each file gets a kind or "No guardar".
-     *     Cancelling the job frees them.
-     */
-    post: operations['assignUnassignedEntry']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/library/scan': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** The last library scan (RF-26) */
-    get: operations['getLibraryScan']
-    put?: never
-    /** Scan the library for changes made over SMB now (RF-26) */
-    post: operations['scanLibrary']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/trash': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** The trash, newest first (RF-30) */
-    get: operations['listTrash']
-    put?: never
-    post?: never
-    /** Delete everything in the trash for good */
-    delete: operations['emptyTrash']
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/trash/{id}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    post?: never
-    /** Delete one entry for good */
-    delete: operations['deleteTrashEntry']
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/trash/{id}/restore': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Put an entry back where it came from
-     * @description Game files go back to their game, named for its current title; if a
-     *     place is taken (a duplicate was stored since), the answer is 409 unless
-     *     `onConflict` is `replace`: the current file then goes to the trash.
-     *     Unassigned files go back to the unassigned section.
-     */
-    post: operations['restoreTrashEntry']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/images/{size}/{imageId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * IGDB image (cover or logo) served from the local cache
-     * @description Downloaded from the IGDB image CDN on first request and cached under
-     *     DATA_PATH, so the NAS keeps working offline and the browser never
-     *     contacts third parties.
-     */
-    get: operations['getImage']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Liveness probe and startup diagnostics
+         * @description Always answers 200 while the process is up. `status` is `degraded` when
+         *     a check fails (for example the library is not writable), so the UI can
+         *     explain the problem instead of the container crash-looping.
+         */
+        get: operations["getHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a session with the shared password */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End the session on this device */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Current session */
+        get: operations["getSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/consoles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The consoles defined in code, in carousel order (RF-40)
+         * @description Every console, with or without games; the carousel hides the empty ones.
+         */
+        get: operations["listConsoles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/consoles/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the carousel order (RF-42) */
+        put: operations["reorderConsoles"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/consoles/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a console's display name (RF-42) */
+        patch: operations["updateConsole"];
+        trace?: never;
+    };
+    "/consoles/{slug}/extensions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a custom extension to a console (RF-41) */
+        post: operations["addConsoleExtension"];
+        /** Remove a custom extension that no file uses (RF-41) */
+        delete: operations["removeConsoleExtension"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metadata/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search games on IGDB, optionally limited to one platform */
+        get: operations["searchGames"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metadata/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether IGDB is configured (RF-54) */
+        get: operations["getMetadataStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recent upload jobs, newest first
+         * @description A job is created when the browser starts a tus upload at /api/uploads/
+         *     (see the metadata above) or assigns an entry of the unassigned section,
+         *     and follows it through extraction, validation, confirmation and commit.
+         */
+        get: operations["listJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live job changes (server-sent events)
+         * @description `text/event-stream`. Each change is sent as `event: job` with an
+         *     UploadJob JSON in `data`. On connect the server first replays every
+         *     non-terminal job, then streams changes; a comment line is sent every
+         *     25 seconds to keep proxies from closing the connection.
+         */
+        get: operations["streamJobEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One upload job */
+        get: operations["getJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Files found in an upload (RF-07)
+         * @description Available once the job reaches `confirm` or `invalid`. `valid` says
+         *     whether the file is a game file for the job's console; the rest are
+         *     discarded when the job is stored.
+         */
+        get: operations["listJobFiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry extraction of an encrypted archive with its password
+         * @description The password is used for this extraction only and never stored.
+         */
+        post: operations["submitJobPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}/console": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate the upload's files for another console (RF-07)
+         * @description The files stay where they are (nothing is extracted again); the job
+         *     becomes `confirm` if they fit the new console, `invalid` otherwise.
+         */
+        post: operations["changeJobConsole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set aside an upload that does not fit its console (RF-07)
+         * @description `unassigned` moves the extracted files to the unassigned section,
+         *     `trash` sends them to the trash (restorable to the unassigned section)
+         *     and `delete` deletes them for good.
+         */
+        post: operations["resolveJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a job and delete its uploaded data
+         * @description A job assigned from the unassigned section gives its file back to the section.
+         */
+        post: operations["cancelJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview the final names of an upload ready to confirm (RF-08, RF-09)
+         * @description Computes the game folder and file names (spec §5) and the duplicates
+         *     against the game's current files, without changing anything.
+         *     `onDuplicate` may be left out; such files come back as `undecided`.
+         */
+        post: operations["planJobCommit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{id}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Store a confirmed upload in the library (RF-10)
+         * @description Moves the valid files to `<console>/<game>/` with their final names,
+         *     sends replaced duplicates to the trash and deletes the rest of the
+         *     staging area. Every duplicate needs `onDuplicate`. If anything fails,
+         *     every move is undone and the job returns to `confirm` with the reason
+         *     in `error`.
+         */
+        post: operations["commitJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/consoles/{slug}/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Games of one console, by title */
+        get: operations["listConsoleGames"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search the library by title, across consoles (RF-22)
+         * @description Every word must appear in the title; case and accents are ignored.
+         */
+        get: operations["searchLibrary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game detail with its files (RF-21) */
+        get: operations["getGame"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games/{id}/edit/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview renaming a game or moving it to another console (RF-24)
+         * @description When another game of the target console already has the new name the
+         *     games merge; files that would collide come back `undecided`. Moving
+         *     needs every file's extension to be valid on the target console.
+         */
+        post: operations["planGameEdit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games/{id}/edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rename a game or move it to another console (RF-24)
+         * @description Reversible like a commit. Every collision of a merge needs a decision.
+         */
+        post: operations["editGame"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The whole game as an uncompressed zip, streamed (RF-23)
+         * @description Entries are "<game folder>/<file>". The zip is built while it is sent,
+         *     so it cannot be resumed; Content-Length is announced, and files over
+         *     4 GB use zip64.
+         */
+        get: operations["downloadGame"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games/{id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send every file of a game to the trash, as one entry (RF-25) */
+        post: operations["trashGame"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/games/{id}/unassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move every file of a game to the unassigned section (RF-24) */
+        post: operations["unassignGame"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a file's kind, version or DLC name (RF-24)
+         * @description The file is renamed. A collision needs `onDuplicate`.
+         */
+        patch: operations["editItem"];
+        trace?: never;
+    };
+    "/items/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download one file; supports HTTP Range (RF-23) */
+        get: operations["downloadItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send one file to the trash (RF-25) */
+        post: operations["trashItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{id}/unassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move one file to the unassigned section (RF-24) */
+        post: operations["unassignItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/unassigned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Entries of the unassigned section, newest first (RF-27)
+         * @description Reads the unassigned folder first: files copied into it over SMB show
+         *     up right away, as copying until they settle (RF-26a).
+         */
+        get: operations["listUnassigned"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/unassigned/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete an unassigned file for good (RF-27) */
+        delete: operations["deleteUnassigned"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/unassigned/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download an unassigned file; supports HTTP Range */
+        get: operations["downloadUnassigned"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/unassigned/{id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send an unassigned file to the trash (RF-27) */
+        post: operations["trashUnassigned"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/unassigned/entries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete every file of an entry for good (RF-27) */
+        delete: operations["deleteUnassignedEntry"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/unassigned/entries/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download an entry; a folder as a zip without compression (RF-27) */
+        get: operations["downloadUnassignedEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/unassigned/entries/{id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send an entry to the trash, as one trash entry (RF-27) */
+        post: operations["trashUnassignedEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/unassigned/entries/{id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a job that assigns a whole entry (RF-27a)
+         * @description The entry's files stay in the section, without actions, while the job
+         *     extracts its archives, validates the files for the console and waits
+         *     for the confirmation, where each file gets a kind or "No guardar".
+         *     Cancelling the job frees them.
+         */
+        post: operations["assignUnassignedEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/library/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The last library scan (RF-26) */
+        get: operations["getLibraryScan"];
+        put?: never;
+        /** Scan the library for changes made over SMB now (RF-26) */
+        post: operations["scanLibrary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The trash, newest first (RF-30) */
+        get: operations["listTrash"];
+        put?: never;
+        post?: never;
+        /** Delete everything in the trash for good */
+        delete: operations["emptyTrash"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete one entry for good */
+        delete: operations["deleteTrashEntry"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put an entry back where it came from
+         * @description Game files go back to their game, named for its current title; if a
+         *     place is taken (a duplicate was stored since), the answer is 409 unless
+         *     `onConflict` is `replace`: the current file then goes to the trash.
+         *     Unassigned files go back to the unassigned section.
+         */
+        post: operations["restoreTrashEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/images/{size}/{imageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * IGDB image (cover or logo) served from the local cache
+         * @description Downloaded from the IGDB image CDN on first request and cached under
+         *     DATA_PATH, so the NAS keeps working offline and the browser never
+         *     contacts third parties.
+         */
+        get: operations["getImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
-export type webhooks = Record<string, never>
+export type webhooks = Record<string, never>;
 export interface components {
-  schemas: {
-    Health: {
-      /** @enum {string} */
-      status: 'ok' | 'degraded'
-      checks: components['schemas']['HealthCheck'][]
-    }
-    HealthCheck: {
-      /** @example library-writable */
-      name: string
-      ok: boolean
-      /** @description Human readable explanation when the check fails. */
-      message?: string
-    }
-    LoginRequest: {
-      /** Format: password */
-      password: string
-    }
-    Session: {
-      /** Format: date-time */
-      expiresAt: string
-    }
-    /**
-     * @description What a file is within its game: base, update and dlc for consoles with
-     *     add-ons (Switch); game for consoles with one file per game (Wii, PSP).
-     * @enum {string}
-     */
-    ItemKind: 'base' | 'update' | 'dlc' | 'game'
-    Console: {
-      /**
-       * @description Folder name in the library; fixed.
-       * @example switch
-       */
-      slug: string
-      /** @example Nintendo Switch */
-      displayName: string
-      /** @description The name defined in code (shown when the display name is reset). */
-      defaultName: string
-      /** Format: int64 */
-      igdbPlatformId: number
-      /** @example 2017 */
-      releaseYear?: number | null
-      /** @description IGDB image id; render with /api/images/logo_med/{logoImageId}. */
-      logoImageId?: string | null
-      /** @description Fixed extensions (environment variable or code default); cannot be removed here. */
-      extensions: string[]
-      /** @description Extensions added from the app. */
-      customExtensions: components['schemas']['CustomExtension'][]
-      /** @description The kinds a file of this console can have. */
-      kinds: components['schemas']['ItemKind'][]
-      /** @description Whether one upload may hold several game files (Switch) or exactly one (Wii, PSP). */
-      multipleFiles: boolean
-      sortOrder: number
-      /** @description Games with at least one file in the library. */
-      gameCount: number
-    }
-    CustomExtension: {
-      /** @example .xcz */
-      extension: string
-      /** @description Files in the library with this extension; it can be removed only at 0. */
-      fileCount: number
-    }
-    ConsoleUpdate: {
-      displayName: string
-    }
-    ConsoleOrder: {
-      /** @description Every console slug, first to last. */
-      slugs: string[]
-    }
-    ExtensionInput: {
-      /** @example .xcz */
-      extension: string
-    }
-    MetadataGame: {
-      /**
-       * Format: int64
-       * @description IGDB game id.
-       */
-      id: number
-      /** @example Mario Kart 8 Deluxe */
-      name: string
-      releaseYear?: number | null
-      /** @description Render with /api/images/cover_big/{coverImageId}. */
-      coverImageId?: string | null
-      summary?: string | null
-      genres: string[]
-      platformIds: number[]
-    }
-    MetadataStatus: {
-      configured: boolean
-    }
-    /**
-     * @description IGDB image size preset.
-     * @enum {string}
-     */
-    ImageSize: 'cover_small' | 'cover_big' | 'logo_med' | 'screenshot_med'
-    /**
-     * @description uploading → uploaded → (extracting ⇄ needs_password) → confirm | invalid
-     *     → committing → done. Parts of a multi-volume archive wait in
-     *     waiting_parts; when the group is complete the first volume continues
-     *     and the rest become merged. An invalid job can change console (back to
-     *     confirm or invalid) or be set aside: unassigned, trashed or cancelled.
-     *     done, failed, cancelled, merged, unassigned and trashed are terminal.
-     * @enum {string}
-     */
-    JobStatus:
-      | 'uploading'
-      | 'uploaded'
-      | 'waiting_parts'
-      | 'merged'
-      | 'extracting'
-      | 'needs_password'
-      | 'confirm'
-      | 'invalid'
-      | 'committing'
-      | 'done'
-      | 'unassigned'
-      | 'trashed'
-      | 'failed'
-      | 'cancelled'
-    /**
-     * @description none = no file fits the console; many = more than one, on a console with one file per game.
-     * @enum {string}
-     */
-    InvalidReason: 'none' | 'many'
-    UploadJob: {
-      /** @description Equals the tus upload id. */
-      id: string
-      /** @example Limbo_Switch.rar */
-      fileName: string
-      /** Format: int64 */
-      size: number
-      /** Format: int64 */
-      received: number
-      status: components['schemas']['JobStatus']
-      /** @description Console slug chosen in the form; empty for an upload to the unassigned section. */
-      console: string
-      /** @description Game name chosen in the form. */
-      title: string
-      /**
-       * Format: int64
-       * @description IGDB game the name was picked from.
-       */
-      igdbId?: number | null
-      invalidReason?: components['schemas']['InvalidReason'] | null
-      /** @description The job was started from an unassigned file. */
-      fromUnassigned?: boolean
-      /** @description Extraction percentage while status is extracting. */
-      progress?: number
-      /** @description Human readable reason (failed, or why a password is needed). */
-      error?: string | null
-      /** @description Non-fatal note, e.g. archive file attributes not applied. */
-      warning?: string | null
-      /** @description Parts of the multi-volume archive this job belongs to. */
-      groupSize?: number | null
-      /** @description Job (first volume) that took over this part. */
-      mergedInto?: string | null
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      updatedAt: string
-    }
-    PasswordRequest: {
-      /** Format: password */
-      password: string
-    }
-    ConsoleChange: {
-      console: string
-    }
-    ResolveRequest: {
-      /** @enum {string} */
-      action: 'unassigned' | 'trash' | 'delete'
-    }
-    StagedFile: {
-      /**
-       * @description Relative to the upload. Identifies the file in the commit.
-       * @example Limbo [0100A8E005E7C000].nsp
-       */
-      path: string
-      /** Format: int64 */
-      size: number
-      /** @description A game file for the job's console; the others are discarded. */
-      valid: boolean
-      /** @description Every console whose extensions accept the file. */
-      consoles: string[]
-      /**
-       * @description A file of an assigned unassigned entry that is not an archive: it
-       *     stays in the section until it is stored (RF-27a).
-       */
-      inPlace?: boolean
-    }
-    CommitRequest: {
-      /** @description One entry per valid file. */
-      files: components['schemas']['CommitFile'][]
-    }
-    CommitFile: {
-      /** @description StagedFile.path. */
-      path: string
-      /** @description Required on consoles with several kinds; omitted means game. */
-      kind?: components['schemas']['ItemKind']
-      /** @description Update version (digits and dots) or DLC name. */
-      label?: string
-      onDuplicate?: components['schemas']['DuplicateAction']
-      /**
-       * @description "No guardar": the file stays in the unassigned section. Only for
-       *     jobs assigned from it (RF-27a); every valid file is still listed,
-       *     and one-file consoles keep exactly one.
-       */
-      skip?: boolean
-    }
-    /**
-     * @description replace sends the existing file to the trash; skip keeps it and drops the new one.
-     * @enum {string}
-     */
-    DuplicateAction: 'replace' | 'skip'
-    PlannedFile: {
-      path: string
-      /** @description Final name inside the game folder. */
-      file: string
-      action: components['schemas']['PlanAction']
-      duplicate?: components['schemas']['LibraryItem'] | null
-    }
-    /** @enum {string} */
-    PlanAction: 'store' | 'replace' | 'skip' | 'undecided'
-    CommitPlan: {
-      console: string
-      title: string
-      /** @example Limbo */
-      folder: string
-      /**
-       * Format: int64
-       * @description Set when the game is already in the library.
-       */
-      gameId?: number | null
-      /** @description The game's current files. */
-      existing: components['schemas']['LibraryItem'][]
-      files: components['schemas']['PlannedFile'][]
-      /** @description Files that are not game files for the console. */
-      discarded: string[]
-    }
-    CommitResult: {
-      job: components['schemas']['UploadJob']
-      /** Format: int64 */
-      gameId: number
-      /**
-       * @description Library-relative game folder.
-       * @example switch/Limbo
-       */
-      path: string
-      stored: number
-      replaced: number
-      skipped: number
-    }
-    LibraryItem: {
-      /** Format: int64 */
-      id: number
-      kind: components['schemas']['ItemKind']
-      /** @description Update version (without the v) or DLC name. */
-      label?: string | null
-      /** @description Name inside the game folder. */
-      file: string
-      /** Format: int64 */
-      size: number
-      /** Format: date-time */
-      createdAt: string
-    }
-    GameSummary: {
-      /** Format: int64 */
-      id: number
-      /**
-       * Format: int64
-       * @description Unset for games with a name of the user's own.
-       */
-      igdbId?: number | null
-      /** @description Console slug. */
-      console: string
-      title: string
-      /** @description Folder inside the console folder. */
-      folder: string
-      releaseYear?: number | null
-      /** @description Render with /api/images/cover_big/{coverImageId}. */
-      coverImageId?: string | null
-      itemCount: number
-      /**
-       * Format: int64
-       * @description Bytes of every file in the library.
-       */
-      size: number
-    }
-    GameDetail: components['schemas']['GameSummary'] & {
-      /**
-       * @description Library-relative folder.
-       * @example switch/Limbo
-       */
-      path: string
-      summary?: string | null
-      genres: string[]
-      /** @description Files in the library (not in the trash), base first. */
-      items: components['schemas']['LibraryItem'][]
-    }
-    GameEdit: {
-      /** @description Target console (the current one to only rename). */
-      console: string
-      title: string
-      /**
-       * Format: int64
-       * @description IGDB game the title was picked from; unset for a name of the user's own.
-       */
-      igdbId?: number | null
-      /** @description For collisions when merging into another game. */
-      decisions?: components['schemas']['ItemDecision'][]
-    }
-    ItemDecision: {
-      /** Format: int64 */
-      itemId: number
-      onDuplicate: components['schemas']['DuplicateAction']
-    }
-    GameEditPlan: {
-      console: string
-      title: string
-      /** @description Folder after the change. */
-      folder: string
-      /**
-       * Format: int64
-       * @description Game that already has the name on that console; the games merge.
-       */
-      mergeInto?: number | null
-      items: components['schemas']['GameEditItem'][]
-    }
-    GameEditItem: {
-      item: components['schemas']['LibraryItem']
-      /** @description New name. */
-      file: string
-      action: components['schemas']['PlanAction']
-      duplicate?: components['schemas']['LibraryItem'] | null
-    }
-    GameEditResult: {
-      /** Format: int64 */
-      gameId: number
-      /** @example switch/Limbo */
-      path: string
-      merged: boolean
-    }
-    ItemEdit: {
-      kind: components['schemas']['ItemKind']
-      label?: string
-      onDuplicate?: components['schemas']['DuplicateAction']
-    }
-    UnassignedFile: {
-      /** Format: int64 */
-      id: number
-      /**
-       * @description Relative to the unassigned folder.
-       * @example Zelda/Zelda.iso
-       */
-      path: string
-      name: string
-      /** @description Where it came from (a library path, or the upload's file name). */
-      origin: string
-      /**
-       * @description Added over SMB, an upload that did not fit, or moved here by the user.
-       * @enum {string}
-       */
-      reason: 'samba' | 'upload' | 'manual'
-      /** Format: int64 */
-      size: number
-      /** Format: date-time */
-      arrivedAt: string
-      /** @description Consoles whose extensions accept the file. */
-      consoles: string[]
-      /** @description A zip, 7z or rar; it is validated once extracted. */
-      archive: boolean
-      /** @description Still being copied over SMB (id is 0); it admits no action (RF-26a). */
-      copying?: boolean
-      /** @description The console it came from, if known. */
-      console?: string
-      /**
-       * Format: int64
-       * @description The IGDB game picked when it was uploaded without console.
-       */
-      igdbId?: number | null
-    }
-    /** @description A first-level folder of the unassigned section, or a loose file (RF-27). */
-    UnassignedEntry: {
-      /**
-       * Format: int64
-       * @description Identifies the entry (the lowest id of its files); 0 while every file is copying.
-       */
-      id: number
-      /** @example Splatoon 3 */
-      name: string
-      folder: boolean
-      /** Format: int64 */
-      size: number
-      /** @description Prefills Asignar. */
-      console?: string
-      /**
-       * Format: int64
-       * @description Prefills Asignar.
-       */
-      igdbId?: number | null
-      /** Format: date-time */
-      arrivedAt: string
-      /** @description A file is still being copied; the entry admits no action. */
-      copying: boolean
-      /** @description An assignment in progress is using it; it admits no action. */
-      busy: boolean
-      files: components['schemas']['UnassignedFile'][]
-    }
-    AssignRequest: {
-      console: string
-      title: string
-      /** Format: int64 */
-      igdbId?: number | null
-    }
-    ScanReport: {
-      /** Format: date-time */
-      scannedAt: string
-      /** @description Unknown files moved to (or found in) the unassigned section. */
-      unassigned: number
-      /** @description Files deleted over SMB that left the library. */
-      removed: number
-      /** @description Unknown files that are still changing (a copy in progress); the next scan moves them. */
-      pending: number
-    }
-    ScanStatus: {
-      /** @description Unset until the first scan has run. */
-      lastScan?: components['schemas']['ScanReport'] | null
-    }
-    TrashEntry: {
-      /** Format: int64 */
-      id: number
-      /**
-       * @description Files of a game, or unassigned files.
-       * @enum {string}
-       */
-      kind: 'game' | 'unassigned'
-      /** Format: int64 */
-      gameId?: number | null
-      console?: string | null
-      /** @description The game's title; empty for unassigned files. */
-      title: string
-      folder?: string | null
-      wholeGame: boolean
-      /**
-       * @description deleted by the user, or replaced by a duplicate.
-       * @enum {string}
-       */
-      reason: 'deleted' | 'replaced'
-      /** Format: date-time */
-      trashedAt: string
-      /**
-       * Format: date-time
-       * @description When it is deleted for good (TRASH_RETENTION_DAYS).
-       */
-      expiresAt: string
-      /** Format: int64 */
-      size: number
-      /** @description Game files (kind game). */
-      items: components['schemas']['LibraryItem'][]
-      /** @description Unassigned files (kind unassigned). */
-      files: components['schemas']['UnassignedFile'][]
-    }
-    RestoreRequest: {
-      /** @enum {string} */
-      onConflict?: 'replace'
-    }
-    RestoreResult: {
-      /** Format: int64 */
-      gameId?: number | null
-      /** @description Library-relative folder the entry went back to. */
-      path: string
-    }
-    /** @description RFC 9457 problem details. */
-    Problem: {
-      type?: string
-      title: string
-      status: number
-      detail?: string
-    }
-  }
-  responses: {
-    /** @description The resource is in a state that does not allow this operation. */
-    Conflict: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/problem+json': components['schemas']['Problem']
-      }
-    }
-    /** @description Missing, invalid or expired session, or wrong password. */
-    Unauthorized: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/problem+json': components['schemas']['Problem']
-      }
-    }
-    /** @description Too many login attempts from this client; retry later. */
-    TooManyRequests: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/problem+json': components['schemas']['Problem']
-      }
-    }
-    /** @description Invalid parameters. */
-    BadRequest: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/problem+json': components['schemas']['Problem']
-      }
-    }
-    /** @description The resource does not exist. */
-    NotFound: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/problem+json': components['schemas']['Problem']
-      }
-    }
-    /** @description IGDB failed or could not be reached. */
-    BadGateway: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/problem+json': components['schemas']['Problem']
-      }
-    }
-    /** @description The operation failed; `detail` explains what happened. */
-    InternalError: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/problem+json': components['schemas']['Problem']
-      }
-    }
-    /** @description IGDB credentials are not configured. */
-    ServiceUnavailable: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/problem+json': components['schemas']['Problem']
-      }
-    }
-  }
-  parameters: {
-    ConsoleSlug: string
-    ItemId: number
-    TrashEntryId: number
-    GameId: number
-    UnassignedId: number
-    JobId: string
-  }
-  requestBodies: never
-  headers: never
-  pathItems: never
+    schemas: {
+        Health: {
+            /** @enum {string} */
+            status: "ok" | "degraded";
+            checks: components["schemas"]["HealthCheck"][];
+        };
+        HealthCheck: {
+            /** @example library-writable */
+            name: string;
+            ok: boolean;
+            /** @description Human readable explanation when the check fails. */
+            message?: string;
+        };
+        LoginRequest: {
+            /** Format: password */
+            password: string;
+        };
+        Session: {
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        /**
+         * @description What a file is within its game: base, update and dlc for consoles with
+         *     add-ons (Switch); game for consoles with one file per game (Wii, PSP).
+         * @enum {string}
+         */
+        ItemKind: "base" | "update" | "dlc" | "game";
+        Console: {
+            /**
+             * @description Folder name in the library; fixed.
+             * @example switch
+             */
+            slug: string;
+            /** @example Nintendo Switch */
+            displayName: string;
+            /** @description The name defined in code (shown when the display name is reset). */
+            defaultName: string;
+            /** Format: int64 */
+            igdbPlatformId: number;
+            /** @example 2017 */
+            releaseYear?: number | null;
+            /** @description IGDB image id; render with /api/images/logo_med/{logoImageId}. */
+            logoImageId?: string | null;
+            /** @description Fixed extensions (environment variable or code default); cannot be removed here. */
+            extensions: string[];
+            /** @description Extensions added from the app. */
+            customExtensions: components["schemas"]["CustomExtension"][];
+            /** @description The kinds a file of this console can have. */
+            kinds: components["schemas"]["ItemKind"][];
+            /** @description Whether one upload may hold several game files (Switch) or exactly one (Wii, PSP). */
+            multipleFiles: boolean;
+            sortOrder: number;
+            /** @description Games with at least one file in the library. */
+            gameCount: number;
+        };
+        CustomExtension: {
+            /** @example .xcz */
+            extension: string;
+            /** @description Files in the library with this extension; it can be removed only at 0. */
+            fileCount: number;
+        };
+        ConsoleUpdate: {
+            displayName: string;
+        };
+        ConsoleOrder: {
+            /** @description Every console slug, first to last. */
+            slugs: string[];
+        };
+        ExtensionInput: {
+            /** @example .xcz */
+            extension: string;
+        };
+        MetadataGame: {
+            /**
+             * Format: int64
+             * @description IGDB game id.
+             */
+            id: number;
+            /** @example Mario Kart 8 Deluxe */
+            name: string;
+            releaseYear?: number | null;
+            /** @description Render with /api/images/cover_big/{coverImageId}. */
+            coverImageId?: string | null;
+            summary?: string | null;
+            genres: string[];
+            platformIds: number[];
+        };
+        MetadataStatus: {
+            configured: boolean;
+        };
+        /**
+         * @description IGDB image size preset.
+         * @enum {string}
+         */
+        ImageSize: "cover_small" | "cover_big" | "logo_med" | "screenshot_med";
+        /**
+         * @description uploading → uploaded → (extracting ⇄ needs_password) → confirm | invalid
+         *     → committing → done. Parts of a multi-volume archive wait in
+         *     waiting_parts; when the group is complete the first volume continues
+         *     and the rest become merged. An invalid job can change console (back to
+         *     confirm or invalid) or be set aside: unassigned, trashed or cancelled.
+         *     done, failed, cancelled, merged, unassigned and trashed are terminal.
+         * @enum {string}
+         */
+        JobStatus: "uploading" | "uploaded" | "waiting_parts" | "merged" | "extracting" | "needs_password" | "confirm" | "invalid" | "committing" | "done" | "unassigned" | "trashed" | "failed" | "cancelled";
+        /**
+         * @description none = no file fits the console; many = more than one, on a console with one file per game.
+         * @enum {string}
+         */
+        InvalidReason: "none" | "many";
+        UploadJob: {
+            /** @description Equals the tus upload id. */
+            id: string;
+            /** @example Limbo_Switch.rar */
+            fileName: string;
+            /** Format: int64 */
+            size: number;
+            /** Format: int64 */
+            received: number;
+            status: components["schemas"]["JobStatus"];
+            /** @description Console slug chosen in the form; empty for an upload to the unassigned section. */
+            console: string;
+            /** @description Game name chosen in the form. */
+            title: string;
+            /**
+             * Format: int64
+             * @description IGDB game the name was picked from.
+             */
+            igdbId?: number | null;
+            invalidReason?: components["schemas"]["InvalidReason"] | null;
+            /** @description The job was started from an unassigned file. */
+            fromUnassigned?: boolean;
+            /** @description Extraction percentage while status is extracting. */
+            progress?: number;
+            /** @description Human readable reason (failed, or why a password is needed). */
+            error?: string | null;
+            /** @description Non-fatal note, e.g. archive file attributes not applied. */
+            warning?: string | null;
+            /** @description Parts of the multi-volume archive this job belongs to. */
+            groupSize?: number | null;
+            /** @description Job (first volume) that took over this part. */
+            mergedInto?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PasswordRequest: {
+            /** Format: password */
+            password: string;
+        };
+        ConsoleChange: {
+            console: string;
+        };
+        ResolveRequest: {
+            /** @enum {string} */
+            action: "unassigned" | "trash" | "delete";
+        };
+        StagedFile: {
+            /**
+             * @description Relative to the upload. Identifies the file in the commit.
+             * @example Limbo [0100A8E005E7C000].nsp
+             */
+            path: string;
+            /** Format: int64 */
+            size: number;
+            /** @description A game file for the job's console; the others are discarded. */
+            valid: boolean;
+            /** @description Every console whose extensions accept the file. */
+            consoles: string[];
+            /**
+             * @description A file of an assigned unassigned entry that is not an archive: it
+             *     stays in the section until it is stored (RF-27a).
+             */
+            inPlace?: boolean;
+        };
+        CommitRequest: {
+            /** @description One entry per valid file. */
+            files: components["schemas"]["CommitFile"][];
+        };
+        CommitFile: {
+            /** @description StagedFile.path. */
+            path: string;
+            /** @description Required on consoles with several kinds; omitted means game. */
+            kind?: components["schemas"]["ItemKind"];
+            /** @description Update version (digits and dots) or DLC name. */
+            label?: string;
+            onDuplicate?: components["schemas"]["DuplicateAction"];
+            /**
+             * @description "No guardar": the file stays in the unassigned section. Only for
+             *     jobs assigned from it (RF-27a); every valid file is still listed,
+             *     and one-file consoles keep exactly one.
+             */
+            skip?: boolean;
+        };
+        /**
+         * @description replace sends the existing file to the trash; skip keeps it and drops the new one.
+         * @enum {string}
+         */
+        DuplicateAction: "replace" | "skip";
+        PlannedFile: {
+            path: string;
+            /** @description Final name inside the game folder. */
+            file: string;
+            action: components["schemas"]["PlanAction"];
+            duplicate?: components["schemas"]["LibraryItem"] | null;
+        };
+        /** @enum {string} */
+        PlanAction: "store" | "replace" | "skip" | "undecided";
+        CommitPlan: {
+            console: string;
+            title: string;
+            /** @example Limbo */
+            folder: string;
+            /**
+             * Format: int64
+             * @description Set when the game is already in the library.
+             */
+            gameId?: number | null;
+            /** @description The game's current files. */
+            existing: components["schemas"]["LibraryItem"][];
+            files: components["schemas"]["PlannedFile"][];
+            /** @description Files that are not game files for the console. */
+            discarded: string[];
+        };
+        CommitResult: {
+            job: components["schemas"]["UploadJob"];
+            /** Format: int64 */
+            gameId: number;
+            /**
+             * @description Library-relative game folder.
+             * @example switch/Limbo
+             */
+            path: string;
+            stored: number;
+            replaced: number;
+            skipped: number;
+        };
+        LibraryItem: {
+            /** Format: int64 */
+            id: number;
+            kind: components["schemas"]["ItemKind"];
+            /** @description Update version (without the v) or DLC name. */
+            label?: string | null;
+            /** @description Name inside the game folder. */
+            file: string;
+            /** Format: int64 */
+            size: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        GameSummary: {
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description Unset for games with a name of the user's own.
+             */
+            igdbId?: number | null;
+            /** @description Console slug. */
+            console: string;
+            title: string;
+            /** @description Folder inside the console folder. */
+            folder: string;
+            releaseYear?: number | null;
+            /** @description Render with /api/images/cover_big/{coverImageId}. */
+            coverImageId?: string | null;
+            itemCount: number;
+            /**
+             * Format: int64
+             * @description Bytes of every file in the library.
+             */
+            size: number;
+        };
+        GameDetail: components["schemas"]["GameSummary"] & {
+            /**
+             * @description Library-relative folder.
+             * @example switch/Limbo
+             */
+            path: string;
+            summary?: string | null;
+            genres: string[];
+            /** @description Files in the library (not in the trash), base first. */
+            items: components["schemas"]["LibraryItem"][];
+        };
+        GameEdit: {
+            /** @description Target console (the current one to only rename). */
+            console: string;
+            title: string;
+            /**
+             * Format: int64
+             * @description IGDB game the title was picked from; unset for a name of the user's own.
+             */
+            igdbId?: number | null;
+            /** @description For collisions when merging into another game. */
+            decisions?: components["schemas"]["ItemDecision"][];
+        };
+        ItemDecision: {
+            /** Format: int64 */
+            itemId: number;
+            onDuplicate: components["schemas"]["DuplicateAction"];
+        };
+        GameEditPlan: {
+            console: string;
+            title: string;
+            /** @description Folder after the change. */
+            folder: string;
+            /**
+             * Format: int64
+             * @description Game that already has the name on that console; the games merge.
+             */
+            mergeInto?: number | null;
+            items: components["schemas"]["GameEditItem"][];
+        };
+        GameEditItem: {
+            item: components["schemas"]["LibraryItem"];
+            /** @description New name. */
+            file: string;
+            action: components["schemas"]["PlanAction"];
+            duplicate?: components["schemas"]["LibraryItem"] | null;
+        };
+        GameEditResult: {
+            /** Format: int64 */
+            gameId: number;
+            /** @example switch/Limbo */
+            path: string;
+            merged: boolean;
+        };
+        ItemEdit: {
+            kind: components["schemas"]["ItemKind"];
+            label?: string;
+            onDuplicate?: components["schemas"]["DuplicateAction"];
+        };
+        UnassignedFile: {
+            /** Format: int64 */
+            id: number;
+            /**
+             * @description Relative to the unassigned folder.
+             * @example Zelda/Zelda.iso
+             */
+            path: string;
+            name: string;
+            /** @description Where it came from (a library path, or the upload's file name). */
+            origin: string;
+            /**
+             * @description Added over SMB, an upload that did not fit, or moved here by the user.
+             * @enum {string}
+             */
+            reason: "samba" | "upload" | "manual";
+            /** Format: int64 */
+            size: number;
+            /** Format: date-time */
+            arrivedAt: string;
+            /** @description Consoles whose extensions accept the file. */
+            consoles: string[];
+            /** @description A zip, 7z or rar; it is validated once extracted. */
+            archive: boolean;
+            /** @description Still being copied over SMB (id is 0); it admits no action (RF-26a). */
+            copying?: boolean;
+            /** @description The console it came from, if known. */
+            console?: string;
+            /**
+             * Format: int64
+             * @description The IGDB game picked when it was uploaded without console.
+             */
+            igdbId?: number | null;
+        };
+        /** @description A first-level folder of the unassigned section, or a loose file (RF-27). */
+        UnassignedEntry: {
+            /**
+             * Format: int64
+             * @description Identifies the entry (the lowest id of its files); 0 while every file is copying.
+             */
+            id: number;
+            /** @example Splatoon 3 */
+            name: string;
+            folder: boolean;
+            /** Format: int64 */
+            size: number;
+            /** @description Prefills Asignar. */
+            console?: string;
+            /**
+             * Format: int64
+             * @description Prefills Asignar.
+             */
+            igdbId?: number | null;
+            /** Format: date-time */
+            arrivedAt: string;
+            /** @description A file is still being copied; the entry admits no action. */
+            copying: boolean;
+            /** @description An assignment in progress is using it; it admits no action. */
+            busy: boolean;
+            files: components["schemas"]["UnassignedFile"][];
+        };
+        AssignRequest: {
+            console: string;
+            title: string;
+            /** Format: int64 */
+            igdbId?: number | null;
+        };
+        ScanReport: {
+            /** Format: date-time */
+            scannedAt: string;
+            /** @description Unknown files moved to (or found in) the unassigned section. */
+            unassigned: number;
+            /** @description Files deleted over SMB that left the library. */
+            removed: number;
+            /** @description Unknown files that are still changing (a copy in progress); the next scan moves them. */
+            pending: number;
+        };
+        ScanStatus: {
+            /** @description Unset until the first scan has run. */
+            lastScan?: components["schemas"]["ScanReport"] | null;
+        };
+        TrashEntry: {
+            /** Format: int64 */
+            id: number;
+            /**
+             * @description Files of a game, or unassigned files.
+             * @enum {string}
+             */
+            kind: "game" | "unassigned";
+            /** Format: int64 */
+            gameId?: number | null;
+            console?: string | null;
+            /** @description The game's title; empty for unassigned files. */
+            title: string;
+            folder?: string | null;
+            wholeGame: boolean;
+            /**
+             * @description deleted by the user, or replaced by a duplicate.
+             * @enum {string}
+             */
+            reason: "deleted" | "replaced";
+            /** Format: date-time */
+            trashedAt: string;
+            /**
+             * Format: date-time
+             * @description When it is deleted for good (TRASH_RETENTION_DAYS).
+             */
+            expiresAt: string;
+            /** Format: int64 */
+            size: number;
+            /** @description Game files (kind game). */
+            items: components["schemas"]["LibraryItem"][];
+            /** @description Unassigned files (kind unassigned). */
+            files: components["schemas"]["UnassignedFile"][];
+        };
+        RestoreRequest: {
+            /** @enum {string} */
+            onConflict?: "replace";
+        };
+        RestoreResult: {
+            /** Format: int64 */
+            gameId?: number | null;
+            /** @description Library-relative folder the entry went back to. */
+            path: string;
+        };
+        /** @description RFC 9457 problem details. */
+        Problem: {
+            type?: string;
+            title: string;
+            status: number;
+            detail?: string;
+        };
+    };
+    responses: {
+        /** @description The resource is in a state that does not allow this operation. */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Missing, invalid or expired session, or wrong password. */
+        Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Too many login attempts from this client; retry later. */
+        TooManyRequests: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Invalid parameters. */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The resource does not exist. */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description IGDB failed or could not be reached. */
+        BadGateway: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The operation failed; `detail` explains what happened. */
+        InternalError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description IGDB credentials are not configured. */
+        ServiceUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+    };
+    parameters: {
+        ConsoleSlug: string;
+        ItemId: number;
+        TrashEntryId: number;
+        GameId: number;
+        UnassignedId: number;
+        JobId: string;
+    };
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
 }
-export type $defs = Record<string, never>
+export type $defs = Record<string, never>;
 export interface operations {
-  getHealth: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The process is up. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['Health']
-        }
-      }
-    }
-  }
-  login: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['LoginRequest']
-      }
-    }
-    responses: {
-      /** @description Session started; the cookie is set. */
-      204: {
-        headers: {
-          'Set-Cookie'?: string
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Unauthorized']
-      429: components['responses']['TooManyRequests']
-    }
-  }
-  logout: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Session cookie cleared. */
-      204: {
-        headers: {
-          'Set-Cookie'?: string
-          [name: string]: unknown
-        }
-        content?: never
-      }
-    }
-  }
-  getSession: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The session is valid. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['Session']
-        }
-      }
-      401: components['responses']['Unauthorized']
-    }
-  }
-  listConsoles: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description All consoles. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['Console'][]
-        }
-      }
-      401: components['responses']['Unauthorized']
-    }
-  }
-  reorderConsoles: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ConsoleOrder']
-      }
-    }
-    responses: {
-      /** @description Consoles in the new order. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['Console'][]
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-    }
-  }
-  updateConsole: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        slug: components['parameters']['ConsoleSlug']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ConsoleUpdate']
-      }
-    }
-    responses: {
-      /** @description The console. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['Console']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-    }
-  }
-  addConsoleExtension: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        slug: components['parameters']['ConsoleSlug']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ExtensionInput']
-      }
-    }
-    responses: {
-      /** @description The console. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['Console']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  removeConsoleExtension: {
-    parameters: {
-      query: {
-        extension: string
-      }
-      header?: never
-      path: {
-        slug: components['parameters']['ConsoleSlug']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The console. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['Console']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  searchGames: {
-    parameters: {
-      query: {
-        q: string
-        /** @description IGDB platform id (Console.igdbPlatformId). */
-        platformId?: number
-        limit?: number
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Matching games, best match first. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MetadataGame'][]
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      502: components['responses']['BadGateway']
-      503: components['responses']['ServiceUnavailable']
-    }
-  }
-  getMetadataStatus: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The status. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MetadataStatus']
-        }
-      }
-      401: components['responses']['Unauthorized']
-    }
-  }
-  listJobs: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Up to 100 jobs. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['UploadJob'][]
-        }
-      }
-      401: components['responses']['Unauthorized']
-    }
-  }
-  streamJobEvents: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Event stream. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'text/event-stream': string
-        }
-      }
-      401: components['responses']['Unauthorized']
-    }
-  }
-  getJob: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The job. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['UploadJob']
-        }
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-    }
-  }
-  listJobFiles: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Files, sorted by path. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['StagedFile'][]
-        }
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-    }
-  }
-  submitJobPassword: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['PasswordRequest']
-      }
-    }
-    responses: {
-      /** @description Extraction queued. */
-      202: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['UploadJob']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  changeJobConsole: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ConsoleChange']
-      }
-    }
-    responses: {
-      /** @description The job. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['UploadJob']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  resolveJob: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ResolveRequest']
-      }
-    }
-    responses: {
-      /** @description The job. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['UploadJob']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-      500: components['responses']['InternalError']
-    }
-  }
-  cancelJob: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The cancelled job. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['UploadJob']
-        }
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  planJobCommit: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CommitRequest']
-      }
-    }
-    responses: {
-      /** @description The plan. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['CommitPlan']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-      502: components['responses']['BadGateway']
-      503: components['responses']['ServiceUnavailable']
-    }
-  }
-  commitJob: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CommitRequest']
-      }
-    }
-    responses: {
-      /** @description Stored; the job is done. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['CommitResult']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-      500: components['responses']['InternalError']
-      502: components['responses']['BadGateway']
-      503: components['responses']['ServiceUnavailable']
-    }
-  }
-  listConsoleGames: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        slug: components['parameters']['ConsoleSlug']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Games with at least one file in the library (trashed files do not count). */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['GameSummary'][]
-        }
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-    }
-  }
-  searchLibrary: {
-    parameters: {
-      query: {
-        q: string
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Matching games, by title. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['GameSummary'][]
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-    }
-  }
-  getGame: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['GameId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The game. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['GameDetail']
-        }
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-    }
-  }
-  planGameEdit: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['GameId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['GameEdit']
-      }
-    }
-    responses: {
-      /** @description The plan. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['GameEditPlan']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      502: components['responses']['BadGateway']
-      503: components['responses']['ServiceUnavailable']
-    }
-  }
-  editGame: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['GameId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['GameEdit']
-      }
-    }
-    responses: {
-      /** @description Where the game is now. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['GameEditResult']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-      500: components['responses']['InternalError']
-      502: components['responses']['BadGateway']
-      503: components['responses']['ServiceUnavailable']
-    }
-  }
-  downloadGame: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['GameId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The zip. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/zip': string
-        }
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-    }
-  }
-  trashGame: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['GameId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description In the trash. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  unassignGame: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['GameId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Moved. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  editItem: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['ItemId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ItemEdit']
-      }
-    }
-    responses: {
-      /** @description The game. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['GameDetail']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-      500: components['responses']['InternalError']
-    }
-  }
-  downloadItem: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['ItemId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The file. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/octet-stream': string
-        }
-      }
-      /** @description The requested range. */
-      206: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/octet-stream': string
-        }
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      /** @description The requested range is not satisfiable. */
-      416: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-    }
-  }
-  trashItem: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['ItemId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description In the trash. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  unassignItem: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['ItemId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Moved. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  listUnassigned: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Entries. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['UnassignedEntry'][]
-        }
-      }
-      401: components['responses']['Unauthorized']
-    }
-  }
-  deleteUnassigned: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['UnassignedId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Deleted. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  downloadUnassigned: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['UnassignedId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The file. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/octet-stream': string
-        }
-      }
-      /** @description The requested range. */
-      206: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/octet-stream': string
-        }
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-      /** @description The requested range is not satisfiable. */
-      416: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-    }
-  }
-  trashUnassigned: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['UnassignedId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description In the trash. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  deleteUnassignedEntry: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['UnassignedId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Deleted. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  downloadUnassignedEntry: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['UnassignedId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The file, or the zip. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/octet-stream': string
-        }
-      }
-      /** @description The requested range (single files only). */
-      206: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/octet-stream': string
-        }
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-      /** @description The requested range is not satisfiable. */
-      416: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-    }
-  }
-  trashUnassignedEntry: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['UnassignedId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description In the trash. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  assignUnassignedEntry: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['UnassignedId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['AssignRequest']
-      }
-    }
-    responses: {
-      /** @description The new job. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['UploadJob']
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-    }
-  }
-  getLibraryScan: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The last scan, if one has run. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ScanStatus']
-        }
-      }
-      401: components['responses']['Unauthorized']
-    }
-  }
-  scanLibrary: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description What changed. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ScanReport']
-        }
-      }
-      401: components['responses']['Unauthorized']
-    }
-  }
-  listTrash: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Entries. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['TrashEntry'][]
-        }
-      }
-      401: components['responses']['Unauthorized']
-    }
-  }
-  emptyTrash: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Emptied. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Unauthorized']
-    }
-  }
-  deleteTrashEntry: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['TrashEntryId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Deleted. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-    }
-  }
-  restoreTrashEntry: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        id: components['parameters']['TrashEntryId']
-      }
-      cookie?: never
-    }
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['RestoreRequest']
-      }
-    }
-    responses: {
-      /** @description Restored. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['RestoreResult']
-        }
-      }
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      409: components['responses']['Conflict']
-      500: components['responses']['InternalError']
-    }
-  }
-  getImage: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        size: components['schemas']['ImageSize']
-        imageId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The image. */
-      200: {
-        headers: {
-          'Cache-Control'?: string
-          [name: string]: unknown
-        }
-        content: {
-          'image/jpeg': string
-          'image/png': string
-        }
-      }
-      400: components['responses']['BadRequest']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      502: components['responses']['BadGateway']
-    }
-  }
+    getHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The process is up. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Session started; the cookie is set. */
+            204: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session cookie cleared. */
+            204: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session is valid. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listConsoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All consoles. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Console"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    reorderConsoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsoleOrder"];
+            };
+        };
+        responses: {
+            /** @description Consoles in the new order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Console"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    updateConsole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["ConsoleSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsoleUpdate"];
+            };
+        };
+        responses: {
+            /** @description The console. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Console"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addConsoleExtension: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["ConsoleSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtensionInput"];
+            };
+        };
+        responses: {
+            /** @description The console. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Console"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    removeConsoleExtension: {
+        parameters: {
+            query: {
+                extension: string;
+            };
+            header?: never;
+            path: {
+                slug: components["parameters"]["ConsoleSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The console. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Console"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    searchGames: {
+        parameters: {
+            query: {
+                q: string;
+                /** @description IGDB platform id (Console.igdbPlatformId). */
+                platformId?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching games, best match first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetadataGame"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getMetadataStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetadataStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up to 100 jobs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadJob"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    streamJobEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadJob"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listJobFiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Files, sorted by path. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StagedFile"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    submitJobPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Extraction queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    changeJobConsole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsoleChange"];
+            };
+        };
+        responses: {
+            /** @description The job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    resolveJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description The job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    cancelJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cancelled job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadJob"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    planJobCommit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitRequest"];
+            };
+        };
+        responses: {
+            /** @description The plan. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommitPlan"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    commitJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Stored; the job is done. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommitResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listConsoleGames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["ConsoleSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Games with at least one file in the library (trashed files do not count). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameSummary"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    searchLibrary: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching games, by title. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameSummary"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getGame: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GameId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The game. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    planGameEdit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GameId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GameEdit"];
+            };
+        };
+        responses: {
+            /** @description The plan. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameEditPlan"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    editGame: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GameId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GameEdit"];
+            };
+        };
+        responses: {
+            /** @description Where the game is now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameEditResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["BadGateway"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    downloadGame: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GameId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The zip. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    trashGame: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GameId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In the trash. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    unassignGame: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GameId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Moved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    editItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItemEdit"];
+            };
+        };
+        responses: {
+            /** @description The game. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description The requested range. */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description The requested range is not satisfiable. */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    trashItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In the trash. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    unassignItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Moved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listUnassigned: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnassignedEntry"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    deleteUnassigned: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UnassignedId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    downloadUnassigned: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UnassignedId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description The requested range. */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description The requested range is not satisfiable. */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    trashUnassigned: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UnassignedId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In the trash. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    deleteUnassignedEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UnassignedId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    downloadUnassignedEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UnassignedId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file, or the zip. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description The requested range (single files only). */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description The requested range is not satisfiable. */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    trashUnassignedEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UnassignedId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description In the trash. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    assignUnassignedEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UnassignedId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignRequest"];
+            };
+        };
+        responses: {
+            /** @description The new job. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getLibraryScan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The last scan, if one has run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    scanLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listTrash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashEntry"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    emptyTrash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Emptied. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    deleteTrashEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TrashEntryId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    restoreTrashEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TrashEntryId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RestoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Restored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                size: components["schemas"]["ImageSize"];
+                imageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image. */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
 }
