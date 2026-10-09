@@ -4,6 +4,8 @@
 > Estado de trabajo: [`tasks.md`](./tasks.md). Mockups: https://claude.ai/artifact/CNf4mdh7jjnMfnjeNFXe56
 >
 > **Ajuste de alcance (2026-10-08, Fase 10).** Tras probar con archivos reales se simplificó el sistema: tres consolas definidas en código (Switch, Wii, PSP), sin detección automática de consola ni de nombre (el usuario lo indica), IGDB opcional (solo sugiere nombres y aporta portadas), sección **No asignados** y escaneo de lo que llega por Samba. Implementado en la Fase 10.
+>
+> **Ajustes tras la prueba en el NAS (2026-10-09, Fase 10.5).** `_unassigned/` existe siempre y lo copiado ahí por Samba aparece al momento; No asignados agrupa por carpeta y se asigna una entrada completa de una vez; la consola pasa a ser opcional al subir (sin consola, la subida va a No asignados). Cambian RF-03, RF-07, RF-26 y RF-27; se agregan RF-07b, RF-26a y RF-27a.
 
 ## 1. Problema y objetivo
 
@@ -28,8 +30,9 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 - **RF-02** Las subidas son reanudables (protocolo tus) y no tienen límite práctico de tamaño.
 - **RF-03** **Formulario antes de subir.** Al elegir archivos se abre un formulario; la subida no empieza hasta enviarlo. Pide:
   - **Nombre del juego** (obligatorio): mientras se escribe, sugiere juegos de IGDB de la plataforma de la consola elegida. Elegir una sugerencia es opcional: se puede guardar cualquier nombre (mods, traducciones, homebrew). Sin credenciales de IGDB, el campo no sugiere nada.
-  - **Consola** (obligatoria): viene elegida según la pantalla. En el carrusel, la del centro; en la pantalla de una consola, esa consola; en Subidas, Ajustes o No asignados, ninguna. Siempre se puede cambiar. La lista muestra todas las consolas, incluso las que no tienen juegos.
-  - Si un archivo **no es comprimido** y su extensión no vale para la consola elegida, el formulario lo avisa y no deja continuar (evita subir varios GB para nada). Los comprimidos se validan al descomprimir (RF-07).
+  - **Consola** (opcional): viene elegida según la pantalla. En el carrusel, la del centro; en la pantalla de una consola, esa consola; en Subidas, Ajustes o No asignados, ninguna. Siempre se puede cambiar o quitar. La lista muestra todas las consolas, incluso las que no tienen juegos. **Sin consola**, la subida va a No asignados (RF-07b) y las sugerencias de IGDB no se filtran por plataforma.
+  - Elegir una sugerencia de IGDB es opcional también sin consola; si se elige, queda guardada con la entrada de No asignados y Asignar la precarga.
+  - Si un archivo **no es comprimido**, se eligió consola y su extensión no vale para ella, el formulario lo avisa y no deja continuar (evita subir varios GB para nada). Los comprimidos se validan al descomprimir (RF-07).
 - **RF-03a** **Varios archivos a la vez.** El formulario pregunta primero cómo tratarlos:
   - **Partes de un mismo comprimido** (`.part1.rar`, `.7z.001`…): un nombre y una consola para todos; cuando todas las partes están subidas, se descomprime desde el primer volumen. Si no forman un conjunto o falta alguna parte, la subida falla con un error claro. El formato antiguo `.r00/.r01` no se admite.
   - **Archivos del mismo juego** (p. ej. una base y un update `.nsp` sueltos): un nombre y una consola para todos; cada archivo se procesa por separado.
@@ -39,7 +42,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 - **RF-05** Antes de descomprimir se comprueba el espacio libre. Ningún archivo extraído puede salir del directorio de staging (zip-slip) y los symlinks se rechazan.
 - **RF-05a** Tras descomprimir, **cada archivo se verifica contra el índice del comprimido (tamaño + CRC32)**. Los errores de 7zz que son *solo de atributos* (*Cannot set file attribute*, porque los datasets con ACL prohíben `chmod`) se registran como advertencia si la verificación pasa; cualquier otro error falla la extracción. *(Hallazgo de la Fase 0.5.)*
 - **RF-06** Un comprimido (zip, 7z, rar/rar5, reconocido por bytes mágicos) se descomprime **después** de enviar el formulario y terminar la subida. El comprimido original se borra tras una extracción exitosa. Un archivo que no es comprimido no se descomprime. La app no intenta adivinar la consola ni el nombre.
-- **RF-07** **Validación por extensión.** Al terminar la descompresión (o la subida, si no era comprimido) se buscan, en cualquier subcarpeta, los archivos cuya extensión vale para la consola elegida. Todo lo demás (`.txt`, `.nfo`, imágenes, carpetas de instrucciones) **se descarta**.
+- **RF-07** **Validación por extensión** (solo si se eligió consola; sin consola aplica RF-07b). Al terminar la descompresión (o la subida, si no era comprimido) se buscan, en cualquier subcarpeta, los archivos cuya extensión vale para la consola elegida. Todo lo demás (`.txt`, `.nfo`, imágenes, carpetas de instrucciones) **se descarta**.
   - **Wii y PSP**: debe haber **exactamente un** archivo válido; con más de uno, es un error de validación.
   - **Switch**: puede haber uno o varios (p. ej. un comprimido con base, update y DLC).
   - **Sin archivos válidos** (o más de uno en Wii/PSP): se muestra un error con estas opciones:
@@ -47,6 +50,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
     - **Mandar a No asignados**: los archivos descomprimidos van a `_unassigned/`.
     - **Mandar a la papelera**: restaurable a No asignados.
     - **Borrar definitivamente**.
+- **RF-07b** **Subida sin consola.** Tras subir y descomprimir (RF-04 a RF-06), **todo** el contenido se mueve a `_unassigned/<nombre>/` (nombre saneado como el de un juego), incluidos `.txt`, `.nfo` e imágenes, conservando sus subcarpetas. No hay validación ni paso de confirmación. Si `_unassigned/<nombre>/` ya existe, se agrega dentro (sin distinguir mayúsculas); un archivo cuyo nombre ya existe en esa ruta recibe el sufijo ` (2)`, ` (3)`… Con varios archivos (RF-03a), «Partes de un mismo comprimido» y «Archivos del mismo juego» van a la misma entrada; «Juegos distintos», cada uno a la suya.
 - **RF-08** **Confirmar y datos por archivo.** Tras la validación siempre hay un paso de confirmación con la vista previa de los nombres finales y el botón Guardar. En **Switch**, ahí se pide para cada archivo válido su **tipo**: Juego base, Update o DLC; el Update exige la **versión** y el DLC exige el **nombre del DLC**. En **Wii y PSP** solo se confirma.
 - **RF-09** **Duplicados.** Si en la carpeta del juego ya existe un archivo con el mismo nombre final (§5), se avisa y se elige **Reemplazar** (el anterior va a la papelera) u **Omitir**. Los archivos en la papelera no cuentan.
 - **RF-10** Al confirmar, la app crea o reutiliza la carpeta del juego, mueve los archivos a `[slug]/[Juego]/[archivo]` con los nombres de §5 y limpia el staging. La operación se puede revertir si falla a mitad: los movimientos se anotan antes en un journal y, si algo falla (o la app se reinicia a mitad), se deshacen y la subida vuelve al paso anterior. Nunca se sobrescribe un archivo existente sin la decisión de RF-09. Antes de confirmar se ve una vista previa con los nombres finales y los duplicados.
@@ -71,14 +75,17 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 ### No asignados y Samba
 - **RF-26** **Escaneo de la biblioteca** al arrancar, cada `LIBRARY_SCAN_INTERVAL` (15 min por defecto) y a pedido («Revisar ahora» en Ajustes › General, con la hora de la última revisión). Reemplaza al chequeo de integridad anterior.
   - Un archivo **borrado** por Samba desaparece de la biblioteca; si era el último de su juego, el juego también. No hay aviso ni estado "faltante".
-  - Todo archivo que la app no conoce y que está **dentro de una carpeta de consola** o **en la raíz del dataset** (incluidas carpetas que no son de ninguna consola, p. ej. `n64/`) se **mueve a `_unassigned/` conservando su ruta**: `wii/Zelda/Zelda.iso` → `_unassigned/wii/Zelda/Zelda.iso`. Si el destino existe, se agrega un sufijo. Se ignoran `.gameexplorer/` y `_unassigned/`.
+  - Todo archivo que la app no conoce y que está **dentro de una carpeta de consola** o **en la raíz del dataset** (incluidas carpetas que no son de ninguna consola, p. ej. `n64/`) se **mueve a `_unassigned/` quitando la carpeta de consola** y conservando el resto de su ruta: `wii/Zelda/Zelda.iso` → `_unassigned/Zelda/Zelda.iso`; un archivo suelto en `switch/` queda suelto en `_unassigned/`. En la raíz del dataset o en carpetas que no son de ninguna consola, se conserva la ruta tal cual (`n64/Mario.z64` → `_unassigned/n64/Mario.z64`). La consola de origen se guarda como dato de la entrada y precarga Asignar. Si el destino existe, se agrega un sufijo. Se ignoran `.gameexplorer/` y `_unassigned/`.
   - Un archivo solo se mueve si no cambió (tamaño y fecha) desde el escaneo anterior, para no tocar una copia por Samba a medias.
   - Renombrar por Samba un archivo de la app equivale a borrarlo y agregar uno desconocido.
-- **RF-27** **Sección No asignados** (`_unassigned/`): lista los archivos (no las carpetas) con su ruta de origen. No se puede subir directamente a ella. Por archivo se puede:
-  - **Asignar** a una consola con el mismo formulario de subida (nombre, consola y, tras la validación, los datos de Switch). Si es comprimido, se descomprime; aplican RF-07 a RF-10.
-  - **Descargar**.
-  - **Mandar a la papelera**.
+- **RF-26a** **`_unassigned/` siempre existe.** La app la crea al arrancar si falta (las carpetas de consola se siguen creando con el primer juego). Lo que se copie por Samba **directamente dentro** de `_unassigned/` no espera al escaneo: la sección lee la carpeta al abrirse y con «Revisar ahora». Un archivo cuyo tamaño o fecha cambió desde la lectura anterior, o modificado hace menos de 1 min, se muestra como **«Copiando…»** y no admite acciones hasta estabilizarse.
+- **RF-27** **Sección No asignados** (`_unassigned/`): lista **entradas**. Cada carpeta de primer nivel es una entrada (con su nombre, sus archivos de cualquier subcarpeta, tamaño total y, si se conocen, consola de origen e IGDB); cada archivo suelto en `_unassigned/` es su propia entrada. Se sube a ella eligiendo «sin consola» (RF-07b). Por entrada se puede:
+  - **Asignar** (RF-27a).
+  - **Descargar** (un archivo suelto, o la carpeta como zip sin compresión, igual que RF-23).
+  - **Mandar a la papelera** (la entrada completa es una sola entrada de papelera).
   - **Borrar definitivamente**.
+  Dentro de una entrada, cada archivo también se puede descargar, mandar a la papelera o borrar por separado.
+- **RF-27a** **Asignar una entrada completa.** El formulario de subida pide una vez nombre, consola (obligatoria aquí) e IGDB, precargados con el nombre de la entrada, su consola de origen y su IGDB si se conocen. Los comprimidos de la entrada se descomprimen (RF-04 a RF-06). Luego, en una sola confirmación, se lista cada archivo con extensión válida para la consola y se elige su tipo (Switch: Base, Update con versión, DLC con nombre; Wii/PSP: el archivo del juego) o **No guardar**. Los archivos con extensión no válida aparecen como «No guardar» sin opción a cambiarlo. Aplican RF-09 y RF-10 como una sola operación revertible; lo no guardado se queda en la entrada de No asignados (que desaparece si queda vacía). Wii y PSP admiten un solo archivo guardado por juego. Si ningún archivo vale para la consola, aplica el error de RF-07 (cambiar de consola o cancelar).
 
 ### Papelera
 - **RF-30** Los archivos y juegos eliminados se mueven a `.gameexplorer/trash` con su metadata, se pueden restaurar y se purgan tras `TRASH_RETENTION_DAYS` (30 por defecto). También se puede borrar para siempre una entrada o **vaciar la papelera** (con confirmación en la interfaz). Se restauran a su lugar de origen (juego, o No asignados para lo que vino de allí o de una subida fallida). Si su lugar está ocupado, se pregunta: **Reemplazar** (lo actual va a la papelera, es un intercambio) o **Cancelar**.
