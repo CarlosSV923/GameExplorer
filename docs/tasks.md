@@ -167,13 +167,14 @@ Depende de: 11 · Cubre: §5, §6, RF-07, RF-08, RF-08a, RF-24, RF-27a, RF-61 ·
 - [x] Contrato OpenAPI, migración si hace falta, i18n ES/EN y tests (Go, web y E2E)
 - [x] Demo: catálogo fijo con las seis consolas y juegos sembrados de las nuevas, incluido un GameCube de 2 discos (RF-61)
 - [x] `README`, `.env.example` y guía de TrueNAS con las variables de extensiones nuevas
-- [ ] Prueba real en el NAS: subir un juego de cada consola nueva y uno de GameCube de 2 discos
+- [x] Prueba real en el NAS con `v0.12.0` (2026-10-09): un juego de cada consola nueva y uno de GameCube de 2 discos
 
 ## Fase 12 — Producción y portfolio
 Depende de: 11.5
-- [ ] Dockerfile multi-stage (web → go con embed → alpine + 7zip) y release en GHCR
-- [ ] `deploy/truenas/compose.yaml` + guía (datasets, PUID/PGID, veto files para `.gameexplorer`)
-- [ ] README EN/ES con capturas/GIF y diagramas de arquitectura
+- [x] Dockerfile multi-stage (web → Go con la SPA incrustada → `debian:13-slim` con el 7-Zip oficial) y release en GHCR con cada tag `v*` (hecho antes de la `v0.10.0`)
+- [x] `deploy/truenas/compose.yaml` y guía (datasets, ACL para `user: 3000:3000` en lugar de PUID/PGID, `veto files` para `.gameexplorer`)
+- [ ] Capturas y GIF automáticos desde la demo con Playwright (`task screenshots`), en inglés y en español, en `docs/screenshots/`: carrusel, detalle de un juego de Switch, confirmación de subida, No asignados y una vista móvil; el GIF recorre subir → confirmar → juego guardado
+- [ ] README EN/ES reescritos para portfolio: GIF y enlace a la demo, características, capturas, diagramas Mermaid (despliegue y estados de una subida), stack, instalación en TrueNAS, desarrollo y licencia
 
 ## Hallazgos de pruebas reales
 Prueba del 2026-10-08 con 17 archivos reales (~37 GB): 7 `.rar` de Switch (base, updates y DLC de juegos que ya estaban en la biblioteca), 1 `.iso` de PS2, 4 `.iso` de PSP y 5 `.7z`/`.zip` de Wii. Todo subió (~50 MB/s por archivo, 2 a la vez), se descomprimió sin errores y la API se mantuvo en ~100 MB de RAM. La detección acertó en Switch, PS2 y Wii, y los duplicados de Switch (base, update y 3 DLC) se marcaron todos. Se guardaron 9 juegos (PS2, Wii y PSP como consola agregada). La descarga por rango (206) y la descarga completa salieron idénticas al original (MD5) y el zip del juego se generó bien. Después se borró todo.
