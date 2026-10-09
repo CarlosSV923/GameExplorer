@@ -156,8 +156,21 @@ Depende de: 10.5 · Cubre: RF-60 a RF-65
 - [x] E2E en modo demo con Playwright (escritorio, tablet y móvil) en CI y con `task e2e` (Docker). Hallazgo corregido: al asignar, el nombre precargado recibía el foco y abría sus sugerencias; al tocar una consola la lista se cerraba, el diálogo saltaba y el toque se perdía.
 - [x] `vercel.json` y guía ([`deploy/vercel/README.md`](../deploy/vercel/README.md)); demo publicada en https://game-explorer-gold.vercel.app/ (2026-10-09) y enlazada en los README
 
+## Fase 11.5 — Nuevas consolas: PlayStation 2, GameCube y Nintendo 64
+Depende de: 11 · Cubre: §5, §6, RF-07, RF-08, RF-08a, RF-24, RF-27a, RF-61 · Versión: `v0.12.0`
+- [ ] Vectores dorados de `contracts/naming-cases.json` para el tipo «Disco N» (`Juego (Disc 2).iso`, un solo disco sin etiqueta, número inválido)
+- [ ] Tipo `disc` con número en el dominio de Go y TS; nombres de §5 en las dos implementaciones
+- [ ] Definir `n64`, `gc` y `ps2` en `catalog/domain/consoles` (variables de entorno de extensiones, IGDB 4, 21 y 8) y el nuevo orden por defecto, siguiendo [`docs/adding-a-console.md`](adding-a-console.md)
+- [ ] Validación: GameCube y PS2 aceptan varios discos (RF-07)
+- [ ] Confirmación con número de disco sugerido y editable; renombrar el disco existente al agregar otro (RF-08, RF-08a)
+- [ ] Editar el número de disco y mover juegos entre consolas con discos (RF-24); asignar entradas con discos (RF-27a)
+- [ ] Contrato OpenAPI, migración si hace falta, i18n ES/EN y tests (Go, web y E2E)
+- [ ] Demo: catálogo fijo con las seis consolas y juegos sembrados de las nuevas, incluido un GameCube de 2 discos (RF-61)
+- [ ] `README`, `.env.example` y guía de TrueNAS con las variables de extensiones nuevas
+- [ ] Prueba real en el NAS: subir un juego de cada consola nueva y uno de GameCube de 2 discos
+
 ## Fase 12 — Producción y portfolio
-Depende de: 11
+Depende de: 11.5
 - [ ] Dockerfile multi-stage (web → go con embed → alpine + 7zip) y release en GHCR
 - [ ] `deploy/truenas/compose.yaml` + guía (datasets, PUID/PGID, veto files para `.gameexplorer`)
 - [ ] README EN/ES con capturas/GIF y diagramas de arquitectura

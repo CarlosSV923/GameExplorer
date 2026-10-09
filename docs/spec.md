@@ -6,6 +6,8 @@
 > **Ajuste de alcance (2026-10-08, Fase 10).** Tras probar con archivos reales se simplificó el sistema: tres consolas definidas en código (Switch, Wii, PSP), sin detección automática de consola ni de nombre (el usuario lo indica), IGDB opcional (solo sugiere nombres y aporta portadas), sección **No asignados** y escaneo de lo que llega por Samba. Implementado en la Fase 10.
 >
 > **Ajustes tras la prueba en el NAS (2026-10-09, Fase 10.5).** `_unassigned/` existe siempre y lo copiado ahí por Samba aparece al momento; No asignados agrupa por carpeta y se asigna una entrada completa de una vez; la consola pasa a ser opcional al subir (sin consola, la subida va a No asignados). Cambian RF-03, RF-07, RF-26 y RF-27; se agregan RF-07b, RF-26a y RF-27a.
+>
+> **Nuevas consolas (2026-10-09, Fase 11.5).** PlayStation 2, GameCube y Nintendo 64 se suman con las reglas de Wii y PSP (sin DLC ni updates). GameCube y PS2 admiten juegos de varios discos (`Juego (Disc 1).iso`). Cambian §5, §6, RF-07, RF-08, RF-24 y RF-27a, y el orden por defecto de las consolas.
 
 ## 1. Problema y objetivo
 
@@ -17,9 +19,9 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 
 | Término | Significado |
 |---|---|
-| Consola | Plataforma con carpeta propia en la biblioteca (`switch/`, `wii/`, `psp/`). Se define en código con sus reglas (§6); no se crea desde la app |
+| Consola | Plataforma con carpeta propia en la biblioteca (`n64/`, `gc/`, `wii/`, `switch/`, `ps2/`, `psp/`). Se define en código con sus reglas (§6); no se crea desde la app |
 | Juego | Un nombre dentro de una consola: `[slug]/[Juego]/`. Puede estar enlazado a IGDB (portada, año, géneros) o tener un nombre libre |
-| Archivo | Un archivo de juego dentro de la carpeta del juego. En Switch tiene tipo (Base, Update o DLC); en Wii y PSP es el único archivo del juego |
+| Archivo | Un archivo de juego dentro de la carpeta del juego. En Switch tiene tipo (Base, Update o DLC); en GameCube y PS2 es el juego o uno de sus discos; en Nintendo 64, Wii y PSP es el único archivo del juego |
 | No asignados | Carpeta `_unassigned/` en la raíz del dataset con archivos que no pertenecen a ningún juego (llegados por Samba, o fallos de validación que el usuario decidió guardar) |
 | Staging | Zona temporal donde se sube y descomprime una subida |
 
@@ -43,7 +45,8 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 - **RF-05a** Tras descomprimir, **cada archivo se verifica contra el índice del comprimido (tamaño + CRC32)**. Los errores de 7zz que son *solo de atributos* (*Cannot set file attribute*, porque los datasets con ACL prohíben `chmod`) se registran como advertencia si la verificación pasa; cualquier otro error falla la extracción. *(Hallazgo de la Fase 0.5.)*
 - **RF-06** Un comprimido (zip, 7z, rar/rar5, reconocido por bytes mágicos) se descomprime **después** de enviar el formulario y terminar la subida. El comprimido original se borra tras una extracción exitosa. Un archivo que no es comprimido no se descomprime. La app no intenta adivinar la consola ni el nombre.
 - **RF-07** **Validación por extensión** (solo si se eligió consola; sin consola aplica RF-07b). Al terminar la descompresión (o la subida, si no era comprimido) se buscan, en cualquier subcarpeta, los archivos cuya extensión vale para la consola elegida. Todo lo demás (`.txt`, `.nfo`, imágenes, carpetas de instrucciones) **se descarta**.
-  - **Wii y PSP**: debe haber **exactamente un** archivo válido; con más de uno, es un error de validación.
+  - **Nintendo 64, Wii y PSP**: debe haber **exactamente un** archivo válido; con más de uno, es un error de validación.
+  - **GameCube y PS2**: uno o varios (los discos de un mismo juego).
   - **Switch**: puede haber uno o varios (p. ej. un comprimido con base, update y DLC).
   - **Sin archivos válidos** (o más de uno en Wii/PSP): se muestra un error con estas opciones:
     - **Cambiar de consola**: si los archivos valen para la nueva consola, se reubican sin volver a descomprimir ni renombrar.
@@ -51,7 +54,8 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
     - **Mandar a la papelera**: restaurable a No asignados.
     - **Borrar definitivamente**.
 - **RF-07b** **Subida sin consola.** Tras subir y descomprimir (RF-04 a RF-06), **todo** el contenido se mueve a `_unassigned/<nombre>/` (nombre saneado como el de un juego), incluidos `.txt`, `.nfo` e imágenes, conservando sus subcarpetas. No hay validación ni paso de confirmación. Si `_unassigned/<nombre>/` ya existe, se agrega dentro (sin distinguir mayúsculas); un archivo cuyo nombre ya existe en esa ruta recibe el sufijo ` (2)`, ` (3)`… Con varios archivos (RF-03a), «Partes de un mismo comprimido» y «Archivos del mismo juego» van a la misma entrada; «Juegos distintos», cada uno a la suya.
-- **RF-08** **Confirmar y datos por archivo.** Tras la validación siempre hay un paso de confirmación con la vista previa de los nombres finales y el botón Guardar. En **Switch**, ahí se pide para cada archivo válido su **tipo**: Juego base, Update o DLC; el Update exige la **versión** y el DLC exige el **nombre del DLC**. En **Wii y PSP** solo se confirma.
+- **RF-08** **Confirmar y datos por archivo.** Tras la validación siempre hay un paso de confirmación con la vista previa de los nombres finales y el botón Guardar. En **Switch**, ahí se pide para cada archivo válido su **tipo**: Juego base, Update o DLC; el Update exige la **versión** y el DLC exige el **nombre del DLC**. En **GameCube y PS2**, con un solo archivo válido solo se confirma; con varios, cada uno es un **disco** con su número, sugerido y editable (el que traiga el nombre, p. ej. `(Disc 2)`, o 1, 2, 3… por orden de nombre) y sin repetirse. En **Nintendo 64, Wii y PSP** solo se confirma.
+- **RF-08a** **Discos de un juego ya guardado (GameCube y PS2).** Si el juego ya tiene un solo disco (`Juego.iso`) y se agrega otro, la confirmación pide el número del nuevo y del existente, y el existente se renombra (`Juego (Disc 1).iso`) en la misma operación revertible. Si ya tiene discos numerados, el nuevo pide su número; repetir uno existente aplica RF-09. Al mandar un disco a la papelera o a No asignados, los demás conservan su nombre.
 - **RF-09** **Duplicados.** Si en la carpeta del juego ya existe un archivo con el mismo nombre final (§5), se avisa y se elige **Reemplazar** (el anterior va a la papelera) u **Omitir**. Los archivos en la papelera no cuentan.
 - **RF-10** Al confirmar, la app crea o reutiliza la carpeta del juego, mueve los archivos a `[slug]/[Juego]/[archivo]` con los nombres de §5 y limpia el staging. La operación se puede revertir si falla a mitad: los movimientos se anotan antes en un journal y, si algo falla (o la app se reinicia a mitad), se deshacen y la subida vuelve al paso anterior. Nunca se sobrescribe un archivo existente sin la decisión de RF-09. Antes de confirmar se ve una vista previa con los nombres finales y los duplicados.
 - **RF-11** **Identidad del juego.** Un juego se identifica por su consola y su nombre saneado, sin distinguir mayúsculas (los shares SMB no las distinguen). Guardar con un nombre que ya existe agrega los archivos a ese juego. Si el nombre se eligió de IGDB, el juego queda enlazado a ese id (portada, año, géneros); con un nombre libre se muestra una portada genérica con el título.
@@ -67,9 +71,9 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 - **RF-23** Descargar un archivo (reanudable con HTTP Range) o el juego completo como zip sin compresión. Dentro del zip los archivos van en `<carpeta del juego>/`. El zip se arma mientras se envía, pero anuncia su tamaño exacto (el navegador muestra el progreso). No se puede reanudar. Si falta un archivo en disco, la descarga falla antes de empezar con un mensaje claro.
 - **RF-24** **Editar un juego** desde su detalle (todo reversible si falla a mitad):
   - **Renombrar**: con una sugerencia de IGDB (lo enlaza) o un nombre libre (lo desenlaza). Cambia la carpeta y el nombre de todos sus archivos. Si ya existe otro juego con ese nombre en la consola, se fusionan aplicando RF-09 a cada choque.
-  - **Mover a otra consola**: solo si **todos** sus archivos tienen extensiones válidas en la consola destino (p. ej. `.iso` entre Wii y PSP). Si allí existe un juego con el mismo nombre, se fusionan aplicando RF-09.
+  - **Mover a otra consola**: solo si **todos** sus archivos tienen extensiones y tipos válidos en la consola destino (p. ej. `.iso` entre Wii, PSP, GameCube y PS2; un juego de varios discos solo entre GameCube y PS2). Si allí existe un juego con el mismo nombre, se fusionan aplicando RF-09.
   - **Mover a No asignados**: el juego completo o un archivo suelto.
-  - **Editar un archivo (Switch)**: cambiar su tipo, versión o nombre del DLC; el archivo se renombra (con RF-09 si choca).
+  - **Editar un archivo (Switch, GameCube, PS2)**: cambiar su tipo, versión o nombre del DLC (Switch) o su número de disco (GameCube, PS2); el archivo se renombra (con RF-09 si choca).
 - **RF-25** Enviar un archivo o un juego a la papelera. Un juego completo es **una sola entrada** (se restaura o borra junta). La carpeta del juego se borra cuando queda vacía, y la de la consola también.
 
 ### No asignados y Samba
@@ -86,7 +90,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
   - **Mandar a la papelera** (la entrada completa es una sola entrada de papelera).
   - **Borrar definitivamente**.
   Dentro de una entrada, cada archivo también se puede descargar, mandar a la papelera o borrar por separado.
-- **RF-27a** **Asignar una entrada completa.** El formulario de subida pide una vez nombre, consola (obligatoria aquí) e IGDB, precargados con el nombre de la entrada, su consola de origen y su IGDB si se conocen. Los archivos no se mueven al asignar: la entrada queda «Asignándose», sin acciones, hasta guardar o cancelar (cancelar solo la libera). Los comprimidos de la entrada se descomprimen (RF-04 a RF-06) y se borran al guardar. Luego, en una sola confirmación, se lista cada archivo con extensión válida para la consola y se elige su tipo (Switch: Base, Update con versión, DLC con nombre; Wii/PSP: el archivo del juego) o **No guardar**. Los archivos con extensión no válida aparecen como «No guardar» sin opción a cambiarlo. Aplican RF-09 y RF-10 como una sola operación revertible; lo no guardado se queda en la entrada de No asignados (que desaparece si queda vacía). Wii y PSP admiten un solo archivo guardado por juego. Si ningún archivo vale para la consola, aplica el error de RF-07 (cambiar de consola o cancelar).
+- **RF-27a** **Asignar una entrada completa.** El formulario de subida pide una vez nombre, consola (obligatoria aquí) e IGDB, precargados con el nombre de la entrada, su consola de origen y su IGDB si se conocen. Los archivos no se mueven al asignar: la entrada queda «Asignándose», sin acciones, hasta guardar o cancelar (cancelar solo la libera). Los comprimidos de la entrada se descomprimen (RF-04 a RF-06) y se borran al guardar. Luego, en una sola confirmación, se lista cada archivo con extensión válida para la consola y se elige su tipo (Switch: Base, Update con versión, DLC con nombre; GameCube/PS2: el juego o su número de disco; Nintendo 64/Wii/PSP: el archivo del juego) o **No guardar**. Los archivos con extensión no válida aparecen como «No guardar» sin opción a cambiarlo. Aplican RF-09 y RF-10 como una sola operación revertible; lo no guardado se queda en la entrada de No asignados (que desaparece si queda vacía). Nintendo 64, Wii y PSP admiten un solo archivo guardado por juego. Si ningún archivo vale para la consola, aplica el error de RF-07 (cambiar de consola o cancelar).
 
 ### Papelera
 - **RF-30** Los archivos y juegos eliminados se mueven a `.gameexplorer/trash` con su metadata, se pueden restaurar y se purgan tras `TRASH_RETENTION_DAYS` (30 por defecto). También se puede borrar para siempre una entrada o **vaciar la papelera** (con confirmación en la interfaz). Se restauran a su lugar de origen (juego, o No asignados para lo que vino de allí o de una subida fallida). Si su lugar está ocupado, se pregunta: **Reemplazar** (lo actual va a la papelera, es un intercambio) o **Cancelar**.
@@ -105,7 +109,7 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 
 ### Modo demo
 - **RF-60** Con `VITE_DATA_SOURCE=demo` el frontend funciona sin backend: adaptadores en memoria y estado solo de la sesión (se reinicia al recargar). Arranca con una biblioteca sembrada desde el catálogo fijo: unos 6–8 juegos por consola (Switch con base, update y DLC) y 1–2 entradas en No asignados. «Revisar ahora» no encuentra cambios.
-- **RF-61** Las sugerencias de IGDB vienen de un catálogo fijo versionado (Switch, Wii y PSP; unos 60 juegos), generado con `task demo-catalog` y credenciales de desarrollo. Las portadas y logos se cargan del CDN de IGDB (`images.igdb.com`) con la atribución «Datos de IGDB»: en la demo no aplica la regla de RF-20a de no contactar a terceros.
+- **RF-61** Las sugerencias de IGDB vienen de un catálogo fijo versionado (las seis consolas; unos 90 juegos), generado con `task demo-catalog` y credenciales de desarrollo. Las portadas y logos se cargan del CDN de IGDB (`images.igdb.com`) con la atribución «Datos de IGDB»: en la demo no aplica la regla de RF-20a de no contactar a terceros.
 - **RF-62** La subida, la descompresión, la contraseña, la validación, los datos de Switch y el guardado se simulan con la misma máquina de estados que el backend.
 - **RF-63** Acepta archivos propios: solo usa su nombre y tamaño. El archivo nunca sale del navegador. El contenido de un comprimido propio se simula como un único archivo válido para la consola elegida.
 - **RF-64** Botón "Probar con archivos de ejemplo" que carga:
@@ -141,9 +145,13 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 | Switch | Juego base | `Juego [BASE].ext` |
 | Switch | Update | `Juego [UPDATE v<versión>].ext` |
 | Switch | DLC | `Juego [DLC <nombre>].ext` |
-| Wii, PSP | — | `Juego.ext` |
+| Nintendo 64, Wii, PSP | — | `Juego.ext` |
+| GameCube, PS2 | Un solo disco | `Juego.ext` |
+| GameCube, PS2 | Disco N (juego de varios discos) | `Juego (Disc N).ext` |
 
-Ejemplos: `Limbo [BASE].xci`, `Limbo [UPDATE v122345].nsp`, `Limbo [DLC Fuga Maestra].nsp`, `Ōkami.nkit.iso`.
+Ejemplos: `Limbo [BASE].xci`, `Limbo [UPDATE v122345].nsp`, `Limbo [DLC Fuga Maestra].nsp`, `Ōkami.nkit.iso`, `Resident Evil 4 (Disc 2).iso` (la convención No-Intro/Redump que reconocen ES-DE y RetroArch).
+
+- **Número de disco**: entero de 1 a 99, sin ceros a la izquierda.
 
 - **Versión del Update**: el usuario escribe solo dígitos y puntos (`1.2.1`, `122345`) y la app antepone `v`. Si escribe `v1.2.1`, la `v` no se duplica.
 - **Extensión**: la de RF-41 (la coincidencia más larga entre todas las consolas: `.nkit.iso`, no `.iso`), en minúsculas.
@@ -162,9 +170,14 @@ Un nombre que supera 255 bytes se rechaza. La carpeta del juego es su nombre san
 
 | Consola | Slug | Extensiones por defecto | Datos por archivo | Archivos válidos por subida | Plataforma IGDB |
 |---|---|---|---|---|---|
-| Nintendo Switch | `switch` | `.nsp .xci` | Tipo (Base / Update / DLC); versión si es Update; nombre si es DLC | Uno o varios | 130 |
+| Nintendo 64 | `n64` | `.z64 .n64 .v64` | — | Exactamente uno | 4 |
+| GameCube | `gc` | `.iso .rvz` | Número de disco si hay varios | Uno o varios (discos) | 21 |
 | Wii | `wii` | `.iso .wbfs .rvz .nkit.iso` | — (sin DLC ni updates por ahora) | Exactamente uno | 5 |
+| Nintendo Switch | `switch` | `.nsp .xci` | Tipo (Base / Update / DLC); versión si es Update; nombre si es DLC | Uno o varios | 130 |
+| PlayStation 2 | `ps2` | `.iso` | Número de disco si hay varios | Uno o varios (discos) | 8 |
 | PlayStation Portable | `psp` | `.iso .cso` | — (sin DLC ni updates por ahora) | Exactamente uno | 38 |
+
+El orden de la tabla es el orden por defecto del carrusel y de Ajustes: por fabricante y, dentro de cada uno, por año. En una instalación que ya guardó su propio orden, las consolas nuevas se agregan al final. Las extensiones se pueden ampliar con la variable de entorno de cada consola o desde Ajustes (RF-41). Como en la Fase 10.5, lo que escaneos anteriores dejaron en `_unassigned/ps2/` o `_unassigned/n64/` sale de esa carpeta al arrancar, ahora que son consolas.
 
 ## 7. Ambientes
 
@@ -179,4 +192,4 @@ Variables: ver [`.env.example`](../.env.example). Cada push a `main` despliega l
 
 ## 8. Fuera de alcance del MVP
 
-Detección automática de consola o nombre · DLC y updates en Wii y PSP · juegos de varios discos · crear consolas desde la app · hash para duplicados exactos · IGDB real en la demo · salvapantallas.
+Detección automática de consola o nombre · DLC y updates en Wii y PSP · crear consolas desde la app · hash para duplicados exactos · IGDB real en la demo · salvapantallas.
