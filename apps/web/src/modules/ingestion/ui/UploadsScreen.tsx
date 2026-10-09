@@ -7,6 +7,7 @@ import { BackLink } from '@/shared/routing/links'
 import { BackLabel, Banner, HelpBar, PageHeader } from '@/shared/ui'
 
 import { useOpenUploadForm } from '../application/queries'
+import { SampleFiles } from './SampleFiles'
 import { DropZone, UploadsPanel } from './UploadsPanel'
 
 /** Uploads: the drop zone and the live panel (RF-01, RF-13). */
@@ -38,6 +39,7 @@ export function UploadsScreen() {
           }}
         />
         <UploadsPanel />
+        <SampleFiles />
       </main>
       <HelpBar
         actions={[

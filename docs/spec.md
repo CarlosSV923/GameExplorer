@@ -104,14 +104,15 @@ GameExplorer es una app web autoalojada, con estética EmulationStation, que des
 - **RF-54** **IGDB es opcional.** Sin `IGDB_CLIENT_ID`/`IGDB_CLIENT_SECRET` todo funciona: el nombre no sugiere nada, no hay portadas y los logos de consola son el nombre en texto. La atribución a IGDB solo aparece si está configurado.
 
 ### Modo demo
-- **RF-60** Con `VITE_DATA_SOURCE=demo` el frontend funciona sin backend: adaptadores en memoria y estado solo de la sesión (se reinicia al recargar).
-- **RF-61** Las sugerencias de IGDB vienen de un catálogo fijo versionado, generado con un comando de Go y credenciales de desarrollo.
+- **RF-60** Con `VITE_DATA_SOURCE=demo` el frontend funciona sin backend: adaptadores en memoria y estado solo de la sesión (se reinicia al recargar). Arranca con una biblioteca sembrada desde el catálogo fijo: unos 6–8 juegos por consola (Switch con base, update y DLC) y 1–2 entradas en No asignados. «Revisar ahora» no encuentra cambios.
+- **RF-61** Las sugerencias de IGDB vienen de un catálogo fijo versionado (Switch, Wii y PSP; unos 60 juegos), generado con `task demo-catalog` y credenciales de desarrollo. Las portadas y logos se cargan del CDN de IGDB (`images.igdb.com`) con la atribución «Datos de IGDB»: en la demo no aplica la regla de RF-20a de no contactar a terceros.
 - **RF-62** La subida, la descompresión, la contraseña, la validación, los datos de Switch y el guardado se simulan con la misma máquina de estados que el backend.
 - **RF-63** Acepta archivos propios: solo usa su nombre y tamaño. El archivo nunca sale del navegador. El contenido de un comprimido propio se simula como un único archivo válido para la consola elegida.
 - **RF-64** Botón "Probar con archivos de ejemplo" que carga:
   - un `.rar` de Switch con base, update y DLC (pide los tipos tras descomprimir; la base sale duplicada);
   - un `.7z` de Wii con contraseña (con la contraseña como pista);
-  - un `.zip` para PSP sin archivos válidos (muestra el error con cambiar de consola / No asignados).
+  - un `.zip` para PSP sin archivos válidos (muestra el error con cambiar de consola / No asignados);
+  - un `.zip` sin consola con base, update y un `.txt`, que queda como entrada en No asignados para asignarla entera con «No guardar» (RF-07b, RF-27a).
 - **RF-65** Las descargas generan un `.txt` explicativo. La demo no tiene login y muestra un banner fijo de modo demo.
 
 ## 4. Requisitos no funcionales

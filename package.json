@@ -15,7 +15,8 @@
     "test:web": "pnpm --filter @gameexplorer/web test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "gen:web": "pnpm --filter @gameexplorer/web gen:api"
+    "gen:web": "pnpm --filter @gameexplorer/web gen:api",
+    "e2e:web": "pnpm --filter @gameexplorer/web e2e"
   },
   "devDependencies": {
     "prettier": "^3.9.9"

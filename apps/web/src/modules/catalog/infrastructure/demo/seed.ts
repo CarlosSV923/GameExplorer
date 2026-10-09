@@ -1,0 +1,104 @@
+import type { ItemKind } from '../../domain/types'
+import { DemoLibrary, type DemoConsoleDef, type DemoGameInfo } from './libraryDemo'
+
+const GB = 1_000_000_000
+const MB = 1_000_000
+
+/** The consoles defined in code (spec §6), as the server has them. */
+export const demoConsoles: Omit<DemoConsoleDef, 'logoImageId'>[] = [
+  {
+    slug: 'switch',
+    name: 'Nintendo Switch',
+    igdbPlatformId: 130,
+    releaseYear: 2017,
+    extensions: ['.nsp', '.xci'],
+    kinds: ['base', 'update', 'dlc'],
+    multipleFiles: true,
+  },
+  {
+    slug: 'wii',
+    name: 'Wii',
+    igdbPlatformId: 5,
+    releaseYear: 2006,
+    extensions: ['.iso', '.wbfs', '.rvz', '.nkit.iso'],
+    kinds: ['game'],
+    multipleFiles: false,
+  },
+  {
+    slug: 'psp',
+    name: 'PlayStation Portable',
+    igdbPlatformId: 38,
+    releaseYear: 2004,
+    extensions: ['.iso', '.cso'],
+    kinds: ['game'],
+    multipleFiles: false,
+  },
+]
+
+type Seed = [igdbId: number, files: { kind: ItemKind; label?: string; ext: string; size: number }[]]
+
+const one = (ext: string, size: number) => [{ kind: 'game' as const, ext, size }]
+
+/** The library the demo opens with (RF-60), from the fixed catalog's games. */
+const seeds: Record<string, Seed[]> = {
+  switch: [
+    [
+      26764,
+      [
+        { kind: 'base', ext: '.nsp', size: 7.1 * GB },
+        { kind: 'update', label: '3.0.3', ext: '.nsp', size: 1.6 * GB },
+        { kind: 'dlc', label: 'Booster Course Pass', ext: '.nsp', size: 2.3 * GB },
+      ],
+    ],
+    // Only its base: the Switch sample brings it again (a duplicate) with an update and a DLC.
+    [109462, [{ kind: 'base', ext: '.nsp', size: 6.7 * GB }]],
+    [
+      7346,
+      [
+        { kind: 'base', ext: '.xci', size: 13.5 * GB },
+        { kind: 'update', label: '1.6.0', ext: '.nsp', size: 1.1 * GB },
+      ],
+    ],
+    [26758, [{ kind: 'base', ext: '.xci', size: 5.6 * GB }]],
+    [14593, [{ kind: 'base', ext: '.nsp', size: 6.8 * GB }]],
+    [113112, [{ kind: 'base', ext: '.nsp', size: 6.4 * GB }]],
+    [
+      17000,
+      [
+        { kind: 'base', ext: '.nsp', size: 0.9 * GB },
+        { kind: 'update', label: '1.6.9', ext: '.nsp', size: 0.4 * GB },
+      ],
+    ],
+  ],
+  wii: [
+    [1077, one('.wbfs', 4.3 * GB)],
+    [1078, one('.wbfs', 4.1 * GB)],
+    [1090, one('.iso', 0.9 * GB)],
+    [885, one('.rvz', 0.6 * GB)],
+  ],
+  psp: [
+    [1533, one('.cso', 0.9 * GB)],
+    [375, one('.iso', 0.7 * GB)],
+    [427, one('.cso', 1.4 * GB)],
+    [1192, one('.iso', 0.5 * GB)],
+    [480, one('.cso', 0.6 * GB)],
+  ],
+}
+
+/** A fresh demo library: the seeded games and two unassigned entries. */
+export function seededLibrary(
+  logos: ReadonlyMap<number, string>,
+  gameInfo: (id: number) => DemoGameInfo | undefined,
+): DemoLibrary {
+  const library = new DemoLibrary(
+    demoConsoles.map((c) => ({ ...c, logoImageId: logos.get(c.igdbPlatformId) ?? null })),
+    gameInfo,
+  )
+  for (const [console, games] of Object.entries(seeds)) {
+    for (const [igdbId, files] of games) library.seedGame(console, igdbId, files)
+  }
+  library.seedLoose('Inside - Edicion Mod/Inside [UPDATE v2.0].nsp', 1.5 * GB, 'samba', 'switch')
+  library.seedLoose('Inside - Edicion Mod/notas.txt', 4_000, 'samba', 'switch')
+  library.seedLoose('Mario.z64', 8 * MB, 'samba')
+  return library
+}

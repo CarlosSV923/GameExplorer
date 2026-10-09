@@ -202,7 +202,8 @@ export function UploadFormDialog({
       title={title}
       subtitle={assigning ? t('upload.assignSubtitle') : t('upload.subtitle')}
       onClose={onClose}
-      initialFocus="field"
+      // A prefilled name would open its suggestions over the dialog: the console comes first.
+      initialFocus={assigning ? 'first' : 'field'}
       actions={
         <>
           <Button size="lg" onClick={onClose}>

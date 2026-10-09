@@ -9,6 +9,8 @@ vars:
   GO_IMAGE: gameexplorer-dev:3
   SQLC_IMAGE: sqlc/sqlc:1.31.1
   LINT_IMAGE: golangci/golangci-lint:v2.14.0
+  # Same version as @playwright/test in apps/web.
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
   # Go tooling runs in Docker: identical to CI on every OS, and avoids Windows
   # Application Control blocking freshly compiled Go binaries.
   DOCKER_GO: >-
@@ -131,6 +133,14 @@ tasks:
   test:web:
     cmds:
       - pnpm test:web
+
+  e2e:
+    desc: End-to-end tests of the demo build (Playwright in Docker; desktop, tablet and phone)
+    cmds:
+      - >-
+        docker run --rm --ipc=host -e CI=1 -v "{{.ROOT_DIR}}:/src" -v /src/node_modules -v /src/apps/web/node_modules
+        -w /src {{.PLAYWRIGHT_IMAGE}}
+        sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm e2e:web"
 
   # ---------- build ----------
   build:

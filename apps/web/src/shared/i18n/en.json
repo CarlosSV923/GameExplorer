@@ -507,5 +507,30 @@
     "conflictTitle": "Its place is taken",
     "conflictBody": "After you trashed it you stored another copy. If you restore “{{title}}”, the current one goes to the trash.",
     "replace": "Replace"
+  },
+  "demo": {
+    "title": "Demo mode:",
+    "body": "there is no server. Your files never leave the browser and everything starts over on reload."
+  },
+  "samples": {
+    "title": "Try with sample files",
+    "intro": "Simulated files: they weigh nothing and go through the whole upload flow.",
+    "try": "Try",
+    "switch": {
+      "title": "Switch: base, update and DLC",
+      "detail": "Once extracted it asks for each file’s type. The base is already in the library: you will see the duplicate warning."
+    },
+    "wii": {
+      "title": "Wii with a password",
+      "detail": "It asks for the password when extracting. Hint: it is “demo”."
+    },
+    "psp": {
+      "title": "PSP without valid files",
+      "detail": "It holds a Wii game: you will see the error with changing the console or sending it to Unassigned."
+    },
+    "unassigned": {
+      "title": "No console, to Unassigned",
+      "detail": "It is extracted into Unassigned. Then assign the whole entry and leave some file with “Don’t store”."
+    }
   }
 }

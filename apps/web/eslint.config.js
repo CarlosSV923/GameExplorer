@@ -35,7 +35,7 @@ export default tseslint.config(
     rules: { 'i18next/no-literal-string': ['error', { mode: 'jsx-text-only' }] },
   },
   {
-    files: ['*.config.{js,ts}', 'eslint.config.js'],
+    files: ['*.config.{js,ts}', 'eslint.config.js', 'e2e/**/*.ts'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node },
   },

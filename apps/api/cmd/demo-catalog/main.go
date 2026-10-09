@@ -19,13 +19,11 @@ import (
 
 	"github.com/caarlos0/env/v11"
 
+	"github.com/CarlosSV923/GameExplorer/apps/api/internal/catalog/domain/consoles"
 	metadataapp "github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/application"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/domain"
 	"github.com/CarlosSV923/GameExplorer/apps/api/internal/metadata/infrastructure/igdb"
 )
-
-// platforms are the six built-in consoles (IGDB ids, same order as the seed).
-var platforms = []int64{130, 5, 21, 7, 8, 9}
 
 // required titles must exist in the catalog because the demo's sample files
 // (spec RF-64) and the mockups use them.
@@ -37,8 +35,9 @@ var required = []struct {
 	{130, "Inside"},
 	{130, "The Rogue Prince of Persia"},
 	{130, "Animal Crossing: New Horizons"},
-	{7, "Final Fantasy VII"},
-	{21, "Metroid Prime"},
+	{130, "Splatoon 3"},
+	{5, "The Legend of Zelda: Twilight Princess"},
+	{38, "Daxter"},
 }
 
 type credentials struct {
@@ -75,7 +74,7 @@ type catalogGame struct {
 
 func main() {
 	out := flag.String("out", "../web/src/modules/metadata/infrastructure/demo/catalog.json", "output file")
-	perPlatform := flag.Int("per-platform", 14, "top-rated games per platform")
+	perPlatform := flag.Int("per-platform", 18, "top-rated games per platform")
 	flag.Parse()
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -86,6 +85,11 @@ func main() {
 }
 
 func run(out string, perPlatform int, log *slog.Logger) error {
+	// The consoles defined in code, in their order (spec §6).
+	var platforms []int64
+	for _, c := range consoles.All() {
+		platforms = append(platforms, c.IGDBPlatformID)
+	}
 	var creds credentials
 	if err := env.Parse(&creds); err != nil {
 		return err

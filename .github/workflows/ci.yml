@@ -89,3 +89,29 @@ jobs:
         run: pnpm build:web
         env:
           VITE_DATA_SOURCE: demo
+
+  e2e:
+    name: E2E (demo)
+    runs-on: ubuntu-latest
+    container:
+      # Same version as @playwright/test in apps/web.
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Desktop, tablet and phone
+        run: pnpm e2e:web
+        env:
+          HOME: /root
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: playwright-traces
+          path: apps/web/test-results
+          retention-days: 7

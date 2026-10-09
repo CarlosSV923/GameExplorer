@@ -27,6 +27,15 @@ export interface UploadCallbacks {
   onError: (error: AppError) => void
 }
 
+/** A ready-made file to try the flow with (the demo's, RF-64). */
+export interface SampleFile {
+  /** Names its texts: samples.<id>.title / .detail. */
+  id: 'switch' | 'wii' | 'psp' | 'unassigned'
+  file: File
+  /** The console the form starts with (none: to the unassigned section). */
+  console?: string
+}
+
 export interface UploadHandle {
   /** Stops sending; the server keeps what it got (it can be resumed). */
   abort: () => void
@@ -51,6 +60,8 @@ export interface IngestionPorts {
   cancel(jobId: string): Promise<UploadJob>
   plan(jobId: string, request: CommitRequest): Promise<CommitPlan>
   commit(jobId: string, request: CommitRequest): Promise<CommitResult>
+  /** Sample files to try the flow with; only adapters that have them (the demo). */
+  samples?(): SampleFile[]
 }
 
 export const [IngestionContext, useIngestionPorts] = createPortContext<IngestionPorts>('Ingestion')

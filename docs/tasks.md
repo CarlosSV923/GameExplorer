@@ -151,9 +151,10 @@ Depende de: 10 · Cubre: RF-03, RF-07b, RF-26, RF-26a, RF-27, RF-27a · Versión
 
 ## Fase 11 — Modo demo
 Depende de: 10.5 · Cubre: RF-60 a RF-65
-- [ ] Adaptadores `demo/`, catálogo fijo, archivos de ejemplo, descargas simuladas, banner
-- [ ] E2E en modo demo (escritorio y perfiles táctiles) en CI
-- [ ] Proyecto en Vercel (`apps/web`, `VITE_DATA_SOURCE=demo`)
+- [x] Catálogo fijo regenerado para Switch, Wii y PSP (RF-61): 60 juegos con `task demo-catalog`, que ahora toma las consolas definidas en código
+- [x] Adaptadores `demo/` con biblioteca sembrada, archivos de ejemplo (4), descargas simuladas, banner y sin login (RF-60, RF-62 a RF-65). Los archivos de ejemplo llegan por un método opcional del puerto de ingestión (`samples`), así la UI no sabe qué adaptadores hay.
+- [x] E2E en modo demo con Playwright (escritorio, tablet y móvil) en CI y con `task e2e` (Docker). Hallazgo corregido: al asignar, el nombre precargado recibía el foco y abría sus sugerencias; al tocar una consola la lista se cerraba, el diálogo saltaba y el toque se perdía.
+- [ ] `vercel.json` y guía ([`deploy/vercel/README.md`](../deploy/vercel/README.md)) listos; falta que el usuario importe el repo en Vercel y la URL va al README
 
 ## Fase 12 — Producción y portfolio
 Depende de: 11

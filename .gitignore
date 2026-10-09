@@ -5,6 +5,8 @@ node_modules/
 dist/
 build/
 coverage/
+test-results/
+playwright-report/
 apps/api/bin/
 apps/api/tmp/
 *.exe

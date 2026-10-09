@@ -13,6 +13,9 @@ import { DropOverlay } from '@/modules/ingestion/ui/UploadsScreen'
 import { HealthBanner } from '@/modules/system/ui/HealthBanner'
 import { useAction } from '@/shared/input'
 
+import { dataSource } from './config'
+import { DemoBanner } from './DemoBanner'
+
 function visible(el: HTMLElement): boolean {
   return el.getClientRects().length > 0
 }
@@ -103,6 +106,7 @@ export function Shell() {
   return (
     <UploadFormContext value={openForm}>
       <HealthBanner />
+      {dataSource === 'demo' && <DemoBanner />}
       <Outlet />
       <DropOverlay consoleSlug={screenConsole} />
       {form && (

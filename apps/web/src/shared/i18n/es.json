@@ -507,5 +507,30 @@
     "conflictTitle": "Su lugar está ocupado",
     "conflictBody": "Después de enviarlo a la papelera guardaste otra copia. Si restauras «{{title}}», la actual va a la papelera.",
     "replace": "Reemplazar"
+  },
+  "demo": {
+    "title": "Modo demo:",
+    "body": "no hay servidor. Tus archivos no salen del navegador y todo vuelve a empezar al recargar."
+  },
+  "samples": {
+    "title": "Probar con archivos de ejemplo",
+    "intro": "Archivos simulados: no pesan nada y recorren todo el flujo de subida.",
+    "try": "Probar",
+    "switch": {
+      "title": "Switch: base, update y DLC",
+      "detail": "Al descomprimir pide el tipo de cada archivo. La base ya está en la biblioteca: verás el aviso de duplicado."
+    },
+    "wii": {
+      "title": "Wii con contraseña",
+      "detail": "Pide la contraseña al descomprimir. Pista: es «demo»."
+    },
+    "psp": {
+      "title": "PSP sin archivos válidos",
+      "detail": "Trae un juego de Wii: verás el error con cambiar de consola o mandarlo a No asignados."
+    },
+    "unassigned": {
+      "title": "Sin consola, a No asignados",
+      "detail": "Se descomprime en No asignados. Luego asigna la entrada entera y deja algún archivo con «No guardar»."
+    }
   }
 }
